@@ -1,0 +1,50 @@
+.PHONY: dev stop backend frontend infra build clean
+
+# Start infrastructure (APISIX + etcd + PostgreSQL)
+infra:
+	docker compose up -d
+
+infra-down:
+	docker compose down
+
+# Backend
+backend:
+	cd backend && air
+
+backend-run:
+	cd backend && go run ./cmd/gateway-api
+
+backend-build:
+	cd backend && go build -o gateway-api ./cmd/gateway-api
+
+backend-test:
+	cd backend && go test ./...
+
+# Frontend
+frontend:
+	cd frontend && pnpm dev
+
+frontend-build:
+	cd frontend && pnpm build
+
+# Development: starts infra, waits for readiness, then runs backend + frontend
+dev:
+	@bash dev.sh
+
+# Stop everything (backend + frontend + infra)
+stop:
+	@echo "Stopping backend..."
+	@-pkill -f "gateway-api" 2>/dev/null || true
+	@-pkill -f "air" 2>/dev/null || true
+	@echo "Stopping frontend..."
+	@-pkill -f "next-server" 2>/dev/null || true
+	@-pkill -f "next dev" 2>/dev/null || true
+	@echo "Stopping infrastructure..."
+	@docker compose down
+	@echo "All stopped."
+
+# Clean
+clean:
+	rm -f backend/gateway-api
+	rm -rf backend/tmp
+	rm -rf frontend/.next

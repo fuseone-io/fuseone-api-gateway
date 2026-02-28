@@ -1,0 +1,37 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/backend/gateway-api
+
+# Go
+/backend/vendor/
+/backend/tmp/
+
+# Node
+/frontend/node_modules/
+/frontend/.next/
+/frontend/out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config (contains secrets)
+backend/config.yaml
+
+# Docker
+docker-compose.override.yml
