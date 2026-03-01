@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.sensedia.com)",
+      "WebFetch(domain:www.sensedia.com)",
+      "Bash(pnpm tsc --noEmit)"
+    ]
+  }
+}

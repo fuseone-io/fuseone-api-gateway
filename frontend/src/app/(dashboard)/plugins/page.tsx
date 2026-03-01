@@ -34,6 +34,9 @@ import {
   Activity,
   CircleDot,
   Loader2,
+  Info,
+  CheckCircle2,
+  AlertTriangle,
   type LucideIcon,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -47,6 +50,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { api } from "@/lib/api-client"
 import { PageHeader } from "@/components/page-header"
 import {
@@ -55,6 +64,7 @@ import {
   type PluginCategory,
   type PluginDefinition,
 } from "@/lib/constants"
+import { PLUGIN_DOCS } from "@/lib/plugin-docs"
 
 // --- Icon map ---
 
@@ -128,6 +138,7 @@ const CATEGORY_BADGE_STYLES: Record<PluginCategory, { bg: string; text: string; 
   traffic: { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", border: "border-amber-500/20" },
   transformation: { bg: "bg-purple-500/10", text: "text-purple-600 dark:text-purple-400", border: "border-purple-500/20" },
   observability: { bg: "bg-green-500/10", text: "text-green-600 dark:text-green-400", border: "border-green-500/20" },
+  ai: { bg: "bg-cyan-500/10", text: "text-cyan-600 dark:text-cyan-400", border: "border-cyan-500/20" },
 }
 
 const PHASE_BADGE_STYLES: Record<string, { bg: string; text: string }> = {
@@ -184,6 +195,12 @@ export default function PluginsPage() {
   const [search, setSearch] = useState("")
   const [activeCategory, setActiveCategory] = useState<PluginCategory | "all">("all")
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE)
+  const [detailPlugin, setDetailPlugin] = useState<string | null>(null)
+
+  const detailData = useMemo(() => {
+    if (!detailPlugin) return null
+    return enrichPlugin(detailPlugin)
+  }, [detailPlugin, plugins])
 
   useEffect(() => {
     api
@@ -245,8 +262,8 @@ export default function PluginsPage() {
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
-        title="Plugin Catalog"
-        description="Discover and manage available plugins for your API Gateway."
+        title="Policy Catalog"
+        description="Discover available policies for your API Gateway."
       />
 
       {/* Search bar — full width */}
@@ -326,7 +343,11 @@ export default function PluginsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <TooltipProvider delayDuration={300}>
               {visible.map((plugin) => (
-                <PluginCard key={plugin.name} plugin={plugin} />
+                <PluginCard
+                  key={plugin.name}
+                  plugin={plugin}
+                  onDetail={() => setDetailPlugin(plugin.name)}
+                />
               ))}
             </TooltipProvider>
           </div>
@@ -349,6 +370,189 @@ export default function PluginsPage() {
           )}
         </>
       )}
+
+      {/* Detail Sheet */}
+      <Sheet open={!!detailPlugin} onOpenChange={() => setDetailPlugin(null)}>
+        <SheetContent side="right" className="overflow-y-auto" style={{ maxWidth: "36rem" }}>
+          <SheetTitle className="sr-only">Policy Details</SheetTitle>
+          {detailData && (
+            <PluginDetailSheet
+              plugin={detailData}
+              onNavigate={(name) => setDetailPlugin(name)}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
+    </div>
+  )
+}
+
+// --- Plugin Detail Sheet ---
+
+function PluginDetailSheet({
+  plugin,
+  onNavigate,
+}: {
+  plugin: EnrichedPlugin
+  onNavigate: (name: string) => void
+}) {
+  const IconComp = getIcon(plugin.icon ?? undefined)
+  const catStyle = plugin.category ? CATEGORY_BADGE_STYLES[plugin.category] : null
+  const phaseStyle = plugin.phase ? PHASE_BADGE_STYLES[plugin.phase] : null
+  const catMeta = plugin.category
+    ? PLUGIN_CATEGORIES.find((c) => c.value === plugin.category)
+    : null
+  const doc = PLUGIN_DOCS[plugin.name]
+
+  return (
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-start gap-3">
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+            catStyle ? catStyle.bg : "bg-muted"
+          }`}
+        >
+          <IconComp className={`h-5 w-5 ${catStyle ? catStyle.text : "text-muted-foreground"}`} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-lg font-semibold">{plugin.label}</h2>
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            {catMeta && (
+              <Badge
+                variant="outline"
+                className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wider border ${catStyle?.border} ${catStyle?.bg} ${catStyle?.text}`}
+              >
+                {catMeta.label}
+              </Badge>
+            )}
+            {phaseStyle && plugin.phase && (
+              <Badge
+                variant="outline"
+                className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wider ${phaseStyle.bg} ${phaseStyle.text} border-transparent`}
+              >
+                {plugin.phase}
+              </Badge>
+            )}
+            {plugin.isManaged && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                Managed
+              </Badge>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {doc ? (
+        <>
+          {/* Overview */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Overview</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {doc.overview}
+            </p>
+          </div>
+
+          {/* Use Cases */}
+          {doc.useCases.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Common Use Cases</h3>
+              <ul className="space-y-1.5">
+                {doc.useCases.map((uc, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <span className="text-primary mt-0.5 shrink-0">•</span>
+                    {uc}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Configuration Examples */}
+          {doc.examples.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold">Configuration Examples</h3>
+              {doc.examples.map((ex, i) => (
+                <div key={i} className="space-y-1.5">
+                  <p className="text-sm font-medium">{ex.title}</p>
+                  <p className="text-xs text-muted-foreground">{ex.description}</p>
+                  <pre className="text-xs bg-muted rounded-md p-3 overflow-x-auto font-mono">
+                    {JSON.stringify(ex.config, null, 2)}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Best Practices */}
+          {doc.bestPractices.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Best Practices</h3>
+              <ul className="space-y-1.5">
+                {doc.bestPractices.map((bp, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500 mt-0.5 shrink-0" />
+                    {bp}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Cautions */}
+          {doc.cautions.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Cautions</h3>
+              <ul className="space-y-1.5">
+                {doc.cautions.map((c, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+                    {c}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Related Plugins */}
+          {doc.relatedPlugins && doc.relatedPlugins.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Related Policies</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {doc.relatedPlugins.map((name) => {
+                  const related = PLUGINS.find((p) => p.name === name)
+                  return (
+                    <Badge
+                      key={name}
+                      variant="outline"
+                      className="cursor-pointer hover:bg-muted transition-colors"
+                      onClick={() => onNavigate(name)}
+                    >
+                      {related?.label || name}
+                    </Badge>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold">Overview</h3>
+          <p className="text-sm text-muted-foreground">{plugin.description}</p>
+          <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3 mt-4">
+            <Info className="h-4 w-4 text-muted-foreground shrink-0" />
+            <p className="text-xs text-muted-foreground">
+              Detailed documentation for this policy will be available in a future update.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="pt-4 border-t">
+        <code className="text-xs text-muted-foreground font-mono">{plugin.name}</code>
+      </div>
     </div>
   )
 }
@@ -396,7 +600,7 @@ function FilterChip({
 
 // --- Plugin Card ---
 
-function PluginCard({ plugin }: { plugin: EnrichedPlugin }) {
+function PluginCard({ plugin, onDetail }: { plugin: EnrichedPlugin; onDetail: () => void }) {
   const IconComp = getIcon(plugin.icon ?? undefined)
   const catStyle = plugin.category ? CATEGORY_BADGE_STYLES[plugin.category] : null
   const phaseStyle = plugin.phase ? PHASE_BADGE_STYLES[plugin.phase] : null
@@ -451,7 +655,7 @@ function PluginCard({ plugin }: { plugin: EnrichedPlugin }) {
       </Tooltip>
 
       {/* Footer */}
-      <div className="flex items-center justify-between mt-3 pt-2.5 border-t">
+      <div className="flex items-center justify-between mt-3 pt-2.5 border-t -mx-4 px-4 -mb-3.5 pb-2.5 bg-muted/40 rounded-b-xl">
         <code className="text-[10px] text-muted-foreground font-mono">{plugin.name}</code>
         <div className="flex items-center gap-1">
           {plugin.isManaged && (
@@ -459,6 +663,14 @@ function PluginCard({ plugin }: { plugin: EnrichedPlugin }) {
               Managed
             </Badge>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={onDetail}
+          >
+            Details
+          </Button>
         </div>
       </div>
     </Card>

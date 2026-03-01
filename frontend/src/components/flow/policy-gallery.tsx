@@ -107,6 +107,10 @@ interface PolicyGalleryProps {
   existingPolicies?: string[]
   /** Optional phase filter — when set, only shows plugins matching this phase */
   phaseFilter?: PluginPhase
+  /** Plugin names to hide from the gallery entirely */
+  excludePlugins?: string[]
+  /** Categories to hide entirely from the gallery (use "other" for uncategorized) */
+  excludeCategories?: (PluginCategory | "other")[]
 }
 
 function PluginCard({
@@ -156,7 +160,7 @@ function PluginCard({
   )
 }
 
-export function PolicyGallery({ onAddPolicy, existingPolicies = [], phaseFilter }: PolicyGalleryProps) {
+export function PolicyGallery({ onAddPolicy, existingPolicies = [], phaseFilter, excludePlugins = [], excludeCategories = [] }: PolicyGalleryProps) {
   const [search, setSearch] = useState("")
   const [activeCategory, setActiveCategory] = useState<PluginCategory | "all">("all")
   const [highlight, setHighlight] = useState(false)
@@ -185,6 +189,11 @@ export function PolicyGallery({ onAddPolicy, existingPolicies = [], phaseFilter 
 
   const filtered = useMemo(() => {
     return allPlugins.filter((p) => {
+      if (excludePlugins.length > 0 && excludePlugins.includes(p.name)) return false
+      if (excludeCategories.length > 0) {
+        if (p.category && excludeCategories.includes(p.category)) return false
+        if (!p.category && excludeCategories.includes("other")) return false
+      }
       const matchesSearch =
         !search ||
         p.label.toLowerCase().includes(search.toLowerCase()) ||
@@ -194,7 +203,7 @@ export function PolicyGallery({ onAddPolicy, existingPolicies = [], phaseFilter 
       const matchesPhase = !phaseFilter || p.phase === phaseFilter
       return matchesSearch && matchesCategory && matchesPhase
     })
-  }, [search, activeCategory, phaseFilter, allPlugins])
+  }, [search, activeCategory, phaseFilter, allPlugins, excludePlugins, excludeCategories])
 
   // Group by category for display
   const grouped = useMemo(() => {
@@ -237,60 +246,71 @@ export function PolicyGallery({ onAddPolicy, existingPolicies = [], phaseFilter 
       </div>
 
       {/* Category filter chips */}
-      <div className="px-4 py-2 border-b flex items-center gap-1">
-        <button
-          onClick={() => setActiveCategory("all")}
-          className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors shrink-0 ${
-            activeCategory === "all"
-              ? "bg-primary text-primary-foreground border-primary"
-              : "bg-transparent border-border hover:border-primary/40"
-          }`}
-        >
-          All
-        </button>
-        {PLUGIN_CATEGORIES.slice(0, 2).map((cat) => (
-          <button
-            key={cat.value}
-            onClick={() => setActiveCategory(cat.value)}
-            className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors shrink-0 ${
-              activeCategory === cat.value
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-transparent border-border hover:border-primary/40"
-            }`}
-          >
-            {cat.label.split(" ")[0]}
-          </button>
-        ))}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+      {(() => {
+        const visibleCats = PLUGIN_CATEGORIES.filter(
+          (c) => !excludeCategories.includes(c.value)
+        )
+        const inlineChips = visibleCats.slice(0, 2)
+        const moreChips = visibleCats.slice(2)
+        return (
+          <div className="px-4 py-2 border-b flex items-center gap-1">
             <button
-              className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors shrink-0 flex items-center gap-0.5 ${
-                PLUGIN_CATEGORIES.slice(2).some((c) => c.value === activeCategory)
+              onClick={() => setActiveCategory("all")}
+              className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors shrink-0 ${
+                activeCategory === "all"
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-transparent border-border hover:border-primary/40"
               }`}
             >
-              {PLUGIN_CATEGORIES.slice(2).find((c) => c.value === activeCategory)?.label.split(" ")[0] || "More"}
-              <ChevronDown className="h-2.5 w-2.5" />
+              All
             </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-[140px]">
-            {PLUGIN_CATEGORIES.slice(2).map((cat) => {
-              const CatIcon = CATEGORY_ICONS[cat.value] || Puzzle
-              return (
-                <DropdownMenuItem
-                  key={cat.value}
-                  onClick={() => setActiveCategory(cat.value)}
-                  className="text-xs gap-2"
-                >
-                  <CatIcon className="h-3 w-3 text-muted-foreground shrink-0" />
-                  {cat.label}
-                </DropdownMenuItem>
-              )
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+            {inlineChips.map((cat) => (
+              <button
+                key={cat.value}
+                onClick={() => setActiveCategory(cat.value)}
+                className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors shrink-0 ${
+                  activeCategory === cat.value
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-transparent border-border hover:border-primary/40"
+                }`}
+              >
+                {cat.label.split(" ")[0]}
+              </button>
+            ))}
+            {moreChips.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors shrink-0 flex items-center gap-0.5 ${
+                      moreChips.some((c) => c.value === activeCategory)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-transparent border-border hover:border-primary/40"
+                    }`}
+                  >
+                    {moreChips.find((c) => c.value === activeCategory)?.label.split(" ")[0] || "More"}
+                    <ChevronDown className="h-2.5 w-2.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-[140px]">
+                  {moreChips.map((cat) => {
+                    const CatIcon = CATEGORY_ICONS[cat.value] || Puzzle
+                    return (
+                      <DropdownMenuItem
+                        key={cat.value}
+                        onClick={() => setActiveCategory(cat.value)}
+                        className="text-xs gap-2"
+                      >
+                        <CatIcon className="h-3 w-3 text-muted-foreground shrink-0" />
+                        {cat.label}
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Plugin list */}
       <div className="flex-1 min-h-0 overflow-y-auto">

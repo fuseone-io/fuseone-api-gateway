@@ -10,10 +10,11 @@ import {
   MoreHorizontal,
   Eye,
   Trash2,
-  Power,
-  PowerOff,
-  ArrowRight,
+  Rocket,
   GitBranch,
+  Cable,
+  Download,
+  Copy,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,9 +22,25 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -38,60 +55,41 @@ import {
 } from "@/components/ui/alert-dialog"
 import { api } from "@/lib/api-client"
 import { PageHeader } from "@/components/page-header"
-import { apisixToApi, apisixServiceToApi } from "@/types/api"
-import type { ApiDefinition } from "@/types/api"
+import { exportAsFuseOneJson, exportAsOpenAPIYaml } from "@/lib/openapi-converter"
+import type { ApiDefRecord } from "@/types/api"
+
+const SYNC_BADGE: Record<string, { label: string; className: string }> = {
+  draft: { label: "Draft", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
+  synced: { label: "Synced", className: "bg-green-500/15 text-green-600 border-green-500/30" },
+  out_of_sync: { label: "Out of Sync", className: "bg-orange-500/15 text-orange-600 border-orange-500/30" },
+}
+
+const LIFECYCLE_BADGE: Record<string, { label: string; className: string }> = {
+  draft: { label: "Draft", className: "bg-slate-500/15 text-slate-600 border-slate-500/30" },
+  active: { label: "Active", className: "bg-green-500/15 text-green-600 border-green-500/30" },
+  deprecated: { label: "Deprecated", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
+  retired: { label: "Retired", className: "bg-red-500/15 text-red-600 border-red-500/30" },
+}
 
 export default function ApisPage() {
   const router = useRouter()
-  const [apis, setApis] = useState<ApiDefinition[]>([])
+  const [records, setRecords] = useState<ApiDefRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
-  const [deleteTarget, setDeleteTarget] = useState<ApiDefinition | null>(null)
+  const [syncFilter, setSyncFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [lifecycleFilter, setLifecycleFilter] = useState<string>("all")
+  const [deleteTarget, setDeleteTarget] = useState<ApiDefRecord | null>(null)
+  const [deploying, setDeploying] = useState<string | null>(null)
 
   const loadApis = async () => {
     try {
-      const [servicesData, routesData] = await Promise.all([
-        api.listResource("services"),
-        api.listResource("routes"),
-      ])
-
-      const allRoutes = (routesData.list || []).map(
-        (item) => ((item.value || item) as Record<string, unknown>)
-      )
-      const allServices = (servicesData.list || []).map(
-        (item) => ((item.value || item) as Record<string, unknown>)
-      )
-
-      // Group routes by service_id
-      const routesByService = new Map<string, Record<string, unknown>[]>()
-      const orphanRoutes: Record<string, unknown>[] = []
-
-      for (const route of allRoutes) {
-        const serviceId = route.service_id as string | undefined
-        if (serviceId) {
-          const existing = routesByService.get(serviceId) || []
-          existing.push(route)
-          routesByService.set(serviceId, existing)
-        } else {
-          orphanRoutes.push(route)
-        }
-      }
-
-      const result: ApiDefinition[] = []
-
-      // Multi-flow APIs (Service + Routes)
-      for (const svc of allServices) {
-        const svcId = svc.id as string
-        const routes = routesByService.get(svcId) || []
-        result.push(apisixServiceToApi(svc, routes))
-      }
-
-      // Legacy single-route APIs (no service)
-      for (const route of orphanRoutes) {
-        result.push(apisixToApi(route))
-      }
-
-      setApis(result)
+      const params: Record<string, string> = { page_size: "100" }
+      if (search) params.search = search
+      if (syncFilter !== "all") params.sync_status = syncFilter
+      if (lifecycleFilter !== "all") params.lifecycle_status = lifecycleFilter
+      const result = await api.listApis(params)
+      setRecords(result.data || [])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load APIs")
     } finally {
@@ -100,24 +98,14 @@ export default function ApisPage() {
   }
 
   useEffect(() => {
-    loadApis()
-  }, [])
+    const timer = setTimeout(loadApis, search ? 300 : 0)
+    return () => clearTimeout(timer)
+  }, [search, syncFilter, lifecycleFilter])
 
   const handleDelete = async () => {
-    if (!deleteTarget?.id) return
+    if (!deleteTarget) return
     try {
-      if (deleteTarget.serviceId) {
-        // Delete all routes first, then service
-        for (const flow of deleteTarget.flows) {
-          if (flow.routeId) {
-            await api.deleteResource("routes", flow.routeId)
-          }
-        }
-        await api.deleteResource("services", deleteTarget.serviceId)
-      } else {
-        // Legacy: delete single route
-        await api.deleteResource("routes", deleteTarget.id)
-      }
+      await api.deleteApi(deleteTarget.id)
       toast.success("API deleted")
       setDeleteTarget(null)
       loadApis()
@@ -126,14 +114,33 @@ export default function ApisPage() {
     }
   }
 
-  const filtered = apis.filter((a) => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (
-      a.name.toLowerCase().includes(q) ||
-      a.description.toLowerCase().includes(q) ||
-      a.flows.some((f) => f.entrypoint.uri.toLowerCase().includes(q))
-    )
+  const handleDeploy = async (record: ApiDefRecord) => {
+    setDeploying(record.id)
+    try {
+      await api.deployApi(record.id)
+      toast.success("API deployed")
+      loadApis()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to deploy API")
+    } finally {
+      setDeploying(null)
+    }
+  }
+
+  const handleClone = async (record: ApiDefRecord) => {
+    try {
+      const cloned = await api.cloneApi(record.id)
+      toast.success(`Cloned to ${cloned.version}`)
+      router.push(`/apis/${cloned.id}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to clone API")
+    }
+  }
+
+  // Client-side status filter (status is inside the definition JSON)
+  const filtered = records.filter((r) => {
+    if (statusFilter === "all") return true
+    return r.definition?.status === statusFilter
   })
 
   if (loading) {
@@ -143,11 +150,10 @@ export default function ApisPage() {
           <Skeleton className="h-9 w-48" />
           <Skeleton className="h-9 w-32" />
         </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-44 rounded-xl" />
-          ))}
-        </div>
+        <Skeleton className="h-10 w-full" />
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
       </div>
     )
   }
@@ -167,30 +173,67 @@ export default function ApisPage() {
         }
       />
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search APIs..."
-          className="pl-9"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      {/* Search & Filters */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search APIs..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="enabled">Enabled</SelectItem>
+            <SelectItem value="disabled">Disabled</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={syncFilter} onValueChange={setSyncFilter}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Sync Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Sync</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="synced">Synced</SelectItem>
+            <SelectItem value="out_of_sync">Out of Sync</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={lifecycleFilter} onValueChange={setLifecycleFilter}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Lifecycle" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Lifecycle</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="deprecated">Deprecated</SelectItem>
+            <SelectItem value="retired">Retired</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* API Cards Grid */}
+      {/* Table */}
       {filtered.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <p className="text-lg font-medium text-muted-foreground mb-2">
-              {search ? "No APIs match your search" : "No APIs created yet"}
+              {search || syncFilter !== "all" || statusFilter !== "all" || lifecycleFilter !== "all"
+                ? "No APIs match your filters"
+                : "No APIs created yet"}
             </p>
             <p className="text-sm text-muted-foreground mb-4">
-              {search
-                ? "Try a different search term"
+              {search || syncFilter !== "all" || statusFilter !== "all" || lifecycleFilter !== "all"
+                ? "Try adjusting your search or filters"
                 : "Create your first API to get started with the visual flow designer"}
             </p>
-            {!search && (
+            {!search && syncFilter === "all" && statusFilter === "all" && lifecycleFilter === "all" && (
               <Button asChild>
                 <Link href="/apis/new">
                   <Plus className="mr-2 h-4 w-4" />
@@ -201,34 +244,91 @@ export default function ApisPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((apiDef) => {
-            const firstFlow = apiDef.flows[0]
-            const totalPolicies = apiDef.flows.reduce((sum, f) => sum + f.policies.length, 0)
-            // Use serviceId for multi-flow APIs, id for legacy
-            const linkId = apiDef.serviceId || apiDef.id
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead className="w-[60px] text-center">Version</TableHead>
+                <TableHead>URI</TableHead>
+                <TableHead className="w-[80px] text-center">Flows</TableHead>
+                <TableHead className="w-[90px] text-center">Policies</TableHead>
+                <TableHead className="w-[100px] text-center">Lifecycle</TableHead>
+                <TableHead className="w-[110px] text-center">Sync</TableHead>
+                <TableHead className="w-[60px]" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((record) => {
+                const def = record.definition
+                const firstFlow = def?.flows?.[0]
+                const totalPolicies = def?.flows?.reduce(
+                  (sum: number, f: { policies: unknown[] }) => sum + (f.policies?.length || 0),
+                  0
+                ) || 0
+                const flowCount = def?.flows?.length || 0
+                const syncInfo = SYNC_BADGE[record.sync_status] || SYNC_BADGE.draft
+                const lifecycleInfo = LIFECYCLE_BADGE[record.lifecycle_status] || LIFECYCLE_BADGE.draft
+                const contextPath = def?.context_path || ""
+                const primaryUri = contextPath || firstFlow?.entrypoint?.uri || "/"
 
-            return (
-              <Card
-                key={linkId}
-                className="group cursor-pointer hover:border-primary/40 hover:shadow-md transition-all"
-                onClick={() => router.push(`/apis/${linkId}`)}
-              >
-                <CardContent className="p-5">
-                  {/* Top row */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold truncate">
-                        {apiDef.name || "Untitled API"}
-                      </h3>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">
-                        {apiDef.description || "No description"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5 ml-2" onClick={(e) => e.stopPropagation()}>
-                      <Badge variant={apiDef.status === "enabled" ? "default" : "secondary"}>
-                        {apiDef.status}
+                return (
+                  <TableRow
+                    key={record.id}
+                    className="cursor-pointer"
+                    onClick={() => router.push(`/apis/${record.id}`)}
+                  >
+                    <TableCell className="max-w-[280px]">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Cable className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate" title={record.name}>
+                            {record.name || "Untitled API"}
+                          </p>
+                          {record.description && (
+                            <p className="text-xs text-muted-foreground truncate mt-0.5" title={record.description}>
+                              {record.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className="text-[10px] font-mono">
+                        {record.version}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <code className="text-xs font-mono text-muted-foreground">
+                        {primaryUri}
+                      </code>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {flowCount > 1 ? (
+                        <Badge variant="outline" className="text-[10px] gap-1">
+                          <GitBranch className="h-3 w-3" />
+                          {flowCount}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{flowCount}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-xs text-muted-foreground">{totalPolicies}</span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className={`text-[10px] ${lifecycleInfo.className}`}>
+                        {lifecycleInfo.label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className={`text-[10px] ${syncInfo.className}`}>
+                        {syncInfo.label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -236,62 +336,43 @@ export default function ApisPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => router.push(`/apis/${linkId}`)}>
+                          <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}`)}>
                             <Eye className="mr-2 h-3.5 w-3.5" /> View
                           </DropdownMenuItem>
+                          {(record.sync_status === "draft" || record.sync_status === "out_of_sync") && (
+                            <DropdownMenuItem
+                              onClick={() => handleDeploy(record)}
+                              disabled={deploying === record.id}
+                            >
+                              <Rocket className="mr-2 h-3.5 w-3.5" />
+                              {deploying === record.id ? "Deploying..." : "Deploy"}
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => handleClone(record)}>
+                            <Copy className="mr-2 h-3.5 w-3.5" /> Clone to New Version
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => record.definition && exportAsFuseOneJson(record.definition)}>
+                            <Download className="mr-2 h-3.5 w-3.5" /> Export JSON
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => record.definition && exportAsOpenAPIYaml(record.definition)}>
+                            <Download className="mr-2 h-3.5 w-3.5" /> Export OpenAPI
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive"
-                            onClick={() => setDeleteTarget(apiDef)}
+                            onClick={() => setDeleteTarget(record)}
                           >
                             <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </div>
-                  </div>
-
-                  {/* Flows info */}
-                  <div className="flex items-center gap-2 mb-3">
-                    {apiDef.flows.length > 1 ? (
-                      <Badge variant="outline" className="text-xs gap-1">
-                        <GitBranch className="h-3 w-3" />
-                        {apiDef.flows.length} flows
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="font-mono text-xs shrink-0">
-                        {firstFlow?.entrypoint.methods.length
-                          ? firstFlow.entrypoint.methods.join(", ")
-                          : "ALL"}
-                      </Badge>
-                    )}
-                    <span className="font-mono text-sm truncate">
-                      {firstFlow?.entrypoint.uri || "/"}
-                    </span>
-                    {apiDef.flows.length > 1 && (
-                      <Badge variant="secondary" className="text-[10px]">
-                        +{apiDef.flows.length - 1}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Mini flow visualization */}
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="shrink-0">Client</span>
-                    <ArrowRight className="h-3 w-3 shrink-0" />
-                    <Badge variant="secondary" className="text-[10px]">
-                      {totalPolicies} {totalPolicies === 1 ? "policy" : "policies"}
-                    </Badge>
-                    <ArrowRight className="h-3 w-3 shrink-0" />
-                    <span className="font-mono truncate shrink-0">
-                      {apiDef.endpoint.nodes[0]
-                        ? `${apiDef.endpoint.nodes[0].host}:${apiDef.endpoint.nodes[0].port}`
-                        : "upstream"}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
         </div>
       )}
 
@@ -301,7 +382,8 @@ export default function ApisPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete API</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this API, all its flows, and its configuration from the gateway.
+              This will permanently delete this API definition
+              {deleteTarget?.sync_status === "synced" && " and remove it from the API Gateway"}.
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -61,6 +61,13 @@ Environment: copy `.env.example` to `.env` and configure.
 - APISIX is an internal implementation detail — users see "FuseOne API Gateway" or just "API Gateway".
 - Code-level references (variable names, types, API paths) may still use `apisix` (e.g., `APISIXClient`, `/api/apisix/`).
 
+### Testing (TDD)
+- **Always use Test-Driven Development (TDD):** Write tests first, then implement. Red → Green → Refactor.
+- Backend: Go tests with `_test.go` files alongside source files. Run with `go test ./...`
+- Frontend: Use Vitest for unit/integration tests. Test files at `__tests__/` or `*.test.ts(x)`.
+- Before implementing a new feature or fixing a bug, write a failing test that describes the expected behavior.
+- All PRs should include tests that cover the new/changed functionality.
+
 ### Adding shadcn components
 ```bash
 cd frontend && pnpm dlx shadcn@latest add <component-name>

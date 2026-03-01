@@ -52,7 +52,7 @@ export default function GlobalRulesPage() {
   const fetchRules = () => {
     setLoading(true)
     api
-      .listResource("global_rules")
+      .listResource("global-rules")
       .then((data) => {
         const items = (data?.list || []).map((node) => node.value as APISIXGlobalRule)
         setRules(items)
@@ -68,8 +68,8 @@ export default function GlobalRulesPage() {
   const handleDelete = async () => {
     if (!deleteId) return
     try {
-      await api.deleteResource("global_rules", deleteId)
-      toast.success("Global rule deleted")
+      await api.deleteResource("global-rules", deleteId)
+      toast.success("Global policy deleted")
       fetchRules()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Delete failed")
@@ -97,13 +97,13 @@ export default function GlobalRulesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Global Rules"
-        description="Manage plugins that apply to all routes globally"
+        title="Global Policies"
+        description="Manage plugins that apply to all API traffic"
         actions={
           <Button asChild>
             <Link href="/global-rules/new">
               <Plus className="mr-2 h-4 w-4" />
-              New Global Rule
+              New Policy
             </Link>
           </Button>
         }
@@ -112,7 +112,7 @@ export default function GlobalRulesPage() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search rules..."
+          placeholder="Search policies..."
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -145,11 +145,11 @@ export default function GlobalRulesPage() {
                   <div className="flex flex-col items-center gap-2">
                     <ShieldCheck className="h-8 w-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
-                      {search ? "No rules match your search" : "No global rules configured"}
+                      {search ? "No policies match your search" : "No global policies configured"}
                     </p>
                     {!search && (
                       <Button asChild variant="outline" size="sm">
-                        <Link href="/global-rules/new">Create your first global rule</Link>
+                        <Link href="/global-rules/new">Create your first global policy</Link>
                       </Button>
                     )}
                   </div>
@@ -218,11 +218,11 @@ export default function GlobalRulesPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Global Rule</AlertDialogTitle>
+            <AlertDialogTitle>Delete Global Policy</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this global rule? This action cannot be
-              undone. All routes will be affected as the plugins in this rule will no
-              longer be applied globally.
+              Are you sure you want to delete this global policy? This action cannot be
+              undone. All API traffic will be affected as these plugins will no
+              longer be applied.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

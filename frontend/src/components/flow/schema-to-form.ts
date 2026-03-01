@@ -30,12 +30,31 @@ interface JsonSchema {
   description?: string
 }
 
-// Fields that typically hold secrets
+// Fields that typically hold secrets — matches exact names and suffix patterns
 const SECRET_FIELD_NAMES = new Set([
-  "password", "secret", "secret_key", "client_secret",
-  "key", "api_key", "token", "auth_header",
-  "redis_password", "redis_cluster_password",
+  // Passwords
+  "password", "redis_password", "redis_cluster_password",
+  "admin_password", "sasl_password",
+  // Keys
+  "secret", "secret_key", "client_secret", "signing_key",
+  "api_key", "access_key", "private_key", "encryption_key",
+  "key", "hmac_key",
+  // Tokens & Auth
+  "token", "access_token", "refresh_token", "bearer_token",
+  "auth_header", "auth_token", "auth_value",
+  // Certificates
+  "client_cert", "client_key", "client_cert_key",
+  "ssl_client_cert", "ssl_client_key",
+  "tls_client_cert", "tls_client_key",
+  // Vault / Cloud
+  "vault_token", "service_account_key",
 ])
+
+// Suffix patterns that indicate sensitive fields
+const SECRET_FIELD_SUFFIXES = [
+  "_password", "_secret", "_key", "_token",
+  "_cert", "_certificate", "_private_key",
+]
 
 function resolveType(prop: JsonSchemaProperty): string {
   if (Array.isArray(prop.type)) {
@@ -77,7 +96,10 @@ function propertyToFieldDef(
   }
 
   // Secret/password fields
-  if (SECRET_FIELD_NAMES.has(key) || prop.encrypted) {
+  const isSecret = SECRET_FIELD_NAMES.has(key)
+    || prop.encrypted
+    || SECRET_FIELD_SUFFIXES.some((suffix) => key.endsWith(suffix))
+  if (isSecret) {
     return {
       key,
       label,

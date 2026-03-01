@@ -137,6 +137,62 @@ export const api = {
     return request<{ data: import("@/types/auth").AuditLog[]; meta: { total: number; page: number; page_size: number } }>(`/api/audit${qs}`)
   },
 
+  // API Definitions (draft/deploy)
+  listApis: (params?: Record<string, string>) => {
+    const qs = params ? "?" + new URLSearchParams(params).toString() : ""
+    return request<{ data: import("@/types/api").ApiDefRecord[]; meta: { total: number; page: number; page_size: number } }>(`/api/apis${qs}`)
+  },
+
+  getApi: (id: string) =>
+    request<{ data: import("@/types/api").ApiDefRecord }>(`/api/apis/${id}`).then((r) => r.data),
+
+  createApi: (data: { name: string; description: string; definition: import("@/types/api").ApiDefinition }) =>
+    request<{ data: import("@/types/api").ApiDefRecord }>("/api/apis", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  updateApi: (id: string, data: { name: string; description: string; definition: import("@/types/api").ApiDefinition }) =>
+    request<{ data: import("@/types/api").ApiDefRecord }>(`/api/apis/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  deployApi: (id: string) =>
+    request<{ data: import("@/types/api").ApiDefRecord }>(`/api/apis/${id}/deploy`, {
+      method: "POST",
+    }).then((r) => r.data),
+
+  deleteApi: (id: string) =>
+    request<{ data: unknown }>(`/api/apis/${id}`, { method: "DELETE" }),
+
+  // API Versioning
+  cloneApi: (id: string, data?: import("@/types/api").CloneApiRequest) =>
+    request<{ data: import("@/types/api").ApiDefRecord }>(`/api/apis/${id}/clone`, {
+      method: "POST",
+      body: JSON.stringify(data || {}),
+    }).then((r) => r.data),
+
+  getApiVersions: (id: string) =>
+    request<{ data: import("@/types/api").ApiDefRecord[] }>(`/api/apis/${id}/versions`).then((r) => r.data),
+
+  // API Lifecycle
+  deprecateApi: (id: string, data?: import("@/types/api").DeprecateApiRequest) =>
+    request<{ data: import("@/types/api").ApiDefRecord }>(`/api/apis/${id}/deprecate`, {
+      method: "POST",
+      body: JSON.stringify(data || {}),
+    }).then((r) => r.data),
+
+  retireApi: (id: string) =>
+    request<{ data: import("@/types/api").ApiDefRecord }>(`/api/apis/${id}/retire`, {
+      method: "POST",
+    }).then((r) => r.data),
+
+  undeprecateApi: (id: string) =>
+    request<{ data: import("@/types/api").ApiDefRecord }>(`/api/apis/${id}/undeprecate`, {
+      method: "POST",
+    }).then((r) => r.data),
+
   // Local Secrets
   listSecrets: (params?: Record<string, string>) => {
     const qs = params ? "?" + new URLSearchParams(params).toString() : ""

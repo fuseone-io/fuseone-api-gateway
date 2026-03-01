@@ -15,16 +15,13 @@ import { Fragment } from "react"
 const LABELS: Record<string, string> = {
   dashboard: "Dashboard",
   apis: "APIs",
-  routes: "Routes",
-  services: "Services",
-  upstreams: "Upstreams",
-  consumers: "Consumers",
-  "consumer-groups": "Consumer Groups",
-  plugins: "Plugins",
-  "plugin-configs": "Plugin Configs",
-  "global-rules": "Global Rules",
+  applications: "Applications",
+  plans: "Plans",
+  plugins: "Policy Catalog",
+  "plugin-configs": "Policy Templates",
+  "global-rules": "Global Policies",
   ssl: "SSL / Certificates",
-  "stream-routes": "Stream Routes",
+  "stream-routes": "Stream Proxy",
   secrets: "Secrets",
   monitoring: "Monitoring",
   audit: "Audit Log",
@@ -45,7 +42,9 @@ export function BreadcrumbNav() {
     const href = "/" + segments.slice(0, index + 1).join("/")
     const isLast = index === segments.length - 1
     // Check if segment is a dynamic ID (not in our label map)
-    const label = LABELS[segment] || (segment.length > 8 ? `#${segment.slice(0, 6)}...` : segment)
+    // Try sessionStorage for dynamic names (e.g., API name instead of UUID)
+    const storedName = typeof window !== "undefined" ? sessionStorage.getItem(`breadcrumb:${segment}`) : null
+    const label = LABELS[segment] || storedName || (segment.length > 8 ? `#${segment.slice(0, 6)}...` : segment)
 
     return { href, label, isLast }
   })

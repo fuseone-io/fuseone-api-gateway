@@ -63,11 +63,15 @@ func main() {
 	userRepo := repository.NewUserRepository(pool)
 	auditRepo := repository.NewAuditRepository(pool)
 	secretRepo := repository.NewSecretRepository(pool)
+	apiDefRepo := repository.NewApiDefinitionRepository(pool)
 
 	// Initialize services
 	authService := service.NewAuthService(userRepo, &cfg.Auth)
 	apisixClient := service.NewAPISIXClient(&cfg.APISIX, logger)
 	cryptoService := service.NewCryptoService(cfg.Secrets.EncryptionKey)
+
+	// Initialize services (domain)
+	apiDefService := service.NewApiDefinitionService(apiDefRepo, apisixClient, logger)
 
 	// Initialize middleware
 	auditLogger := middleware.NewAuditLogger(auditRepo, logger)
@@ -79,6 +83,7 @@ func main() {
 	pluginHandler := handler.NewPluginHandler(apisixClient)
 	auditHandler := handler.NewAuditHandler(auditRepo)
 	secretHandler := handler.NewSecretHandler(secretRepo, cryptoService, auditLogger)
+	apiDefHandler := handler.NewApiDefinitionHandler(apiDefService, auditLogger)
 
 	// APISIX resource handlers
 	routeHandler := handler.NewAPISIXResourceHandler(apisixClient, auditLogger, "routes")
@@ -145,6 +150,24 @@ func main() {
 		// Plugins (read-only)
 		api.GET("/apisix/plugins", middleware.RequirePermission("plugins:read"), pluginHandler.ListPlugins)
 		api.GET("/apisix/plugins/:name", middleware.RequirePermission("plugins:read"), pluginHandler.GetPluginSchema)
+
+		// API Definitions (draft/deploy workflow)
+		apis := api.Group("/apis")
+		{
+			apis.GET("", middleware.RequirePermission("apis:read"), apiDefHandler.List)
+			apis.GET("/:id", middleware.RequirePermission("apis:read"), apiDefHandler.Get)
+			apis.POST("", middleware.RequirePermission("apis:write"), apiDefHandler.Create)
+			apis.PUT("/:id", middleware.RequirePermission("apis:write"), apiDefHandler.Update)
+			apis.POST("/:id/deploy", middleware.RequirePermission("apis:write"), apiDefHandler.Deploy)
+			apis.DELETE("/:id", middleware.RequirePermission("apis:write"), apiDefHandler.Delete)
+			// Versioning
+			apis.POST("/:id/clone", middleware.RequirePermission("apis:write"), apiDefHandler.Clone)
+			apis.GET("/:id/versions", middleware.RequirePermission("apis:read"), apiDefHandler.GetVersions)
+			// Lifecycle
+			apis.POST("/:id/deprecate", middleware.RequirePermission("apis:write"), apiDefHandler.Deprecate)
+			apis.POST("/:id/retire", middleware.RequirePermission("apis:write"), apiDefHandler.Retire)
+			apis.POST("/:id/undeprecate", middleware.RequirePermission("apis:write"), apiDefHandler.Undeprecate)
+		}
 
 		// Local Secrets vault
 		secrets := api.Group("/secrets")

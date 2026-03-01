@@ -41,6 +41,7 @@ import {
   CircleDot,
   Search,
   Puzzle,
+  FileJson,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -136,6 +137,8 @@ export interface VerticalFlowProps {
   onAddPlugin: (pluginName: string) => void
   existingPlugins?: string[]
   readOnly?: boolean
+  templateName?: string
+  templatePluginCount?: number
 }
 
 /* ── Edge-aligned policy row (Request = icon left, Response = icon right) ── */
@@ -467,6 +470,8 @@ export function VerticalFlow({
   onAddPlugin,
   existingPlugins = [],
   readOnly = false,
+  templateName,
+  templatePluginCount,
 }: VerticalFlowProps) {
   const requestPolicies = flow.policies.filter((p) => p.phase === "request")
   const responsePolicies = flow.policies.filter((p) => p.phase === "response")
@@ -491,6 +496,30 @@ export function VerticalFlow({
           </EdgeRow>
 
           <EdgeLine side="left" />
+
+          {/* Template indicator */}
+          {templateName && (
+            <>
+              <EdgeRow side="left" nodeContent={
+                <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-dashed border-purple-500/40 bg-purple-500/10">
+                  <FileJson className="h-4 w-4 text-purple-500" />
+                </div>
+              }>
+                <div className="w-full rounded-xl border border-dashed border-purple-500/30 bg-purple-500/5 px-3 py-2">
+                  <p className="text-[11px] font-medium text-purple-600 dark:text-purple-400">
+                    Template: {templateName}
+                  </p>
+                  {templatePluginCount != null && (
+                    <p className="text-[10px] text-muted-foreground">
+                      {templatePluginCount} inherited {templatePluginCount === 1 ? "policy" : "policies"}
+                    </p>
+                  )}
+                </div>
+              </EdgeRow>
+              <EdgeLine side="left" />
+            </>
+          )}
+
           <EdgeSectionLabel label="Request Policies" color="bg-blue-500" side="left" />
           <EdgeLine side="left" height="h-3" />
 

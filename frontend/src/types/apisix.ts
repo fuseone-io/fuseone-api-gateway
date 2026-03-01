@@ -50,7 +50,7 @@ export interface APISIXUpstream {
   retries?: number
   retry_timeout?: number
   timeout?: { connect: number; send: number; read: number }
-  scheme?: "http" | "https" | "grpc" | "grpcs"
+  scheme?: "http" | "https" | "grpc" | "grpcs" | "tcp" | "tls"
   checks?: {
     active?: {
       type?: string
@@ -94,7 +94,16 @@ export interface APISIXSSL {
   id?: string
   cert: string
   key: string
+  certs?: string[]
+  keys?: string[]
   snis: string[]
+  type?: "server" | "client"
+  client?: {
+    ca: string
+    depth?: number
+    skip_mtls_uri_regex?: string[]
+  }
+  ssl_protocols?: string[]
   labels?: Record<string, string>
   status?: 0 | 1
   validity_start?: number
@@ -121,14 +130,21 @@ export interface APISIXPluginConfig {
 
 export interface APISIXStreamRoute {
   id?: string
+  name?: string
   desc?: string
+  labels?: Record<string, string>
   remote_addr?: string
   server_addr?: string
   server_port?: number
   sni?: string
   upstream?: APISIXUpstream
   upstream_id?: string
+  service_id?: string
   plugins?: Record<string, unknown>
+  protocol?: {
+    name: string
+    conf?: Record<string, unknown>
+  }
   create_time?: number
   update_time?: number
 }
