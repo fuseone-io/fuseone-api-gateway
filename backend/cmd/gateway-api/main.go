@@ -62,10 +62,12 @@ func main() {
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(pool)
 	auditRepo := repository.NewAuditRepository(pool)
+	secretRepo := repository.NewSecretRepository(pool)
 
 	// Initialize services
 	authService := service.NewAuthService(userRepo, &cfg.Auth)
 	apisixClient := service.NewAPISIXClient(&cfg.APISIX, logger)
+	cryptoService := service.NewCryptoService(cfg.Secrets.EncryptionKey)
 
 	// Initialize middleware
 	auditLogger := middleware.NewAuditLogger(auditRepo, logger)
@@ -76,6 +78,7 @@ func main() {
 	dashboardHandler := handler.NewDashboardHandler(apisixClient)
 	pluginHandler := handler.NewPluginHandler(apisixClient)
 	auditHandler := handler.NewAuditHandler(auditRepo)
+	secretHandler := handler.NewSecretHandler(secretRepo, cryptoService, auditLogger)
 
 	// APISIX resource handlers
 	routeHandler := handler.NewAPISIXResourceHandler(apisixClient, auditLogger, "routes")
@@ -88,7 +91,7 @@ func main() {
 	pluginConfigHandler := handler.NewAPISIXResourceHandler(apisixClient, auditLogger, "plugin_configs")
 	pluginMetadataHandler := handler.NewAPISIXResourceHandler(apisixClient, auditLogger, "plugin_metadata")
 	streamRouteHandler := handler.NewAPISIXResourceHandler(apisixClient, auditLogger, "stream_routes")
-	secretHandler := handler.NewAPISIXResourceHandler(apisixClient, auditLogger, "secrets")
+	apisixSecretHandler := handler.NewAPISIXResourceHandler(apisixClient, auditLogger, "secrets")
 
 	// Setup router
 	gin.SetMode(gin.ReleaseMode)
@@ -137,11 +140,31 @@ func main() {
 		registerResourceRoutes(api, "apisix/plugin-configs", pluginConfigHandler, "plugins")
 		registerResourceRoutes(api, "apisix/plugin-metadata", pluginMetadataHandler, "plugins")
 		registerResourceRoutes(api, "apisix/stream-routes", streamRouteHandler, "stream_routes")
-		registerResourceRoutes(api, "apisix/secrets", secretHandler, "secrets")
+		registerResourceRoutes(api, "apisix/secrets", apisixSecretHandler, "secrets")
 
 		// Plugins (read-only)
 		api.GET("/apisix/plugins", middleware.RequirePermission("plugins:read"), pluginHandler.ListPlugins)
 		api.GET("/apisix/plugins/:name", middleware.RequirePermission("plugins:read"), pluginHandler.GetPluginSchema)
+
+		// Local Secrets vault
+		secrets := api.Group("/secrets")
+		{
+			secrets.GET("", middleware.RequirePermission("secrets:read"), secretHandler.ListSecrets)
+			secrets.GET("/:id", middleware.RequirePermission("secrets:read"), secretHandler.GetSecret)
+			secrets.POST("", middleware.RequirePermission("secrets:write"), secretHandler.CreateSecret)
+			secrets.PUT("/:id", middleware.RequirePermission("secrets:write"), secretHandler.UpdateSecret)
+			secrets.DELETE("/:id", middleware.RequirePermission("secrets:write"), secretHandler.DeleteSecret)
+		}
+
+		// Secret Managers (external: Vault, AWS, GCP)
+		managers := api.Group("/secret-managers")
+		{
+			managers.GET("", middleware.RequirePermission("secrets:read"), secretHandler.ListManagers)
+			managers.GET("/:id", middleware.RequirePermission("secrets:read"), secretHandler.GetManager)
+			managers.POST("", middleware.RequirePermission("secrets:write"), secretHandler.CreateManager)
+			managers.PUT("/:id", middleware.RequirePermission("secrets:write"), secretHandler.UpdateManager)
+			managers.DELETE("/:id", middleware.RequirePermission("secrets:write"), secretHandler.DeleteManager)
+		}
 	}
 
 	// Start server

@@ -48,12 +48,18 @@ Environment: copy `.env.example` to `.env` and configure.
 - Auth types: `src/types/auth.ts`
 - Route groups: `(auth)` for login, `(dashboard)` for authenticated pages
 - Use pnpm as package manager
+- **State management**: Use **Zustand** for client-side state (auth, UI preferences, shared data). Store files go in `src/stores/` (e.g., `src/stores/auth-store.ts`). Keep stores small and focused — one per domain.
 
 ### Adding new APISIX resource
 1. Backend: Create a `NewAPISIXResourceHandler(apisixClient, auditLogger, "resource_name")` in main.go
 2. Backend: Register with `registerResourceRoutes(api, "apisix/resource-name", handler, "permBase")`
 3. Frontend: Create page at `src/app/(dashboard)/resource-name/page.tsx`
 4. Frontend: Add navigation item in `src/components/app-sidebar.tsx`
+
+### UI Text & Branding
+- **Never use "APISIX" in frontend-facing text.** Always refer to "API Gateway" instead.
+- APISIX is an internal implementation detail — users see "FuseOne API Gateway" or just "API Gateway".
+- Code-level references (variable names, types, API paths) may still use `apisix` (e.g., `APISIXClient`, `/api/apisix/`).
 
 ### Adding shadcn components
 ```bash

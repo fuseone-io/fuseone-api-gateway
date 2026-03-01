@@ -136,4 +136,44 @@ export const api = {
     const qs = params ? "?" + new URLSearchParams(params).toString() : ""
     return request<{ data: import("@/types/auth").AuditLog[]; meta: { total: number; page: number; page_size: number } }>(`/api/audit${qs}`)
   },
+
+  // Local Secrets
+  listSecrets: (params?: Record<string, string>) => {
+    const qs = params ? "?" + new URLSearchParams(params).toString() : ""
+    return request<{ data: import("@/types/api").Secret[]; meta: { total: number; page: number; page_size: number } }>(`/api/secrets${qs}`)
+  },
+
+  createSecret: (data: { name: string; description?: string; value: string; tags?: string[] }) =>
+    request<{ data: import("@/types/api").Secret }>("/api/secrets", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  updateSecret: (id: string, data: { description?: string; value?: string; tags?: string[] }) =>
+    request<{ data: unknown }>(`/api/secrets/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteSecret: (id: string) =>
+    request<{ data: unknown }>(`/api/secrets/${id}`, { method: "DELETE" }),
+
+  // Secret Managers
+  listSecretManagers: () =>
+    request<{ data: import("@/types/api").SecretManager[] }>("/api/secret-managers").then((r) => r.data),
+
+  createSecretManager: (data: { name: string; type: string; config: Record<string, unknown> }) =>
+    request<{ data: import("@/types/api").SecretManager }>("/api/secret-managers", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  updateSecretManager: (id: string, data: { name?: string; config?: Record<string, unknown>; is_active?: boolean }) =>
+    request<{ data: unknown }>(`/api/secret-managers/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteSecretManager: (id: string) =>
+    request<{ data: unknown }>(`/api/secret-managers/${id}`, { method: "DELETE" }),
 }

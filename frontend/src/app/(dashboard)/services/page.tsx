@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import {
@@ -9,9 +9,11 @@ import {
   Trash2,
   MoreHorizontal,
   Server,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -37,6 +39,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageHeader } from "@/components/page-header"
 import { api } from "@/lib/api-client"
 import type { APISIXService } from "@/types/apisix"
 
@@ -44,6 +47,7 @@ export default function ServicesPage() {
   const [services, setServices] = useState<APISIXService[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
 
   const fetchServices = () => {
     setLoading(true)
@@ -93,32 +97,46 @@ export default function ServicesPage() {
     return plugins ? Object.keys(plugins).length : 0
   }
 
-  function getLabelsDisplay(labels?: Record<string, string>): string[] {
-    if (!labels) return []
-    return Object.entries(labels).map(([k, v]) => `${k}:${v}`)
-  }
+  const filtered = useMemo(() => {
+    if (!search) return services
+    const q = search.toLowerCase()
+    return services.filter(
+      (s) =>
+        (s.name || "").toLowerCase().includes(q) ||
+        (s.desc || "").toLowerCase().includes(q) ||
+        getUpstreamDisplay(s).toLowerCase().includes(q)
+    )
+  }, [services, search])
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Services</h1>
-          <p className="text-muted-foreground">
-            Manage your API services and their upstream configurations
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/services/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Service
-          </Link>
-        </Button>
+      <PageHeader
+        title="Services"
+        description="Manage your API services and their upstream configurations"
+        actions={
+          <Button asChild>
+            <Link href="/services/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New Service
+            </Link>
+          </Button>
+        }
+      />
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search services..."
+          className="pl-9"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
               <TableHead>Name</TableHead>
               <TableHead>Upstream</TableHead>
               <TableHead>Plugins</TableHead>
@@ -137,21 +155,25 @@ export default function ServicesPage() {
                   ))}
                 </TableRow>
               ))
-            ) : services.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2">
                     <Server className="h-8 w-8 text-muted-foreground" />
-                    <p className="text-muted-foreground">No services configured</p>
-                    <Button asChild variant="outline" size="sm">
-                      <Link href="/services/new">Create your first service</Link>
-                    </Button>
+                    <p className="text-muted-foreground">
+                      {search ? "No services match your search" : "No services configured"}
+                    </p>
+                    {!search && (
+                      <Button asChild variant="outline" size="sm">
+                        <Link href="/services/new">Create your first service</Link>
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
             ) : (
-              services.map((service) => (
-                <TableRow key={service.id}>
+              filtered.map((service) => (
+                <TableRow key={service.id} className="hover:bg-muted/50">
                   <TableCell className="font-medium">
                     {service.name || service.id}
                   </TableCell>
@@ -165,10 +187,10 @@ export default function ServicesPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {getLabelsDisplay(service.labels).length > 0
-                        ? getLabelsDisplay(service.labels).map((label) => (
-                            <Badge key={label} variant="outline" className="text-xs">
-                              {label}
+                      {service.labels && Object.entries(service.labels).length > 0
+                        ? Object.entries(service.labels).map(([k, v]) => (
+                            <Badge key={k} variant="outline" className="text-xs">
+                              {k}:{v}
                             </Badge>
                           ))
                         : <span className="text-muted-foreground">-</span>}
@@ -177,7 +199,7 @@ export default function ServicesPage() {
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

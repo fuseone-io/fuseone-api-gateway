@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import {
@@ -9,9 +9,11 @@ import {
   Trash2,
   MoreHorizontal,
   ArrowUpDown,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -37,6 +39,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageHeader } from "@/components/page-header"
 import { api } from "@/lib/api-client"
 import type { APISIXUpstream } from "@/types/apisix"
 
@@ -44,6 +47,7 @@ export default function UpstreamsPage() {
   const [upstreams, setUpstreams] = useState<APISIXUpstream[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
 
   const fetchUpstreams = () => {
     setLoading(true)
@@ -84,27 +88,46 @@ export default function UpstreamsPage() {
     return !!(upstream.checks?.active || upstream.checks?.passive)
   }
 
+  const filtered = useMemo(() => {
+    if (!search) return upstreams
+    const q = search.toLowerCase()
+    return upstreams.filter(
+      (u) =>
+        (u.name || "").toLowerCase().includes(q) ||
+        (u.type || "").toLowerCase().includes(q) ||
+        (u.desc || "").toLowerCase().includes(q)
+    )
+  }, [upstreams, search])
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Upstreams</h1>
-          <p className="text-muted-foreground">
-            Manage upstream server groups and load balancing configurations
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/upstreams/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Upstream
-          </Link>
-        </Button>
+      <PageHeader
+        title="Upstreams"
+        description="Manage upstream server groups and load balancing configurations"
+        actions={
+          <Button asChild>
+            <Link href="/upstreams/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New Upstream
+            </Link>
+          </Button>
+        }
+      />
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search upstreams..."
+          className="pl-9"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
               <TableHead>Name</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Nodes</TableHead>
@@ -124,21 +147,25 @@ export default function UpstreamsPage() {
                   ))}
                 </TableRow>
               ))
-            ) : upstreams.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2">
                     <ArrowUpDown className="h-8 w-8 text-muted-foreground" />
-                    <p className="text-muted-foreground">No upstreams configured</p>
-                    <Button asChild variant="outline" size="sm">
-                      <Link href="/upstreams/new">Create your first upstream</Link>
-                    </Button>
+                    <p className="text-muted-foreground">
+                      {search ? "No upstreams match your search" : "No upstreams configured"}
+                    </p>
+                    {!search && (
+                      <Button asChild variant="outline" size="sm">
+                        <Link href="/upstreams/new">Create your first upstream</Link>
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
             ) : (
-              upstreams.map((upstream) => (
-                <TableRow key={upstream.id}>
+              filtered.map((upstream) => (
+                <TableRow key={upstream.id} className="hover:bg-muted/50">
                   <TableCell className="font-medium">
                     {upstream.name || upstream.id}
                   </TableCell>
@@ -163,7 +190,7 @@ export default function UpstreamsPage() {
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

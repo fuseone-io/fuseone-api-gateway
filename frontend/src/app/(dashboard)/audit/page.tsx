@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api } from "@/lib/api-client"
+import { PageHeader } from "@/components/page-header"
 import type { AuditLog } from "@/types/auth"
 
 const ACTION_OPTIONS = [
@@ -94,12 +95,10 @@ export default function AuditPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Audit Log</h1>
-        <p className="text-muted-foreground">
-          Track all changes and actions performed in the API Gateway
-        </p>
-      </div>
+      <PageHeader
+        title="Audit Log"
+        description="Track all changes and actions performed in the API Gateway"
+      />
 
       <div className="flex flex-wrap gap-3">
         <Select value={actionFilter} onValueChange={setActionFilter}>
@@ -129,10 +128,10 @@ export default function AuditPage() {
         </Select>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
               <TableHead>Time</TableHead>
               <TableHead>User</TableHead>
               <TableHead>Action</TableHead>
@@ -168,7 +167,7 @@ export default function AuditPage() {
               </TableRow>
             ) : (
               logs.map((log) => (
-                <TableRow key={log.id}>
+                <TableRow key={log.id} className="hover:bg-muted/50">
                   <TableCell className="text-sm whitespace-nowrap">
                     {formatTimestamp(log.created_at)}
                   </TableCell>

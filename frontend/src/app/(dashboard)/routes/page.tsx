@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import {
@@ -9,9 +9,11 @@ import {
   Trash2,
   MoreHorizontal,
   Route as RouteIcon,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -37,6 +39,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageHeader } from "@/components/page-header"
 import { api } from "@/lib/api-client"
 import type { APISIXRoute } from "@/types/apisix"
 
@@ -44,6 +47,7 @@ export default function RoutesPage() {
   const [routes, setRoutes] = useState<APISIXRoute[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
 
   const fetchRoutes = () => {
     setLoading(true)
@@ -74,27 +78,48 @@ export default function RoutesPage() {
     }
   }
 
+  const filtered = useMemo(() => {
+    if (!search) return routes
+    const q = search.toLowerCase()
+    return routes.filter(
+      (r) =>
+        (r.name || "").toLowerCase().includes(q) ||
+        (r.uri || "").toLowerCase().includes(q) ||
+        (r.host || "").toLowerCase().includes(q)
+    )
+  }, [routes, search])
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Routes</h1>
-          <p className="text-muted-foreground">
-            Manage your API routes and their configurations
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/routes/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Route
-          </Link>
-        </Button>
+      <PageHeader
+        title="Routes"
+        description="Manage your API routes and their configurations"
+        actions={
+          <Button asChild>
+            <Link href="/routes/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New Route
+            </Link>
+          </Button>
+        }
+      />
+
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search routes..."
+          className="pl-9"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
-      <div className="rounded-md border">
+      {/* Table */}
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
               <TableHead>Name</TableHead>
               <TableHead>URI</TableHead>
               <TableHead>Methods</TableHead>
@@ -114,21 +139,25 @@ export default function RoutesPage() {
                   ))}
                 </TableRow>
               ))
-            ) : routes.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2">
                     <RouteIcon className="h-8 w-8 text-muted-foreground" />
-                    <p className="text-muted-foreground">No routes configured</p>
-                    <Button asChild variant="outline" size="sm">
-                      <Link href="/routes/new">Create your first route</Link>
-                    </Button>
+                    <p className="text-muted-foreground">
+                      {search ? "No routes match your search" : "No routes configured"}
+                    </p>
+                    {!search && (
+                      <Button asChild variant="outline" size="sm">
+                        <Link href="/routes/new">Create your first route</Link>
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
             ) : (
-              routes.map((route) => (
-                <TableRow key={route.id}>
+              filtered.map((route) => (
+                <TableRow key={route.id} className="hover:bg-muted/50">
                   <TableCell className="font-medium">
                     {route.name || route.id}
                   </TableCell>
@@ -157,7 +186,7 @@ export default function RoutesPage() {
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

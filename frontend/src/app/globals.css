@@ -13,7 +13,7 @@
   --primary-foreground: #ffffff;
   --secondary: #950fb8;
   --secondary-foreground: #ffffff;
-  --background: #f7f8fa;
+  --background: #ffffff;
   --foreground: #0a1628;
   --card: #ffffff;
   --card-foreground: #0a1628;
@@ -127,6 +127,69 @@ body {
   --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
   --sidebar-width: 16rem;
   --sidebar-width-icon: 3rem;
+}
+
+/* Flow edge animations */
+@keyframes flow-down {
+  0% {
+    top: -4px;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    top: calc(100% - 4px);
+    opacity: 0;
+  }
+}
+
+@keyframes flow-up {
+  0% {
+    bottom: -4px;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    bottom: calc(100% - 4px);
+    opacity: 0;
+  }
+}
+
+.edge-line-request::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 0 6px #3b82f680;
+  opacity: 0;
+  animation: flow-down 1.8s ease-in-out infinite;
+}
+
+.edge-line-response::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b98180;
+  opacity: 0;
+  animation: flow-up 1.8s ease-in-out infinite;
 }
 
 @layer base {

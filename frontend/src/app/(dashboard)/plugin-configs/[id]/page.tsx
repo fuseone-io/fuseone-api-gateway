@@ -8,27 +8,35 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { PageHeader } from "@/components/page-header"
 
-export default function PluginConfigPage() {
+export default function PluginConfigDetailPage() {
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <Card className="w-full max-w-md text-center">
+    <div className="space-y-6">
+      <PageHeader
+        title="Plugin Configs"
+        description="Manage reusable plugin configuration sets"
+      />
+
+      <Card>
         <CardHeader>
-          <div className="flex justify-center mb-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-              <FileJson className="h-7 w-7 text-muted-foreground" />
-            </div>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileJson className="h-5 w-5 text-primary" />
+              Plugin Config Sets
+            </CardTitle>
+            <Badge variant="secondary">Coming Soon</Badge>
           </div>
-          <CardTitle>Plugin Configs</CardTitle>
           <CardDescription>
-            Plugin configuration management is coming soon.
+            This feature will allow you to create and manage reusable plugin configuration
+            sets that can be shared across multiple routes and services.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            This feature will allow you to create reusable plugin configuration
-            templates that can be shared across multiple routes.
-          </p>
+          <div className="flex items-center justify-center py-12 rounded-lg bg-muted/50 border border-dashed">
+            <FileJson className="h-16 w-16 text-muted-foreground/20" />
+          </div>
         </CardContent>
       </Card>
     </div>

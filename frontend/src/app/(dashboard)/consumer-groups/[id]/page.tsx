@@ -8,27 +8,35 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { PageHeader } from "@/components/page-header"
 
-export default function ConsumerGroupPage() {
+export default function ConsumerGroupDetailPage() {
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <Card className="w-full max-w-md text-center">
+    <div className="space-y-6">
+      <PageHeader
+        title="Consumer Groups"
+        description="Group consumers and apply shared plugins"
+      />
+
+      <Card>
         <CardHeader>
-          <div className="flex justify-center mb-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-              <UserCog className="h-7 w-7 text-muted-foreground" />
-            </div>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserCog className="h-5 w-5 text-primary" />
+              Consumer Group Management
+            </CardTitle>
+            <Badge variant="secondary">Coming Soon</Badge>
           </div>
-          <CardTitle>Consumer Groups</CardTitle>
           <CardDescription>
-            Consumer group management is coming soon.
+            This feature will allow you to create consumer groups, manage group
+            membership, and apply shared plugin configurations across multiple consumers.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            This feature will allow you to group consumers together and apply
-            shared plugin configurations across multiple consumers.
-          </p>
+          <div className="flex items-center justify-center py-12 rounded-lg bg-muted/50 border border-dashed">
+            <UserCog className="h-16 w-16 text-muted-foreground/20" />
+          </div>
         </CardContent>
       </Card>
     </div>

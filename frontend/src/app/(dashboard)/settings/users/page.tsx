@@ -8,28 +8,36 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { PageHeader } from "@/components/page-header"
 
 export default function UsersSettingsPage() {
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <Card className="w-full max-w-md text-center">
+    <div className="space-y-6">
+      <PageHeader
+        title="User Management"
+        description="Create and manage user accounts for the API Gateway"
+      />
+
+      <Card>
         <CardHeader>
-          <div className="flex justify-center mb-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-              <Users className="h-7 w-7 text-muted-foreground" />
-            </div>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              User Accounts
+            </CardTitle>
+            <Badge variant="secondary">Coming Soon</Badge>
           </div>
-          <CardTitle>User Management</CardTitle>
           <CardDescription>
-            User management is coming soon.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
             This feature will allow you to create and manage user accounts,
             send invitations, enable two-factor authentication, and control
             access to the API Gateway dashboard.
-          </p>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-12 rounded-lg bg-muted/50 border border-dashed">
+            <Users className="h-16 w-16 text-muted-foreground/20" />
+          </div>
         </CardContent>
       </Card>
     </div>

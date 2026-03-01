@@ -16,6 +16,7 @@ import {
   UserCog,
   Users,
   Wifi,
+  Workflow,
   type LucideIcon,
 } from "lucide-react"
 import Link from "next/link"
@@ -51,6 +52,7 @@ const navGroups: NavGroup[] = [
   {
     label: "API Management",
     items: [
+      { path: "/apis", label: "APIs", icon: Workflow },
       { path: "/routes", label: "Routes", icon: Route },
       { path: "/services", label: "Services", icon: Server },
       { path: "/upstreams", label: "Upstreams", icon: ArrowUpDown },
@@ -89,8 +91,8 @@ export function AppSidebar({ user }: { user: User | null }) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#0f5fb8] to-[#950fb8] text-white font-bold text-sm">
-                  F
+                <div className="flex aspect-square size-8 items-center justify-center shrink-0">
+                  <img src="/logo-mark.svg" alt="FuseOne" className="size-8" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">FuseOne</span>

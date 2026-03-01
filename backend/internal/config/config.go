@@ -12,6 +12,11 @@ type Config struct {
 	Database DatabaseConfig `mapstructure:"database"`
 	APISIX   APISIXConfig   `mapstructure:"apisix"`
 	Auth     AuthConfig     `mapstructure:"auth"`
+	Secrets  SecretsConfig  `mapstructure:"secrets"`
+}
+
+type SecretsConfig struct {
+	EncryptionKey string `mapstructure:"encryption_key"`
 }
 
 type ServerConfig struct {
@@ -81,6 +86,9 @@ func Load() (*Config, error) {
 	v.SetDefault("auth.jwt_expiry_minutes", 60)
 	v.SetDefault("auth.refresh_expiry_days", 30)
 
+	// Secrets defaults
+	v.SetDefault("secrets.encryption_key", "")
+
 	// Bind environment variables explicitly
 	v.BindEnv("database.host", "DB_HOST")
 	v.BindEnv("database.port", "DB_PORT")
@@ -95,6 +103,7 @@ func Load() (*Config, error) {
 	v.BindEnv("auth.refresh_expiry_days", "REFRESH_EXPIRY_DAYS")
 	v.BindEnv("server.port", "SERVER_PORT")
 	v.BindEnv("server.cors_origins", "SERVER_CORS_ORIGINS")
+	v.BindEnv("secrets.encryption_key", "SECRET_ENCRYPTION_KEY")
 
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -109,6 +118,11 @@ func Load() (*Config, error) {
 
 	if cfg.Auth.JWTSecret == "" {
 		return nil, fmt.Errorf("auth.jwt_secret (JWT_SECRET) is required")
+	}
+
+	// Default encryption key to JWT secret if not set
+	if cfg.Secrets.EncryptionKey == "" {
+		cfg.Secrets.EncryptionKey = cfg.Auth.JWTSecret
 	}
 
 	return &cfg, nil

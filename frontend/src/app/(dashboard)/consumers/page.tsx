@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import {
@@ -9,9 +9,11 @@ import {
   Trash2,
   MoreHorizontal,
   Users,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -37,6 +39,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageHeader } from "@/components/page-header"
 import { api } from "@/lib/api-client"
 import type { APISIXConsumer } from "@/types/apisix"
 
@@ -44,6 +47,7 @@ export default function ConsumersPage() {
   const [consumers, setConsumers] = useState<APISIXConsumer[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteUsername, setDeleteUsername] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
 
   const fetchConsumers = () => {
     setLoading(true)
@@ -78,27 +82,45 @@ export default function ConsumersPage() {
     return plugins ? Object.keys(plugins).length : 0
   }
 
+  const filtered = useMemo(() => {
+    if (!search) return consumers
+    const q = search.toLowerCase()
+    return consumers.filter(
+      (c) =>
+        c.username.toLowerCase().includes(q) ||
+        (c.desc || "").toLowerCase().includes(q)
+    )
+  }, [consumers, search])
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Consumers</h1>
-          <p className="text-muted-foreground">
-            Manage API consumers and their authentication credentials
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/consumers/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Consumer
-          </Link>
-        </Button>
+      <PageHeader
+        title="Consumers"
+        description="Manage API consumers and their authentication credentials"
+        actions={
+          <Button asChild>
+            <Link href="/consumers/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New Consumer
+            </Link>
+          </Button>
+        }
+      />
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search consumers..."
+          className="pl-9"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
               <TableHead>Username</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Plugins</TableHead>
@@ -117,21 +139,25 @@ export default function ConsumersPage() {
                   ))}
                 </TableRow>
               ))
-            ) : consumers.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2">
                     <Users className="h-8 w-8 text-muted-foreground" />
-                    <p className="text-muted-foreground">No consumers configured</p>
-                    <Button asChild variant="outline" size="sm">
-                      <Link href="/consumers/new">Create your first consumer</Link>
-                    </Button>
+                    <p className="text-muted-foreground">
+                      {search ? "No consumers match your search" : "No consumers configured"}
+                    </p>
+                    {!search && (
+                      <Button asChild variant="outline" size="sm">
+                        <Link href="/consumers/new">Create your first consumer</Link>
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
             ) : (
-              consumers.map((consumer) => (
-                <TableRow key={consumer.username}>
+              filtered.map((consumer) => (
+                <TableRow key={consumer.username} className="hover:bg-muted/50">
                   <TableCell className="font-medium">
                     {consumer.username}
                   </TableCell>
@@ -149,7 +175,7 @@ export default function ConsumersPage() {
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

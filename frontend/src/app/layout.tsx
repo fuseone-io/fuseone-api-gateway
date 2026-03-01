@@ -9,7 +9,10 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "FuseOne API Gateway",
-  description: "Modern dashboard for Apache APISIX management",
+  description: "Modern dashboard for API Gateway management",
+  icons: {
+    icon: "/favicon.svg",
+  },
 }
 
 export default function RootLayout({
@@ -28,7 +31,7 @@ export default function RootLayout({
         >
           <TooltipProvider>
             {children}
-            <Toaster richColors />
+            <Toaster richColors position="top-right" />
           </TooltipProvider>
         </ThemeProvider>
       </body>

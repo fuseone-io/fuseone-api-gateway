@@ -8,28 +8,35 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { PageHeader } from "@/components/page-header"
 
 export default function RolesSettingsPage() {
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <Card className="w-full max-w-md text-center">
+    <div className="space-y-6">
+      <PageHeader
+        title="Role Management"
+        description="Configure roles and permissions for RBAC"
+      />
+
+      <Card>
         <CardHeader>
-          <div className="flex justify-center mb-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-              <ShieldCheck className="h-7 w-7 text-muted-foreground" />
-            </div>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              Roles & Permissions
+            </CardTitle>
+            <Badge variant="secondary">Coming Soon</Badge>
           </div>
-          <CardTitle>Roles &amp; Permissions</CardTitle>
           <CardDescription>
-            Role management is coming soon.
+            This feature will allow you to configure granular role-based access control
+            with custom permissions for routes, services, plugins, and other resources.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            This feature will allow you to define custom roles with granular
-            permissions, controlling what each user can view, create, update,
-            or delete across the API Gateway.
-          </p>
+          <div className="flex items-center justify-center py-12 rounded-lg bg-muted/50 border border-dashed">
+            <ShieldCheck className="h-16 w-16 text-muted-foreground/20" />
+          </div>
         </CardContent>
       </Card>
     </div>

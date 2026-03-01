@@ -8,27 +8,36 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { PageHeader } from "@/components/page-header"
 
-export default function StreamRoutePage() {
+export default function StreamRouteDetailPage() {
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <Card className="w-full max-w-md text-center">
+    <div className="space-y-6">
+      <PageHeader
+        title="Stream Routes"
+        description="Manage TCP/UDP stream proxy routes"
+      />
+
+      <Card>
         <CardHeader>
-          <div className="flex justify-center mb-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-              <Wifi className="h-7 w-7 text-muted-foreground" />
-            </div>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Wifi className="h-5 w-5 text-primary" />
+              Stream Route Configuration
+            </CardTitle>
+            <Badge variant="secondary">Coming Soon</Badge>
           </div>
-          <CardTitle>Stream Routes</CardTitle>
           <CardDescription>
-            Stream route management is coming soon.
+            This feature will allow you to configure Layer 4 (TCP/UDP) stream
+            proxy routes with SNI-based routing, TLS termination, and upstream
+            health checks.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            This feature will allow you to configure TCP/UDP stream proxying
-            with SNI-based routing and stream-level plugins.
-          </p>
+          <div className="flex items-center justify-center py-12 rounded-lg bg-muted/50 border border-dashed">
+            <Wifi className="h-16 w-16 text-muted-foreground/20" />
+          </div>
         </CardContent>
       </Card>
     </div>

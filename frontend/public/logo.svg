@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 48">
+  <defs>
+    <linearGradient id="gw" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f5fb8"/>
+      <stop offset="100%" stop-color="#950fb8"/>
+    </linearGradient>
+  </defs>
+  <!-- Shield icon -->
+  <g transform="translate(4, 2)">
+    <!-- Glow -->
+    <path d="M22,0 L42,8 L42,24 C42,35 34,41 22,44 C10,41 2,35 2,24 L2,8 Z" fill="url(#gw)" opacity="0.12"/>
+    <!-- Shield -->
+    <path d="M22,2 L40,9 L40,24 C40,34 33,40 22,43 C11,40 4,34 4,24 L4,9 Z" fill="url(#gw)"/>
+    <!-- Three converging paths -->
+    <path d="M10,14 L18,20" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+    <path d="M22,10 L22,20" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.9"/>
+    <path d="M34,14 L26,20" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+    <!-- Central gateway node -->
+    <rect x="17.5" y="18" width="9" height="9" rx="2.2" fill="white" opacity="0.95" transform="rotate(45 22 22.5)"/>
+    <!-- Outgoing path -->
+    <path d="M22,29 L22,37" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.9"/>
+    <path d="M19,34.5 L22,38 L25,34.5" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+  </g>
+  <!-- Wordmark -->
+  <text x="58" y="33" font-family="'Inter', 'Segoe UI', sans-serif" font-size="28" letter-spacing="-0.5">
+    <tspan font-weight="700" fill="#0f5fb8">Fuse</tspan><tspan font-weight="300" fill="#0a1628">One</tspan>
+  </text>
+  <text x="210" y="33" font-family="'Inter', 'Segoe UI', sans-serif" font-size="12" font-weight="500" fill="#8e98a8" letter-spacing="2.5">API GATEWAY</text>
+</svg>

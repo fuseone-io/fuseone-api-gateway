@@ -10,6 +10,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { api } from "@/lib/api-client"
 import type { User } from "@/types/auth"
 
@@ -51,11 +52,12 @@ export default function DashboardLayout({
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-4">
           <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 !h-4" />
+          <Separator orientation="vertical" className="mr-2 h-4 !self-auto" />
+          <BreadcrumbNav />
           <div className="flex-1" />
           <ThemeToggle />
         </header>
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-8">
           {children}
         </main>
       </SidebarInset>
