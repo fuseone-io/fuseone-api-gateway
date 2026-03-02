@@ -1,10 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import {
   AlertTriangle,
-  ArrowLeft,
   CheckCircle2,
   Clock,
   Heart,
@@ -40,11 +39,6 @@ function getNodes(checker: UpstreamHealthChecker): UpstreamHealthNode[] {
   return Array.isArray(checker.nodes) ? checker.nodes : []
 }
 
-function extractResourceId(name: string): string {
-  const parts = name.split("/")
-  return parts[3] || name
-}
-
 function countNodes(checkers: UpstreamHealthChecker[]) {
   let total = 0
   let healthy = 0
@@ -78,7 +72,7 @@ function StatusBadge({ status }: { status: UpstreamHealthNode["status"] }) {
 
 export default function ApiHealthPage() {
   const params = useParams()
-  const router = useRouter()
+
   const apiId = params.id as string
 
   // API info
@@ -142,6 +136,12 @@ export default function ApiHealthPage() {
   const { total, healthy, unhealthy } = countNodes(checkers)
   const isDraft = record?.sync_status === "draft"
 
+  // Detect diagnostic patterns to help the operator
+  const allNodes = checkers.flatMap(getNodes)
+  const hasActiveCheckFailures = allNodes.some(
+    (n) => n.status === "unhealthy" && n.counter.success === 0 && (n.counter.tcp_failure > 0 || n.counter.timeout_failure > 0)
+  )
+
   if (loadingApi) {
     return (
       <div className="space-y-6">
@@ -158,19 +158,14 @@ export default function ApiHealthPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => router.push(`/apis/${apiId}`)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight truncate">{record?.name || "API"}</h1>
-              {record?.version && (
-                <Badge variant="outline" className="text-[10px] font-mono shrink-0">v{record.version}</Badge>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mt-0.5">Upstream health status and node monitoring</p>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight truncate">{record?.name || "API"}</h1>
+            {record?.version && (
+              <Badge variant="outline" className="text-[10px] font-mono shrink-0">v{record.version}</Badge>
+            )}
           </div>
+          <p className="text-sm text-muted-foreground mt-0.5">Upstream health status and node monitoring</p>
         </div>
       </div>
 
@@ -279,9 +274,28 @@ export default function ApiHealthPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
+        <>
+          {/* Diagnostic hint */}
+          {hasActiveCheckFailures && (
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardContent className="p-4 flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-amber-700 dark:text-amber-400">Active health check cannot reach upstream</p>
+                  <p className="text-muted-foreground mt-1">
+                    Nodes show 0 successes with TCP/timeout failures. The active health checker is unable to connect to the
+                    upstream. If the API works when you send requests, the issue is likely in the health check configuration
+                    (wrong port, missing TLS, firewall blocking the probe). Passive health checks will mark nodes as healthy
+                    when real traffic succeeds, but they will go back to unhealthy once traffic stops.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardContent className="p-0">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Node</TableHead>
@@ -299,9 +313,6 @@ export default function ApiHealthPage() {
                     <TableRow key={`${checker.name}-${node.ip}-${node.port}`}>
                       <TableCell className="font-mono text-xs">
                         {node.ip}:{node.port}
-                        <span className="block text-muted-foreground text-[10px]">
-                          {extractResourceId(checker.name)}
-                        </span>
                       </TableCell>
                       <TableCell>
                         <StatusBadge status={node.status} />
@@ -330,6 +341,7 @@ export default function ApiHealthPage() {
             </Table>
           </CardContent>
         </Card>
+        </>
       )}
     </div>
   )

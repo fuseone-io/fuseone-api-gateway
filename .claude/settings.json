@@ -69,10 +69,13 @@
       "Bash(pnpm dlx shadcn@latest add calendar --yes)",
       "Bash(pnpm dlx shadcn@latest add calendar --overwrite)",
       "Bash(go test ./internal/service/ -v -count=1)",
-      "Bash(pnpm dlx shadcn@latest add popover --overwrite --yes)"
+      "Bash(pnpm dlx shadcn@latest add popover --overwrite --yes)",
+      "Bash(go test ./internal/handler/ -run TestReload -v)",
+      "Bash(go test ./internal/handler/ -run \"TestReload|TestList\" -v)"
     ],
     "additionalDirectories": [
-      "/home/kleber/Dados/fuseone-api-gateway/frontend/src/app/(dashboard)/apis/[id]"
+      "/home/kleber/Dados/fuseone-api-gateway/frontend/src/app/(dashboard)/apis/[id]",
+      "/home/kleber/Dados/fuseone-api-gateway/custom-plugins/apisix/plugins"
     ]
   }
 }

@@ -1047,4 +1047,218 @@ export const PLUGIN_DOCS: Record<string, PluginDoc> = {
     ],
     relatedPlugins: ["zipkin", "prometheus", "request-id"],
   },
+
+  // ─── FuseOne Custom Plugins ─────────────────────────────────
+
+  "http-callout": {
+    overview:
+      "HTTP Callout makes HTTP(S) calls to external services during API request processing. This enables request enrichment (adding user metadata from a profile service), external authorization (calling a custom auth endpoint), data validation (verifying input against a business rules engine), and webhook notifications (fire-and-forget calls to notification services). The callout response can be cached and fields can be extracted via JSONPath and injected into the upstream request headers. Built-in SSRF protection blocks callouts to private IP ranges.",
+    useCases: [
+      "Call an external authorization service to validate tokens or check permissions before allowing the request",
+      "Enrich requests by fetching user profile data, account tier, or company metadata from an internal service",
+      "Send webhook notifications to Slack, Teams, or custom endpoints on specific API calls",
+      "Validate request data against an external business rules engine before proxying to the upstream",
+    ],
+    bestPractices: [
+      "Set separate connect/read/send timeouts to match the external service profile — use short connect_timeout (1s) and longer read_timeout (5s) for slow services",
+      "Use caching (cache_ttl) for enrichment callouts that return slowly-changing data like user profiles",
+      "Use fire-and-forget mode for webhook notifications to avoid blocking the main request flow",
+      "Use exit_on_status for 'best effort' callouts where connection failures are acceptable but specific HTTP rejections (401, 403) must block the request",
+      "Use exit_on_error for critical callouts (like authorization) where any failure should block the request",
+    ],
+    cautions: [
+      "Callouts add latency to every request — use caching or fire-and-forget to minimize impact",
+      "SSRF protection is enforced by default — callouts to private IPs (10.x, 172.16.x, 192.168.x) are blocked",
+      "exit_on_error and exit_on_status serve different purposes: exit_on_error stops on ALL errors (connection + HTTP), exit_on_status stops ONLY on specific HTTP status codes and silently ignores connection/timeout errors",
+      "External service downtime will cause request failures if exit_on_error is enabled — configure appropriate error_status and error_message",
+    ],
+    examples: [
+      {
+        title: "External Authorization (strict)",
+        description: "Validate tokens via an external auth service — reject on any failure including service downtime",
+        config: {
+          uri: "http://auth-service:8080/validate",
+          method: "POST",
+          body: "{\"token\": \"$http_authorization\"}",
+          connect_timeout: 1000,
+          read_timeout: 3000,
+          exit_on_error: true,
+          error_status: 401,
+          error_message: "Authentication failed",
+          extract: [
+            { source: "$.user_id", target_header: "X-User-Id" },
+            { source: "$.roles", target_header: "X-User-Roles" },
+          ],
+        },
+      },
+      {
+        title: "Best-Effort Validation (exit_on_status)",
+        description: "Call a validation service — only block on explicit rejection (422, 403). If the service is down or times out, continue the flow.",
+        config: {
+          uri: "http://validation-service:8080/check",
+          method: "POST",
+          body: "{\"payload\": \"$request_body\"}",
+          connect_timeout: 2000,
+          read_timeout: 5000,
+          exit_on_status: [422, 403],
+          error_status: 422,
+          error_message: "Validation rejected",
+        },
+      },
+      {
+        title: "Request Enrichment with Cache",
+        description: "Fetch user tier from a profile service, cache the result for 5 minutes",
+        config: {
+          uri: "http://user-service:8080/profile/$http_x_user_id",
+          method: "GET",
+          cache_ttl: 300,
+          extract: [{ source: "$.tier", target_header: "X-User-Tier" }],
+        },
+      },
+      {
+        title: "Slack Webhook (Fire-and-Forget)",
+        description: "Notify a Slack channel without waiting for the response",
+        config: {
+          uri: "https://hooks.slack.com/services/xxx/yyy/zzz",
+          method: "POST",
+          body: "{\"text\": \"API call: $request_uri\"}",
+          fire_and_forget: true,
+        },
+      },
+    ],
+    relatedPlugins: ["forward-auth", "proxy-rewrite", "serverless-pre-function"],
+  },
+
+  "data-masking": {
+    overview:
+      "Data Masking redacts sensitive data (PII) from API response bodies before they reach the client. It supports multiple masking strategies including full replacement, partial masking, SHA-256 hashing, and specialized email/phone formats. Fields are targeted using JSONPath expressions, supporting nested objects and arrays. This plugin is critical for LGPD and GDPR compliance when APIs expose personal data that should be partially or fully hidden from certain consumers.",
+    useCases: [
+      "Mask CPF, credit card numbers, and other PII in responses to comply with LGPD/GDPR",
+      "Partially reveal email addresses (j***@example.com) while protecting full addresses",
+      "Hash sensitive fields with SHA-256 for data correlation without exposing actual values",
+      "Mask phone numbers in API responses while keeping country code and last digits visible",
+    ],
+    bestPractices: [
+      "Use 'partial' strategy for fields where partial visibility aids user experience (e.g., last 4 digits of a card)",
+      "Use 'hash' strategy when downstream systems need to correlate records without seeing actual values",
+      "Place data-masking before any logging plugins in the execution order to avoid logging unmasked PII",
+      "Test masking rules with debug mode to verify the correct fields are being targeted",
+    ],
+    cautions: [
+      "This plugin only processes JSON responses — non-JSON responses pass through unmodified",
+      "Body buffering is required, which adds memory overhead for large response bodies",
+      "Masking rules with array wildcards ($.data[*].field) iterate over all array elements, which may impact performance on very large arrays",
+    ],
+    examples: [
+      {
+        title: "LGPD Compliance",
+        description: "Mask CPF, email, and password fields in customer data responses",
+        config: {
+          rules: [
+            { path: "$.cpf", strategy: "partial", visible_chars: 3 },
+            { path: "$.data[*].email", strategy: "email" },
+            { path: "$.password", strategy: "full", replacement: "[REDACTED]" },
+          ],
+        },
+      },
+      {
+        title: "Credit Card Masking",
+        description: "Show only last 4 digits of credit card numbers",
+        config: {
+          rules: [
+            { path: "$.credit_card", strategy: "partial", visible_chars: 4 },
+            { path: "$.data[*].card_number", strategy: "partial", visible_chars: 4 },
+          ],
+        },
+      },
+      {
+        title: "Hash for Correlation",
+        description: "Replace sensitive IDs with SHA-256 hashes for analytics without PII exposure",
+        config: {
+          rules: [
+            { path: "$.user_id", strategy: "hash" },
+            { path: "$.data[*].document_id", strategy: "hash" },
+          ],
+        },
+      },
+    ],
+    relatedPlugins: ["response-rewrite", "body-transformer", "threat-protection"],
+  },
+
+  "threat-protection": {
+    overview:
+      "Threat Protection defends APIs against payload-based attacks by enforcing structural limits on JSON requests and detecting injection patterns. It validates JSON depth, array sizes, object entries, and string lengths to prevent resource exhaustion attacks. It also scans request query parameters, headers, and body for SQL injection and XSS patterns. Detected threats can be rejected with a 403 response or logged for monitoring without blocking the request.",
+    useCases: [
+      "Protect APIs from SQL injection attacks in query parameters and request bodies",
+      "Block cross-site scripting (XSS) payloads in API inputs",
+      "Prevent resource exhaustion from deeply nested JSON or oversized arrays",
+      "Enforce maximum request body sizes beyond what basic size limits offer",
+    ],
+    bestPractices: [
+      "Start with 'log' action mode to identify false positives before switching to 'reject'",
+      "Enable scan_query and scan_body by default, but only enable scan_headers if your API processes user-controlled headers",
+      "Set JSON structural limits based on your actual API schema — overly restrictive limits may break legitimate requests",
+      "Combine with request-validation for schema-level enforcement and threat-protection for injection defense",
+    ],
+    cautions: [
+      "SQL injection patterns may cause false positives on legitimate text containing SQL-like keywords — test with real traffic first",
+      "XSS detection scans for common patterns but is not a WAF replacement — use dedicated WAF for comprehensive web protection",
+      "Body scanning only works for text-based content types — binary payloads are not scanned",
+    ],
+    examples: [
+      {
+        title: "Standard API Protection",
+        description: "Default protection with SQL injection and XSS detection enabled",
+        config: {
+          json: {
+            max_depth: 20,
+            max_array_length: 1000,
+            max_body_size: 1048576,
+          },
+          injection: {
+            sql_injection: true,
+            xss: true,
+            scan_query: true,
+            scan_body: true,
+          },
+          action: "reject",
+        },
+      },
+      {
+        title: "Strict Protection for Public APIs",
+        description: "Tight limits for publicly exposed APIs that handle untrusted input",
+        config: {
+          json: {
+            max_depth: 5,
+            max_array_length: 100,
+            max_object_entries: 50,
+            max_string_length: 10000,
+            max_body_size: 524288,
+          },
+          injection: {
+            sql_injection: true,
+            xss: true,
+            scan_headers: true,
+            scan_query: true,
+            scan_body: true,
+          },
+          action: "reject",
+        },
+      },
+      {
+        title: "Monitor Mode (Log Only)",
+        description: "Detect threats without blocking requests — useful for initial rollout",
+        config: {
+          injection: {
+            sql_injection: true,
+            xss: true,
+            scan_query: true,
+            scan_body: true,
+          },
+          action: "log",
+        },
+      },
+    ],
+    relatedPlugins: ["request-validation", "ip-restriction", "uri-blocker", "data-masking"],
+  },
 }

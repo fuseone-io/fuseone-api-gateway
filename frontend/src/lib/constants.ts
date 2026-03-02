@@ -68,6 +68,8 @@ export const PLUGINS: PluginDefinition[] = [
   { name: "request-validation", label: "Request Validation", description: "Validate request headers and body with JSON Schema", category: "security", phase: "request", icon: "CheckSquare" },
   { name: "ua-restriction", label: "User-Agent Filter", description: "Allow or deny access by User-Agent header", category: "security", phase: "request", icon: "Monitor" },
   { name: "referer-restriction", label: "Referer Filter", description: "Allow or deny access by Referer header", category: "security", phase: "request", icon: "Link" },
+  { name: "threat-protection", label: "Threat Protection", description: "Protect against JSON attacks, SQL injection, and XSS", category: "security", phase: "request", icon: "ShieldAlert" },
+  { name: "data-masking", label: "Data Masking", description: "Redact PII from response bodies (LGPD/GDPR)", category: "security", phase: "response", icon: "EyeOff" },
 
   // Traffic Control (request phase)
   { name: "limit-req", label: "Rate Limit", description: "Limit request rate per time window", category: "traffic", phase: "request", icon: "Gauge" },
@@ -97,6 +99,7 @@ export const PLUGINS: PluginDefinition[] = [
   { name: "openwhisk", label: "OpenWhisk", description: "Proxy requests to Apache OpenWhisk actions", category: "transformation", phase: "request", icon: "Cloud" },
   { name: "gzip", label: "Gzip", description: "Compress response body with gzip", category: "transformation", phase: "response", icon: "FileArchive" },
   { name: "grpc-web", label: "gRPC-Web", description: "Enable gRPC-Web protocol for browser clients", category: "transformation", phase: "request", icon: "ArrowLeftRight" },
+  { name: "http-callout", label: "HTTP Callout", description: "Call external services during request processing for enrichment or validation", category: "transformation", phase: "request", icon: "Globe" },
 
   // Observability (log phase)
   { name: "prometheus", label: "Prometheus", description: "Export metrics to Prometheus", category: "observability", phase: "observability", icon: "BarChart3" },

@@ -1994,6 +1994,123 @@ const AI_AWS_CONTENT_MODERATION: PluginFormDef = {
   ],
 }
 
+// --- FuseOne Custom Plugins ---
+
+const HTTP_CALLOUT: PluginFormDef = {
+  pluginName: "http-callout",
+  groups: [
+    {
+      title: "External Service",
+      fields: [
+        { key: "uri", label: "Service URL", type: "string", required: true, placeholder: "http://auth-service:8080/validate", description: "URL of the external service to call. Supports $var substitution (e.g., $http_authorization, $request_uri)." },
+        { key: "method", label: "HTTP Method", type: "enum", defaultValue: "GET", options: [
+          { value: "GET", label: "GET" },
+          { value: "POST", label: "POST" },
+          { value: "PUT", label: "PUT" },
+          { value: "DELETE", label: "DELETE" },
+          { value: "PATCH", label: "PATCH" },
+          { value: "HEAD", label: "HEAD" },
+        ]},
+        { key: "body", label: "Request Body", type: "text", placeholder: "{\"token\": \"$http_authorization\"}", description: "Body to send with the callout. Supports $var substitution from the original request." },
+        { key: "connect_timeout", label: "Connection Timeout", type: "integer", defaultValue: 3000, suffix: "ms", min: 100, max: 30000, description: "Maximum time to establish connection with the external service." },
+        { key: "read_timeout", label: "Read Timeout", type: "integer", defaultValue: 3000, suffix: "ms", min: 100, max: 60000, description: "Maximum time to wait for the external service response after connection is established." },
+        { key: "send_timeout", label: "Send Timeout", type: "integer", defaultValue: 3000, suffix: "ms", min: 100, max: 30000, description: "Maximum time to send the request body to the external service." },
+      ],
+    },
+    {
+      title: "Response Extraction",
+      description: "Extract fields from the callout response and inject them as request headers sent to the upstream.",
+      collapsible: true,
+      defaultOpen: true,
+      fields: [
+        { key: "extract", label: "Extraction Rules (JSON)", type: "text", placeholder: "[{\"source\": \"$.user_id\", \"target_header\": \"X-User-Id\"}]", description: "JSON array of extraction rules. Each rule needs a 'source' (JSONPath) and 'target_header' (header name to inject)." },
+      ],
+    },
+    {
+      title: "Error Handling",
+      description: "3 modes: (1) Default — ignore all errors. (2) Exit on Error — stop on ANY failure. (3) Exit on Status — stop only on specific HTTP codes, connection/timeout errors are ignored.",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "exit_on_error", label: "Exit on Any Error", type: "boolean", defaultValue: false, description: "Stop request on ANY callout failure (connection timeout, HTTP error, etc). Use this when callout availability is critical." },
+        { key: "exit_on_status", label: "Exit on Status Codes", type: "string", placeholder: "401, 403, 422", description: "Comma-separated HTTP status codes. Stop ONLY when the callout returns one of these codes. Connection/timeout errors are silently ignored and the flow continues. Useful when the callout is 'best effort' but specific rejection statuses must be honored." },
+        { key: "error_status", label: "Error Status Code", type: "integer", defaultValue: 503, min: 400, max: 599, description: "HTTP status code returned to the client when the callout triggers an exit." },
+        { key: "error_message", label: "Error Message", type: "string", defaultValue: "External service unavailable", description: "Error message returned to the client when the callout triggers an exit." },
+      ],
+    },
+    {
+      title: "Advanced",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "fire_and_forget", label: "Fire-and-Forget", type: "boolean", defaultValue: false, description: "Execute callout asynchronously without waiting for response." },
+        { key: "cache_ttl", label: "Cache TTL", type: "integer", defaultValue: 0, suffix: "s", min: 0, description: "Cache callout response for N seconds (0 = no cache)." },
+        { key: "ssl_verify", label: "Verify SSL", type: "boolean", defaultValue: true },
+        { key: "keepalive", label: "Connection Keepalive", type: "boolean", defaultValue: true },
+      ],
+    },
+  ],
+}
+
+const DATA_MASKING: PluginFormDef = {
+  pluginName: "data-masking",
+  groups: [
+    {
+      title: "Masking Rules",
+      description: "Define fields to mask in the JSON response body. Each rule specifies a JSONPath and masking strategy.",
+      fields: [
+        { key: "rules", label: "Rules (JSON)", type: "text", required: true, placeholder: "[\n  {\"path\": \"$.cpf\", \"strategy\": \"partial\", \"visible_chars\": 3},\n  {\"path\": \"$.data[*].email\", \"strategy\": \"email\"},\n  {\"path\": \"$.password\", \"strategy\": \"full\", \"replacement\": \"[REDACTED]\"}\n]", description: "JSON array of masking rules. Each rule needs a 'path' (JSONPath) and 'strategy' (full, partial, hash, email, phone). Optional: 'replacement' for full strategy, 'visible_chars' for partial strategy." },
+      ],
+    },
+    {
+      title: "Options",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "content_types", label: "Content Types (JSON array)", type: "text", placeholder: "[\"application/json\"]", description: "Response content-types to process. Defaults to application/json." },
+        { key: "enabled_for_debug", label: "Debug Bypass", type: "boolean", defaultValue: false, description: "Skip masking when X-FuseOne-Debug header is present." },
+      ],
+    },
+  ],
+}
+
+const THREAT_PROTECTION: PluginFormDef = {
+  pluginName: "threat-protection",
+  groups: [
+    {
+      title: "JSON Structure Limits",
+      description: "Limit JSON payload structure to prevent resource exhaustion attacks.",
+      fields: [
+        { key: "json.max_depth", label: "Max Depth", type: "integer", defaultValue: 20, min: 1, max: 100, description: "Maximum nesting depth for JSON objects/arrays." },
+        { key: "json.max_array_length", label: "Max Array Length", type: "integer", defaultValue: 1000, min: 1, description: "Maximum number of elements in any JSON array." },
+        { key: "json.max_object_entries", label: "Max Object Entries", type: "integer", defaultValue: 500, min: 1, description: "Maximum number of key-value pairs in any JSON object." },
+        { key: "json.max_string_length", label: "Max String Length", type: "integer", defaultValue: 100000, min: 1, description: "Maximum length of any string value in the JSON body." },
+        { key: "json.max_body_size", label: "Max Body Size", type: "integer", defaultValue: 1048576, min: 1, suffix: "bytes", description: "Maximum request body size in bytes (default 1 MB)." },
+      ],
+    },
+    {
+      title: "Injection Detection",
+      description: "Detect common injection attacks in request parameters.",
+      fields: [
+        { key: "injection.sql_injection", label: "SQL Injection", type: "boolean", defaultValue: true, description: "Detect SQL injection patterns." },
+        { key: "injection.xss", label: "XSS Detection", type: "boolean", defaultValue: true, description: "Detect cross-site scripting patterns." },
+        { key: "injection.scan_headers", label: "Scan Headers", type: "boolean", defaultValue: false, description: "Check request headers for injection patterns." },
+        { key: "injection.scan_query", label: "Scan Query Params", type: "boolean", defaultValue: true, description: "Check URL query parameters for injection patterns." },
+        { key: "injection.scan_body", label: "Scan Body", type: "boolean", defaultValue: true, description: "Check request body for injection patterns." },
+      ],
+    },
+    {
+      title: "Action",
+      fields: [
+        { key: "action", label: "On Threat Detected", type: "enum", defaultValue: "reject", options: [
+          { value: "reject", label: "Reject (403 Forbidden)" },
+          { value: "log", label: "Log Only (allow request)" },
+        ], description: "Action to take when a threat is detected." },
+      ],
+    },
+  ],
+}
+
 // --- Registry ---
 
 export const PLUGIN_FORM_REGISTRY: Record<string, PluginFormDef> = {
@@ -2077,4 +2194,8 @@ export const PLUGIN_FORM_REGISTRY: Record<string, PluginFormDef> = {
   "ai-rate-limiting": AI_RATE_LIMITING,
   "ai-rag": AI_RAG,
   "ai-aws-content-moderation": AI_AWS_CONTENT_MODERATION,
+  // FuseOne Custom Plugins
+  "http-callout": HTTP_CALLOUT,
+  "data-masking": DATA_MASKING,
+  "threat-protection": THREAT_PROTECTION,
 }

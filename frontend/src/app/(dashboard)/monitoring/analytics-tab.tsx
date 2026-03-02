@@ -4,14 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceArea,
 } from "recharts"
 import {
   Activity,
@@ -32,13 +31,6 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Table,
   TableBody,
   TableCell,
@@ -48,22 +40,25 @@ import {
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
+import { MetricsDateRange } from "@/components/metrics-date-range"
 import { api } from "@/lib/api-client"
-import { formatBytes, formatLatency, formatErrorRate, formatTimestamp, formatNumber } from "@/lib/metrics-utils"
-import type { TimeSeriesPoint, MetricsSummary, TopRoute, TimeRange } from "@/types/metrics"
+import {
+  formatBytes,
+  formatLatency,
+  formatErrorRate,
+  formatTimestampForSpan,
+  formatNumber,
+  dateRangeToParams,
+  dateRangeSpanHours,
+} from "@/lib/metrics-utils"
+import type { TimeSeriesPoint, MetricsSummary, TopRoute, DateRangeValue } from "@/types/metrics"
 import { toast } from "sonner"
 
-const TIME_RANGES: { value: TimeRange; label: string }[] = [
-  { value: "1h", label: "Last Hour" },
-  { value: "6h", label: "Last 6 Hours" },
-  { value: "24h", label: "Last 24 Hours" },
-  { value: "7d", label: "Last 7 Days" },
-]
-
 const AUTO_REFRESH_INTERVAL = 30_000
+const SYNC_ID = "global-analytics"
 
 export function AnalyticsTab() {
-  const [range_, setRange] = useState<TimeRange>("1h")
+  const [dateRange, setDateRange] = useState<DateRangeValue>({ type: "preset", preset: "1h" })
   const [timeSeries, setTimeSeries] = useState<TimeSeriesPoint[]>([])
   const [summary, setSummary] = useState<MetricsSummary | null>(null)
   const [topRoutes, setTopRoutes] = useState<TopRoute[]>([])
@@ -73,12 +68,17 @@ export function AnalyticsTab() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Drag-to-zoom state (index into chartData)
+  const [dragStartIdx, setDragStartIdx] = useState<number | null>(null)
+  const [dragEndIdx, setDragEndIdx] = useState<number | null>(null)
+
   const fetchData = useCallback(async () => {
+    const rangeParams = dateRangeToParams(dateRange)
     try {
       const [ts, sum, routes] = await Promise.all([
-        api.metricsTimeSeries({ range: range_ }),
-        api.metricsSummary({ range: range_ }),
-        api.metricsTopRoutes({ range: range_, limit: 10 }),
+        api.metricsTimeSeries(rangeParams),
+        api.metricsSummary(rangeParams),
+        api.metricsTopRoutes({ ...rangeParams, limit: 10 }),
       ])
       setTimeSeries(ts)
       setSummary(sum)
@@ -91,7 +91,7 @@ export function AnalyticsTab() {
     } finally {
       setLoading(false)
     }
-  }, [range_])
+  }, [dateRange])
 
   useEffect(() => {
     setLoading(true)
@@ -112,11 +112,44 @@ export function AnalyticsTab() {
     fetchData().then(() => toast.success("Metrics refreshed"))
   }
 
-  // Format time series data for recharts
+  const spanHours = dateRangeSpanHours(dateRange)
   const chartData = timeSeries.map((p) => ({
     ...p,
-    time: formatTimestamp(p.ts, range_),
+    time: formatTimestampForSpan(p.ts, spanHours),
   }))
+
+  // Drag-to-zoom: select a time range on any chart → update dateRange to custom
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function handleChartMouseDown(e: any) {
+    if (e?.activeTooltipIndex != null) setDragStartIdx(e.activeTooltipIndex)
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function handleChartMouseMove(e: any) {
+    if (dragStartIdx != null && e?.activeTooltipIndex != null) setDragEndIdx(e.activeTooltipIndex)
+  }
+  function handleChartMouseUp() {
+    if (dragStartIdx != null && dragEndIdx != null && dragStartIdx !== dragEndIdx) {
+      const i1 = Math.min(dragStartIdx, dragEndIdx)
+      const i2 = Math.max(dragStartIdx, dragEndIdx)
+      const fromTs = timeSeries[i1]?.ts
+      const toTs = timeSeries[i2]?.ts
+      if (fromTs && toTs) {
+        setDateRange({ type: "custom", from: new Date(fromTs), to: new Date(toTs) })
+      }
+    }
+    setDragStartIdx(null)
+    setDragEndIdx(null)
+  }
+
+  // Compute drag selection labels for ReferenceArea
+  const dragRefStart = dragStartIdx != null ? chartData[dragStartIdx]?.time : null
+  const dragRefEnd = dragEndIdx != null ? chartData[dragEndIdx]?.time : null
+
+  // Common tooltip style
+  const tooltipStyle = {
+    contentStyle: { backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" },
+    labelStyle: { color: "var(--foreground)" },
+  }
 
   if (loading && timeSeries.length === 0) {
     return (
@@ -163,18 +196,7 @@ export function AnalyticsTab() {
       {/* Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Select value={range_} onValueChange={(v) => setRange(v as TimeRange)}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TIME_RANGES.map((r) => (
-                <SelectItem key={r.value} value={r.value}>
-                  {r.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MetricsDateRange value={dateRange} onChange={setDateRange} />
           <div className="flex items-center gap-2">
             <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} id="metrics-auto-refresh" />
             <label htmlFor="metrics-auto-refresh" className="text-sm text-muted-foreground cursor-pointer">
@@ -188,10 +210,12 @@ export function AnalyticsTab() {
             </span>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={handleManualRefresh} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleManualRefresh} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -277,19 +301,19 @@ export function AnalyticsTab() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Requests Over Time</CardTitle>
-              <CardDescription>Total requests per time window</CardDescription>
+              <CardDescription>Drag on any chart to select a time range</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={chartData}>
+                <LineChart data={chartData} syncId={SYNC_ID} onMouseDown={handleChartMouseDown} onMouseMove={handleChartMouseMove} onMouseUp={handleChartMouseUp}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="time" className="text-xs" tick={{ fontSize: 11 }} />
                   <YAxis className="text-xs" tick={{ fontSize: 11 }} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
-                    labelStyle={{ color: "var(--foreground)" }}
-                  />
+                  <Tooltip {...tooltipStyle} />
                   <Line type="monotone" dataKey="requests_total" stroke="var(--primary)" strokeWidth={2} dot={false} name="Requests" />
+                  {dragRefStart && dragRefEnd && (
+                    <ReferenceArea x1={dragRefStart} x2={dragRefEnd} strokeOpacity={0.3} fill="var(--primary)" fillOpacity={0.15} />
+                  )}
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -303,19 +327,21 @@ export function AnalyticsTab() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={chartData}>
+                <LineChart data={chartData} syncId={SYNC_ID} onMouseDown={handleChartMouseDown} onMouseMove={handleChartMouseMove} onMouseUp={handleChartMouseUp}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="time" className="text-xs" tick={{ fontSize: 11 }} />
                   <YAxis className="text-xs" tick={{ fontSize: 11 }} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
-                    labelStyle={{ color: "var(--foreground)" }}
+                    {...tooltipStyle}
                     formatter={(value) => value != null ? [`${Number(value).toFixed(1)} ms`] : ["-"]}
                   />
                   <Legend />
                   <Line type="monotone" dataKey="latency_p50" stroke="#22c55e" strokeWidth={2} dot={false} name="p50" />
                   <Line type="monotone" dataKey="latency_p95" stroke="#f59e0b" strokeWidth={2} dot={false} name="p95" />
                   <Line type="monotone" dataKey="latency_p99" stroke="#ef4444" strokeWidth={2} dot={false} name="p99" />
+                  {dragRefStart && dragRefEnd && (
+                    <ReferenceArea x1={dragRefStart} x2={dragRefEnd} strokeOpacity={0.3} fill="var(--primary)" fillOpacity={0.15} />
+                  )}
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -329,20 +355,20 @@ export function AnalyticsTab() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={chartData}>
+                <LineChart data={chartData} syncId={SYNC_ID} onMouseDown={handleChartMouseDown} onMouseMove={handleChartMouseMove} onMouseUp={handleChartMouseUp}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="time" className="text-xs" tick={{ fontSize: 11 }} />
                   <YAxis className="text-xs" tick={{ fontSize: 11 }} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
-                    labelStyle={{ color: "var(--foreground)" }}
-                  />
+                  <Tooltip {...tooltipStyle} />
                   <Legend />
-                  <Bar dataKey="status_2xx" stackId="status" fill="#22c55e" name="2xx" />
-                  <Bar dataKey="status_3xx" stackId="status" fill="#3b82f6" name="3xx" />
-                  <Bar dataKey="status_4xx" stackId="status" fill="#f59e0b" name="4xx" />
-                  <Bar dataKey="status_5xx" stackId="status" fill="#ef4444" name="5xx" />
-                </BarChart>
+                  <Line type="monotone" dataKey="status_2xx" stroke="#22c55e" strokeWidth={2} dot={false} name="2xx" />
+                  <Line type="monotone" dataKey="status_3xx" stroke="#3b82f6" strokeWidth={2} dot={false} name="3xx" />
+                  <Line type="monotone" dataKey="status_4xx" stroke="#f59e0b" strokeWidth={2} dot={false} name="4xx" />
+                  <Line type="monotone" dataKey="status_5xx" stroke="#ef4444" strokeWidth={2} dot={false} name="5xx" />
+                  {dragRefStart && dragRefEnd && (
+                    <ReferenceArea x1={dragRefStart} x2={dragRefEnd} strokeOpacity={0.3} fill="var(--primary)" fillOpacity={0.15} />
+                  )}
+                </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -369,16 +395,9 @@ export function AnalyticsTab() {
                     {topRoutes.map((route) => (
                       <TableRow key={route.route_id}>
                         <TableCell>
-                          <div>
-                            <span className="font-medium text-sm">
-                              {route.route_name || route.route_id}
-                            </span>
-                            {route.route_name && route.route_name !== route.route_id && (
-                              <span className="block text-xs text-muted-foreground font-mono">
-                                {route.route_id}
-                              </span>
-                            )}
-                          </div>
+                          <span className="font-medium text-sm">
+                            {route.route_name || route.route_id}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           {formatNumber(route.requests_total)}

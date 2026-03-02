@@ -1,0 +1,14 @@
+replicaCount: 3
+
+image:
+  repository: quay.io/coreos/etcd
+  tag: v3.5.21
+  pullPolicy: IfNotPresent
+
+storage:
+  size: 25Gi
+  # storageClassName: ""
+
+affinity: {}
+
+tolerations: []

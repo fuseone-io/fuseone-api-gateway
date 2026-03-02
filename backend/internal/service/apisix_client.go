@@ -221,6 +221,22 @@ func (c *APISIXClient) ValidateSchema(ctx context.Context, resource string, data
 	return nil
 }
 
+// ReloadPlugins triggers a hot-reload of all APISIX plugins (zero downtime)
+func (c *APISIXClient) ReloadPlugins(ctx context.Context) error {
+	resp, err := c.do(ctx, http.MethodPut, "/plugins/reload", nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("plugin reload failed (%d): %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 // Control API methods (port 9090, no auth required)
 
 func (c *APISIXClient) GetUpstreamHealth(ctx context.Context) (json.RawMessage, error) {

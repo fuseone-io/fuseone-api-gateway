@@ -3,9 +3,88 @@ apisix:
   enable_admin: true
   enable_admin_cors: true
   enable_control: true
+  extra_lua_path: "/opt/custom-plugins/?.lua"
   control:
     ip: "0.0.0.0"
     port: 9090
+
+plugins:
+  # Built-in plugins (APISIX 3.15 defaults)
+  - real-ip
+  - client-control
+  - proxy-control
+  - request-id
+  - zipkin
+  - ext-plugin-pre-req
+  - fault-injection
+  - mocking
+  - serverless-pre-function
+  - cors
+  - ip-restriction
+  - ua-restriction
+  - referer-restriction
+  - csrf
+  - uri-blocker
+  - request-validation
+  - multi-auth
+  - openid-connect
+  - authz-keycloak
+  - authz-casdoor
+  - wolf-rbac
+  - ldap-auth
+  - hmac-auth
+  - basic-auth
+  - jwt-auth
+  - key-auth
+  - consumer-restriction
+  - forward-auth
+  - opa
+  - authz-casbin
+  - cas-auth
+  - limit-conn
+  - limit-count
+  - limit-req
+  - gzip
+  - server-info
+  - traffic-split
+  - redirect
+  - response-rewrite
+  - grpc-transcode
+  - grpc-web
+  - public-api
+  - prometheus
+  - datadog
+  - elasticsearch-logger
+  - echo
+  - loggly
+  - http-logger
+  - skywalking-logger
+  - google-cloud-logging
+  - sls-logger
+  - tcp-logger
+  - kafka-logger
+  - rocketmq-logger
+  - syslog
+  - udp-logger
+  - file-logger
+  - clickhouse-logger
+  - tencent-cloud-cls
+  - inspect
+  - example-plugin
+  - api-breaker
+  - proxy-mirror
+  - proxy-cache
+  - proxy-rewrite
+  - workflow
+  - opentelemetry
+  - body-transformer
+  - ext-plugin-post-req
+  - ext-plugin-post-resp
+  - serverless-post-function
+  # FuseOne custom plugins
+  - http-callout
+  - data-masking
+  - threat-protection
 
 deployment:
   admin:

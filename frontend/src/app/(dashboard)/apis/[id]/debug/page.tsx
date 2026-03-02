@@ -1,11 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import {
   Activity,
   AlertTriangle,
-  ArrowLeft,
   Bug,
   ChevronLeft,
   ChevronRight,
@@ -254,7 +253,7 @@ function CollapsibleCode({ title, badge, defaultOpen, variant = "default", child
 
 export default function ApiDebugPage() {
   const params = useParams()
-  const router = useRouter()
+
   const apiId = params.id as string
 
   // API info
@@ -435,19 +434,14 @@ export default function ApiDebugPage() {
     <div className="space-y-6">
       {/* ─── Header ─── */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => router.push(`/apis/${apiId}`)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight truncate">{record?.name || "API"}</h1>
-              {record?.version && (
-                <Badge variant="outline" className="text-[10px] font-mono shrink-0">v{record.version}</Badge>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mt-0.5">Request logs and traffic debugging</p>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight truncate">{record?.name || "API"}</h1>
+            {record?.version && (
+              <Badge variant="outline" className="text-[10px] font-mono shrink-0">v{record.version}</Badge>
+            )}
           </div>
+          <p className="text-sm text-muted-foreground mt-0.5">Request logs and traffic debugging</p>
         </div>
 
         <div className="flex items-center gap-3 shrink-0">

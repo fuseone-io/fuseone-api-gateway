@@ -5,11 +5,13 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
+  BarChart3,
   Bug,
   Plus,
   Search,
   MoreHorizontal,
   Eye,
+  Heart,
   Trash2,
   Rocket,
   GitBranch,
@@ -361,9 +363,6 @@ export default function ApisPage() {
                           <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}`)}>
                             <Eye className="mr-2 h-3.5 w-3.5" /> View
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}/debug`)}>
-                            <Bug className="mr-2 h-3.5 w-3.5" /> Debug
-                          </DropdownMenuItem>
                           {(record.sync_status === "draft" || record.sync_status === "out_of_sync") && (
                             <DropdownMenuItem
                               onClick={() => handleDeploy(record)}
@@ -382,6 +381,16 @@ export default function ApisPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => record.definition && exportAsOpenAPIYaml(record.definition)}>
                             <Download className="mr-2 h-3.5 w-3.5" /> Export OpenAPI
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}/analytics`)}>
+                            <BarChart3 className="mr-2 h-3.5 w-3.5" /> Analytics
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}/health`)}>
+                            <Heart className="mr-2 h-3.5 w-3.5" /> Health Check
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}/debug`)}>
+                            <Bug className="mr-2 h-3.5 w-3.5" /> Debug
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem

@@ -580,24 +580,32 @@ apisix:
   # -- customPlugins allows you to mount your own HTTP plugins.
   customPlugins:
     # -- Whether to configure some custom plugins
-    enabled: false
+    enabled: true
     # -- the lua_path that tells APISIX where it can find plugins,
     # note the last ';' is required.
     luaPath: "/opts/custom_plugins/?.lua"
     plugins:
-      # -- plugin name.
-      - name: "plugin-name"
-        # -- plugin attrs
+      - name: "http-callout"
         attrs: {}
-        # -- plugin codes can be saved inside configmap object.
         configMap:
-          # -- name of configmap.
-          name: "configmap-name"
-          # -- since keys in configmap is flat, mountPath allows to define the mount
-          # path, so that plugin codes can be mounted hierarchically.
+          name: "fuseone-custom-plugins"
           mounts:
-            - key: "the-file-name"
-              path: "mount-path"
+            - key: "http-callout.lua"
+              path: "/opts/custom_plugins/apisix/plugins/http-callout.lua"
+      - name: "data-masking"
+        attrs: {}
+        configMap:
+          name: "fuseone-custom-plugins"
+          mounts:
+            - key: "data-masking.lua"
+              path: "/opts/custom_plugins/apisix/plugins/data-masking.lua"
+      - name: "threat-protection"
+        attrs: {}
+        configMap:
+          name: "fuseone-custom-plugins"
+          mounts:
+            - key: "threat-protection.lua"
+              path: "/opts/custom_plugins/apisix/plugins/threat-protection.lua"
 
   status:
     ip: "0.0.0.0"

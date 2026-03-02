@@ -83,7 +83,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService, userRepo, auditLogger)
 	healthHandler := handler.NewHealthHandler(pool, apisixClient)
 	dashboardHandler := handler.NewDashboardHandler(apisixClient)
-	pluginHandler := handler.NewPluginHandler(apisixClient)
+	pluginHandler := handler.NewPluginHandler(apisixClient, auditLogger)
 	auditHandler := handler.NewAuditHandler(auditRepo)
 	secretHandler := handler.NewSecretHandler(secretRepo, cryptoService, auditLogger)
 	apiDefHandler := handler.NewApiDefinitionHandler(apiDefService, auditLogger)
@@ -182,9 +182,10 @@ func main() {
 		registerResourceRoutes(api, "apisix/stream-routes", streamRouteHandler, "stream_routes")
 		registerResourceRoutes(api, "apisix/secrets", apisixSecretHandler, "secrets")
 
-		// Plugins (read-only)
+		// Plugins
 		api.GET("/apisix/plugins", middleware.RequirePermission("plugins:read"), pluginHandler.ListPlugins)
 		api.GET("/apisix/plugins/:name", middleware.RequirePermission("plugins:read"), pluginHandler.GetPluginSchema)
+		api.PUT("/apisix/plugins/reload", middleware.RequirePermission("plugins:write"), pluginHandler.ReloadPlugins)
 
 		// API Definitions (draft/deploy workflow)
 		apis := api.Group("/apis")

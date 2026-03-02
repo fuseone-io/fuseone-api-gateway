@@ -1,23 +1,21 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceArea,
 } from "recharts"
 import {
   Activity,
   ArrowDownRight,
-  ArrowLeft,
   ArrowUpRight,
   Clock,
   RefreshCw,
@@ -34,13 +32,6 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Table,
   TableBody,
   TableCell,
@@ -51,30 +42,26 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { MetricsDateRange } from "@/components/metrics-date-range"
 import { api } from "@/lib/api-client"
 import {
   formatBytes,
   formatLatency,
   formatErrorRate,
-  formatTimestamp,
+  formatTimestampForSpan,
   formatNumber,
+  dateRangeToParams,
+  dateRangeSpanHours,
 } from "@/lib/metrics-utils"
-import type { TimeSeriesPoint, MetricsSummary, TopRoute, TimeRange } from "@/types/metrics"
+import type { TimeSeriesPoint, MetricsSummary, TopRoute, DateRangeValue } from "@/types/metrics"
 import type { ApiDefRecord } from "@/types/api"
 import { toast } from "sonner"
 
-const TIME_RANGES: { value: TimeRange; label: string }[] = [
-  { value: "1h", label: "Last Hour" },
-  { value: "6h", label: "Last 6 Hours" },
-  { value: "24h", label: "Last 24 Hours" },
-  { value: "7d", label: "Last 7 Days" },
-]
-
 const AUTO_REFRESH_INTERVAL = 30_000
+const SYNC_ID = "api-analytics"
 
 export default function ApiAnalyticsPage() {
   const params = useParams()
-  const router = useRouter()
   const apiId = params.id as string
 
   // API info
@@ -82,7 +69,7 @@ export default function ApiAnalyticsPage() {
   const [loadingApi, setLoadingApi] = useState(true)
 
   // Metrics state
-  const [range_, setRange] = useState<TimeRange>("1h")
+  const [dateRange, setDateRange] = useState<DateRangeValue>({ type: "preset", preset: "1h" })
   const [timeSeries, setTimeSeries] = useState<TimeSeriesPoint[]>([])
   const [summary, setSummary] = useState<MetricsSummary | null>(null)
   const [topRoutes, setTopRoutes] = useState<TopRoute[]>([])
@@ -90,6 +77,10 @@ export default function ApiAnalyticsPage() {
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Drag-to-zoom state (index into chartData)
+  const [dragStartIdx, setDragStartIdx] = useState<number | null>(null)
+  const [dragEndIdx, setDragEndIdx] = useState<number | null>(null)
 
   // Load API info
   useEffect(() => {
@@ -114,11 +105,12 @@ export default function ApiAnalyticsPage() {
       setLoading(false)
       return
     }
+    const rangeParams = dateRangeToParams(dateRange)
     try {
       const [ts, sum, routes] = await Promise.all([
-        api.metricsTimeSeries({ route_ids: routeIds, range: range_ }),
-        api.metricsSummary({ route_ids: routeIds, range: range_ }),
-        api.metricsTopRoutes({ route_ids: routeIds, range: range_, limit: 20 }),
+        api.metricsTimeSeries({ route_ids: routeIds, ...rangeParams }),
+        api.metricsSummary({ route_ids: routeIds, ...rangeParams }),
+        api.metricsTopRoutes({ route_ids: routeIds, ...rangeParams, limit: 20 }),
       ])
       setTimeSeries(ts)
       setSummary(sum)
@@ -131,7 +123,7 @@ export default function ApiAnalyticsPage() {
     } finally {
       setLoading(false)
     }
-  }, [routeIds, range_, autoRefresh])
+  }, [routeIds, dateRange, autoRefresh])
 
   useEffect(() => {
     if (!loadingApi) {
@@ -149,13 +141,47 @@ export default function ApiAnalyticsPage() {
     }
   }, [autoRefresh, fetchData, loadingApi])
 
+  const spanHours = dateRangeSpanHours(dateRange)
   const chartData = timeSeries.map((p) => ({
     ...p,
-    time: formatTimestamp(p.ts, range_),
+    time: formatTimestampForSpan(p.ts, spanHours),
   }))
+
+  // Drag-to-zoom: select a time range on any chart → update dateRange to custom
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function handleChartMouseDown(e: any) {
+    if (e?.activeTooltipIndex != null) setDragStartIdx(e.activeTooltipIndex)
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function handleChartMouseMove(e: any) {
+    if (dragStartIdx != null && e?.activeTooltipIndex != null) setDragEndIdx(e.activeTooltipIndex)
+  }
+  function handleChartMouseUp() {
+    if (dragStartIdx != null && dragEndIdx != null && dragStartIdx !== dragEndIdx) {
+      const i1 = Math.min(dragStartIdx, dragEndIdx)
+      const i2 = Math.max(dragStartIdx, dragEndIdx)
+      const fromTs = timeSeries[i1]?.ts
+      const toTs = timeSeries[i2]?.ts
+      if (fromTs && toTs) {
+        setDateRange({ type: "custom", from: new Date(fromTs), to: new Date(toTs) })
+      }
+    }
+    setDragStartIdx(null)
+    setDragEndIdx(null)
+  }
+
+  // Compute drag selection labels for ReferenceArea
+  const dragRefStart = dragStartIdx != null ? chartData[dragStartIdx]?.time : null
+  const dragRefEnd = dragEndIdx != null ? chartData[dragEndIdx]?.time : null
 
   const hasData = timeSeries.length > 0
   const isDraft = record?.sync_status === "draft"
+
+  // Common tooltip style
+  const tooltipStyle = {
+    contentStyle: { backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" },
+    labelStyle: { color: "var(--foreground)" },
+  }
 
   if (loadingApi) {
     return (
@@ -173,37 +199,21 @@ export default function ApiAnalyticsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => router.push(`/apis/${apiId}`)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight truncate">{record?.name || "API"}</h1>
-              {record?.version && (
-                <Badge variant="outline" className="text-[10px] font-mono shrink-0">v{record.version}</Badge>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mt-0.5">Traffic analytics and performance metrics</p>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight truncate">{record?.name || "API"}</h1>
+            {record?.version && (
+              <Badge variant="outline" className="text-[10px] font-mono shrink-0">v{record.version}</Badge>
+            )}
           </div>
+          <p className="text-sm text-muted-foreground mt-0.5">Traffic analytics and performance metrics</p>
         </div>
       </div>
 
       {/* Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Select value={range_} onValueChange={(v) => setRange(v as TimeRange)}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TIME_RANGES.map((r) => (
-                <SelectItem key={r.value} value={r.value}>
-                  {r.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MetricsDateRange value={dateRange} onChange={setDateRange} />
           <div className="flex items-center gap-1.5">
             <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} id="api-metrics-auto" />
             <Label htmlFor="api-metrics-auto" className="text-xs text-muted-foreground cursor-pointer">
@@ -217,10 +227,12 @@ export default function ApiAnalyticsPage() {
             </span>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchData() }} disabled={loading}>
-          <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchData() }} disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -323,19 +335,19 @@ export default function ApiAnalyticsPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Requests Over Time</CardTitle>
-              <CardDescription>Total requests per time window</CardDescription>
+              <CardDescription>Drag on any chart to select a time range</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={chartData}>
+                <LineChart data={chartData} syncId={SYNC_ID} onMouseDown={handleChartMouseDown} onMouseMove={handleChartMouseMove} onMouseUp={handleChartMouseUp}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="time" className="text-xs" tick={{ fontSize: 11 }} />
                   <YAxis className="text-xs" tick={{ fontSize: 11 }} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
-                    labelStyle={{ color: "var(--foreground)" }}
-                  />
+                  <Tooltip {...tooltipStyle} />
                   <Line type="monotone" dataKey="requests_total" stroke="var(--primary)" strokeWidth={2} dot={false} name="Requests" />
+                  {dragRefStart && dragRefEnd && (
+                    <ReferenceArea x1={dragRefStart} x2={dragRefEnd} strokeOpacity={0.3} fill="var(--primary)" fillOpacity={0.15} />
+                  )}
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -349,19 +361,21 @@ export default function ApiAnalyticsPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={chartData}>
+                <LineChart data={chartData} syncId={SYNC_ID} onMouseDown={handleChartMouseDown} onMouseMove={handleChartMouseMove} onMouseUp={handleChartMouseUp}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="time" className="text-xs" tick={{ fontSize: 11 }} />
                   <YAxis className="text-xs" tick={{ fontSize: 11 }} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
-                    labelStyle={{ color: "var(--foreground)" }}
+                    {...tooltipStyle}
                     formatter={(value) => value != null ? [`${Number(value).toFixed(1)} ms`] : ["-"]}
                   />
                   <Legend />
                   <Line type="monotone" dataKey="latency_p50" stroke="#22c55e" strokeWidth={2} dot={false} name="p50" />
                   <Line type="monotone" dataKey="latency_p95" stroke="#f59e0b" strokeWidth={2} dot={false} name="p95" />
                   <Line type="monotone" dataKey="latency_p99" stroke="#ef4444" strokeWidth={2} dot={false} name="p99" />
+                  {dragRefStart && dragRefEnd && (
+                    <ReferenceArea x1={dragRefStart} x2={dragRefEnd} strokeOpacity={0.3} fill="var(--primary)" fillOpacity={0.15} />
+                  )}
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -375,20 +389,20 @@ export default function ApiAnalyticsPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={chartData}>
+                <LineChart data={chartData} syncId={SYNC_ID} onMouseDown={handleChartMouseDown} onMouseMove={handleChartMouseMove} onMouseUp={handleChartMouseUp}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="time" className="text-xs" tick={{ fontSize: 11 }} />
                   <YAxis className="text-xs" tick={{ fontSize: 11 }} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
-                    labelStyle={{ color: "var(--foreground)" }}
-                  />
+                  <Tooltip {...tooltipStyle} />
                   <Legend />
-                  <Bar dataKey="status_2xx" stackId="status" fill="#22c55e" name="2xx" />
-                  <Bar dataKey="status_3xx" stackId="status" fill="#3b82f6" name="3xx" />
-                  <Bar dataKey="status_4xx" stackId="status" fill="#f59e0b" name="4xx" />
-                  <Bar dataKey="status_5xx" stackId="status" fill="#ef4444" name="5xx" />
-                </BarChart>
+                  <Line type="monotone" dataKey="status_2xx" stroke="#22c55e" strokeWidth={2} dot={false} name="2xx" />
+                  <Line type="monotone" dataKey="status_3xx" stroke="#3b82f6" strokeWidth={2} dot={false} name="3xx" />
+                  <Line type="monotone" dataKey="status_4xx" stroke="#f59e0b" strokeWidth={2} dot={false} name="4xx" />
+                  <Line type="monotone" dataKey="status_5xx" stroke="#ef4444" strokeWidth={2} dot={false} name="5xx" />
+                  {dragRefStart && dragRefEnd && (
+                    <ReferenceArea x1={dragRefStart} x2={dragRefEnd} strokeOpacity={0.3} fill="var(--primary)" fillOpacity={0.15} />
+                  )}
+                </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -415,16 +429,9 @@ export default function ApiAnalyticsPage() {
                     {topRoutes.map((route) => (
                       <TableRow key={route.route_id}>
                         <TableCell>
-                          <div>
-                            <span className="font-medium text-sm">
-                              {route.route_name || route.route_id}
-                            </span>
-                            {route.route_name && route.route_name !== route.route_id && (
-                              <span className="block text-xs text-muted-foreground font-mono">
-                                {route.route_id}
-                              </span>
-                            )}
-                          </div>
+                          <span className="font-medium text-sm">
+                            {route.route_name || route.route_id}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           {formatNumber(route.requests_total)}

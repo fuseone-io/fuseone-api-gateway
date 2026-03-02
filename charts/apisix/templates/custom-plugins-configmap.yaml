@@ -1,0 +1,16 @@
+{{- if .Values.apisix.customPlugins.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fuseone-custom-plugins
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "apisix.labels" . | nindent 4 }}
+data:
+  http-callout.lua: |
+    {{ .Files.Get "files/http-callout.lua" | nindent 4 }}
+  data-masking.lua: |
+    {{ .Files.Get "files/data-masking.lua" | nindent 4 }}
+  threat-protection.lua: |
+    {{ .Files.Get "files/threat-protection.lua" | nindent 4 }}
+{{- end }}

@@ -131,6 +131,9 @@ export const api = {
   getPluginSchema: (name: string) =>
     request<{ data: unknown }>(`/api/apisix/plugins/${name}`).then((r) => r.data),
 
+  reloadPlugins: () =>
+    request<{ data: { message: string } }>("/api/apisix/plugins/reload", { method: "PUT" }).then((r) => r.data),
+
   // Monitoring
   upstreamHealth: () =>
     request<{ data: import("@/types/apisix").UpstreamHealthChecker[] }>("/api/monitoring/upstream-health").then((r) => r.data),

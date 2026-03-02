@@ -57,6 +57,9 @@ const EXTRA_DESCRIPTIONS: Record<string, string> = {
   "client-control": "Control client request behavior",
   "proxy-control": "Control proxy behavior",
   "workflow": "Complex condition-based workflow",
+  "http-callout": "Call external services during request processing",
+  "data-masking": "Redact PII from API response bodies",
+  "threat-protection": "Detect and block payload-based attacks",
 }
 
 // --- Heuristic classification for unknown plugins ---
