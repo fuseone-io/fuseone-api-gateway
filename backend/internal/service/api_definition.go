@@ -16,13 +16,14 @@ import (
 )
 
 type ApiDefinitionService struct {
-	repo   *repository.ApiDefinitionRepository
-	apisix *APISIXClient
-	logger *zap.Logger
+	repo           *repository.ApiDefinitionRepository
+	apisix         *APISIXClient
+	secretResolver *SecretResolver
+	logger         *zap.Logger
 }
 
-func NewApiDefinitionService(repo *repository.ApiDefinitionRepository, apisix *APISIXClient, logger *zap.Logger) *ApiDefinitionService {
-	return &ApiDefinitionService{repo: repo, apisix: apisix, logger: logger}
+func NewApiDefinitionService(repo *repository.ApiDefinitionRepository, apisix *APISIXClient, secretResolver *SecretResolver, logger *zap.Logger) *ApiDefinitionService {
+	return &ApiDefinitionService{repo: repo, apisix: apisix, secretResolver: secretResolver, logger: logger}
 }
 
 func (s *ApiDefinitionService) Get(ctx context.Context, id uuid.UUID) (*model.ApiDefinition, error) {
@@ -150,10 +151,10 @@ func (s *ApiDefinitionService) Deploy(ctx context.Context, id uuid.UUID) (*model
 		return nil, fmt.Errorf("parsing definition: %w", err)
 	}
 
-	// Default routing mode
+	// Default routing mode — "none" means no version in URI or headers
 	routingMode := def.RoutingMode
 	if routingMode == "" {
-		routingMode = "path"
+		routingMode = "none"
 	}
 
 	// Build upstream from endpoint
@@ -206,9 +207,13 @@ func (s *ApiDefinitionService) Deploy(ctx context.Context, id uuid.UUID) (*model
 		plugins := map[string]interface{}{}
 		for _, p := range flow.Policies {
 			if p.Enabled {
-				plugins[p.Name] = p.Config
+				plugins[p.Name] = stripConsumerCredentials(p.Name, p.Config)
 			}
 		}
+
+		// Strip context path from upstream requests (like Gravitee default behavior).
+		// Injects proxy-rewrite with regex_uri so /payments/invoices → /invoices on upstream.
+		injectProxyRewrite(plugins, def.ContextPath)
 
 		// Route status
 		routeStatus := 1
@@ -249,6 +254,13 @@ func (s *ApiDefinitionService) Deploy(ctx context.Context, id uuid.UUID) (*model
 		}
 
 		strategies := []routeStrategy{}
+
+		if routingMode == "none" {
+			resolvedURI := resolveBaseURI(def.ContextPath, flowURI)
+			strategies = append(strategies, routeStrategy{
+				key: "none", uri: resolvedURI,
+			})
+		}
 
 		if routingMode == "path" || routingMode == "both" {
 			resolvedURI := resolveVersionedURI(def.ContextPath, existing.Version, flowURI)
@@ -363,6 +375,11 @@ func (s *ApiDefinitionService) Deploy(ctx context.Context, id uuid.UUID) (*model
 		flowMappings[i] = flowRouteMapping{flowIndex: i, routeIDs: newFlowRouteIDs}
 	}
 
+	// Auto-create/update consumers for auth plugins with credentials
+	if err := s.ensureConsumersForAuthPlugins(ctx, def.Name, def.Flows); err != nil {
+		s.logger.Warn("failed to auto-create consumers for auth plugins", zap.Error(err))
+	}
+
 	// Delete orphaned routes (from previous deploy)
 	for _, oldID := range oldRouteIDs {
 		if !usedRouteIDs[oldID] {
@@ -418,6 +435,181 @@ func resolveBaseURI(contextPath, flowURI string) string {
 		uri = "/"
 	}
 	return uri
+}
+
+// buildContextPathRewrite returns a proxy-rewrite config that strips the context
+// path prefix before forwarding to the upstream. Returns nil if contextPath is
+// empty or "/" (nothing to strip).
+func buildContextPathRewrite(contextPath string) map[string]interface{} {
+	if contextPath == "" || contextPath == "/" {
+		return nil
+	}
+	// Uses a non-capturing alternation so group 1 never includes the leading slash:
+	//   /teste/foo  → group 1 = "foo"  → replacement = "/foo"
+	//   /teste      → group 1 = ""     → replacement = "/"
+	return map[string]interface{}{
+		"regex_uri": []string{
+			"^" + contextPath + "(?:/(.*))?$", "/$1",
+		},
+	}
+}
+
+// injectProxyRewrite adds context-path stripping to the plugins map. If a
+// proxy-rewrite config already exists it merges the regex_uri into it;
+// otherwise it creates a new entry.
+func injectProxyRewrite(plugins map[string]interface{}, contextPath string) {
+	if plugins == nil {
+		return
+	}
+	rewriteCfg := buildContextPathRewrite(contextPath)
+	if rewriteCfg == nil {
+		return
+	}
+
+	existing, ok := plugins["proxy-rewrite"]
+	if ok {
+		if m, ok := existing.(map[string]interface{}); ok {
+			m["regex_uri"] = rewriteCfg["regex_uri"]
+			return
+		}
+	}
+	plugins["proxy-rewrite"] = rewriteCfg
+}
+
+// authConsumerFields lists fields that belong on the Consumer, not on the Route.
+// These are stripped from plugin configs when deploying routes to APISIX.
+var authConsumerFields = map[string][]string{
+	"key-auth":   {"key"},
+	"basic-auth": {"username", "password"},
+	"jwt-auth":   {"key", "secret", "public_key", "algorithm", "exp", "base64_secret"},
+	"hmac-auth":  {"key_id", "secret_key"},
+}
+
+// stripConsumerCredentials removes consumer-level credential fields from auth
+// plugin configs so they are not sent to the APISIX Route. Credentials belong
+// on the Consumer object, while the Route only needs behavioural settings
+// (e.g. hide_credentials, header, query).
+func stripConsumerCredentials(pluginName string, config map[string]interface{}) map[string]interface{} {
+	fields, ok := authConsumerFields[pluginName]
+	if !ok || config == nil {
+		return config
+	}
+	cleaned := make(map[string]interface{}, len(config))
+	for k, v := range config {
+		cleaned[k] = v
+	}
+	for _, f := range fields {
+		delete(cleaned, f)
+	}
+	return cleaned
+}
+
+// extractConsumerCredentials returns only the consumer-level credential fields
+// from an auth plugin config. Returns nil if no credentials are present.
+func extractConsumerCredentials(pluginName string, config map[string]interface{}) map[string]interface{} {
+	fields, ok := authConsumerFields[pluginName]
+	if !ok || config == nil {
+		return nil
+	}
+	creds := map[string]interface{}{}
+	for _, f := range fields {
+		if v, exists := config[f]; exists {
+			// Skip empty string values
+			if s, ok := v.(string); ok && s == "" {
+				continue
+			}
+			creds[f] = v
+		}
+	}
+	if len(creds) == 0 {
+		return nil
+	}
+	return creds
+}
+
+// ensureConsumersForAuthPlugins scans flow policies for auth plugins that have
+// credential fields (e.g. key-auth with a "key"). For each, it creates or
+// updates an APISIX consumer so the credentials work at runtime.
+// Consumer username: slugified "{apiName}-{flowName}" to keep them traceable.
+func (s *ApiDefinitionService) ensureConsumersForAuthPlugins(ctx context.Context, apiName string, flows []struct {
+	ID         string                `json:"id"`
+	RouteID    *string               `json:"routeId"`
+	RouteIDs   map[string]string     `json:"routeIds"`
+	Name       string                `json:"name"`
+	Entrypoint map[string]interface{} `json:"entrypoint"`
+	Policies   []struct {
+		Name    string                 `json:"name"`
+		Enabled bool                   `json:"enabled"`
+		Config  map[string]interface{} `json:"config"`
+	} `json:"policies"`
+}) error {
+	for _, flow := range flows {
+		for _, p := range flow.Policies {
+			if !p.Enabled {
+				continue
+			}
+			creds := extractConsumerCredentials(p.Name, p.Config)
+			if creds == nil {
+				continue
+			}
+
+			// Resolve $secret://local/... references to plaintext values
+			if s.secretResolver != nil {
+				resolved, err := s.secretResolver.ResolveConfig(ctx, creds)
+				if err != nil {
+					return fmt.Errorf("resolving secrets for plugin %s: %w", p.Name, err)
+				}
+				creds = resolved
+			}
+
+			// Build a deterministic consumer username from the API + flow
+			username := sanitizeConsumerUsername(apiName, flow.Name)
+
+			consumerPayload := map[string]interface{}{
+				"username": username,
+				"desc":     fmt.Sprintf("Auto-created by API \"%s\", flow \"%s\"", apiName, flow.Name),
+				"plugins": map[string]interface{}{
+					p.Name: creds,
+				},
+			}
+
+			payloadJSON, _ := json.Marshal(consumerPayload)
+
+			if _, err := s.apisix.CreateWithID(ctx, "consumers", username, payloadJSON); err != nil {
+				return fmt.Errorf("creating/updating consumer %q for plugin %s: %w", username, p.Name, err)
+			}
+
+			s.logger.Info("auto-created consumer for auth plugin",
+				zap.String("consumer", username),
+				zap.String("plugin", p.Name),
+				zap.String("api", apiName),
+			)
+		}
+	}
+	return nil
+}
+
+// sanitizeConsumerUsername creates a URL-safe consumer username from API and flow names.
+func sanitizeConsumerUsername(apiName, flowName string) string {
+	name := strings.ToLower(apiName)
+	if flowName != "" && flowName != "Default Flow" {
+		name += "-" + strings.ToLower(flowName)
+	}
+	// Replace spaces and special chars with hyphens
+	var b strings.Builder
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			b.WriteRune(r)
+		} else if r == ' ' {
+			b.WriteRune('-')
+		}
+	}
+	result := b.String()
+	// Collapse multiple hyphens
+	for strings.Contains(result, "--") {
+		result = strings.ReplaceAll(result, "--", "-")
+	}
+	return strings.Trim(result, "-")
 }
 
 // Clone creates a copy of an API definition with an incremented version.

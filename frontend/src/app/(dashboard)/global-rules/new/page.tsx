@@ -52,8 +52,8 @@ export default function NewGlobalPolicyPage() {
     setSaving(true)
     try {
       const generatedId = String(Date.now())
-      await api.createResource("global-rules", {
-        id: generatedId,
+      // APISIX global_rules only supports PUT (not POST), so we use updateResource with explicit ID
+      await api.updateResource("global-rules", generatedId, {
         plugins,
       })
       toast.success("Global policy created")

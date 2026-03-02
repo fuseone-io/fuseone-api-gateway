@@ -12,6 +12,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { api } from "@/lib/api-client"
+import { useUIStore } from "@/stores/ui-store"
 import type { User } from "@/types/auth"
 
 export default function DashboardLayout({
@@ -22,6 +23,7 @@ export default function DashboardLayout({
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const { sidebarOpen, setSidebarOpen } = useUIStore()
 
   useEffect(() => {
     const token = localStorage.getItem("access_token")
@@ -47,7 +49,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
       <AppSidebar user={user} />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-4">

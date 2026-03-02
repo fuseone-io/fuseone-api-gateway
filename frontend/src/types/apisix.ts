@@ -115,6 +115,7 @@ export interface APISIXSSL {
 export interface APISIXGlobalRule {
   id?: string
   plugins: Record<string, unknown>
+  labels?: Record<string, string>
   create_time?: number
   update_time?: number
 }
@@ -171,4 +172,26 @@ export interface DashboardSummary {
   plugins: number
   stream_routes: number
   apisix_status: "healthy" | "degraded" | "unhealthy"
+}
+
+// Upstream Health (from APISIX Control API /v1/healthcheck)
+
+export interface UpstreamHealthNode {
+  ip: string
+  port: number
+  hostname?: string
+  status: "healthy" | "unhealthy"
+  counter: {
+    http_failure: number
+    success: number
+    timeout_failure: number
+    tcp_failure: number
+  }
+}
+
+export interface UpstreamHealthChecker {
+  name: string
+  // APISIX returns {} (empty object) when no nodes checked, [] (array) when checked
+  nodes: UpstreamHealthNode[] | Record<string, never>
+  type: "http" | "https" | "tcp"
 }

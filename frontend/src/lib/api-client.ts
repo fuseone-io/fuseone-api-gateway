@@ -131,6 +131,48 @@ export const api = {
   getPluginSchema: (name: string) =>
     request<{ data: unknown }>(`/api/apisix/plugins/${name}`).then((r) => r.data),
 
+  // Monitoring
+  upstreamHealth: () =>
+    request<{ data: import("@/types/apisix").UpstreamHealthChecker[] }>("/api/monitoring/upstream-health").then((r) => r.data),
+
+  // Metrics
+  metricsTimeSeries: (params: { route_ids?: string[]; range?: import("@/types/metrics").TimeRange; from?: string; to?: string }) => {
+    const qs = new URLSearchParams()
+    if (params.route_ids?.length) qs.set("route_ids", params.route_ids.join(","))
+    if (params.from) {
+      qs.set("from", params.from)
+      if (params.to) qs.set("to", params.to)
+    } else {
+      qs.set("range", params.range || "1h")
+    }
+    return request<{ data: import("@/types/metrics").TimeSeriesPoint[] }>(`/api/metrics/timeseries?${qs}`).then((r) => r.data)
+  },
+
+  metricsSummary: (params?: { route_ids?: string[]; range?: import("@/types/metrics").TimeRange; from?: string; to?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.route_ids?.length) qs.set("route_ids", params.route_ids.join(","))
+    if (params?.from) {
+      qs.set("from", params.from)
+      if (params.to) qs.set("to", params.to)
+    } else {
+      qs.set("range", params?.range || "24h")
+    }
+    return request<{ data: import("@/types/metrics").MetricsSummary }>(`/api/metrics/summary?${qs}`).then((r) => r.data)
+  },
+
+  metricsTopRoutes: (params?: { route_ids?: string[]; range?: import("@/types/metrics").TimeRange; from?: string; to?: string; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (params?.route_ids?.length) qs.set("route_ids", params.route_ids.join(","))
+    if (params?.from) {
+      qs.set("from", params.from)
+      if (params.to) qs.set("to", params.to)
+    } else {
+      qs.set("range", params?.range || "24h")
+    }
+    if (params?.limit) qs.set("limit", String(params.limit))
+    return request<{ data: import("@/types/metrics").TopRoute[] }>(`/api/metrics/top-routes?${qs}`).then((r) => r.data)
+  },
+
   // Audit
   listAuditLogs: (params?: Record<string, string>) => {
     const qs = params ? "?" + new URLSearchParams(params).toString() : ""
@@ -232,4 +274,56 @@ export const api = {
 
   deleteSecretManager: (id: string) =>
     request<{ data: unknown }>(`/api/secret-managers/${id}`, { method: "DELETE" }),
+
+  // Debug / Troubleshooting
+  debugLogs: (params?: import("@/types/debug").DebugLogFilter) => {
+    const qs = new URLSearchParams()
+    if (params?.route_id) qs.set("route_id", params.route_id)
+    if (params?.api_id) qs.set("api_id", params.api_id)
+    if (params?.status_min) qs.set("status_min", String(params.status_min))
+    if (params?.status_max) qs.set("status_max", String(params.status_max))
+    if (params?.method) qs.set("method", params.method)
+    if (params?.search) qs.set("search", params.search)
+    if (params?.client_ip) qs.set("client_ip", params.client_ip)
+    if (params?.consumer_name) qs.set("consumer_name", params.consumer_name)
+    if (params?.latency_min) qs.set("latency_min", String(params.latency_min))
+    if (params?.limit) qs.set("limit", String(params.limit))
+    if (params?.offset) qs.set("offset", String(params.offset))
+    const query = qs.toString()
+    return request<{ data: import("@/types/debug").DebugLog[]; meta: { total: number; page: number; page_size: number } }>(`/api/debug/logs${query ? "?" + query : ""}`)
+  },
+
+  debugLog: (id: number) =>
+    request<{ data: import("@/types/debug").DebugLog }>(`/api/debug/logs/${id}`).then((r) => r.data),
+
+  debugToggle: (routeId: string, options?: import("@/types/debug").DebugToggleOptions) =>
+    request<{ data: import("@/types/debug").DebugStatus }>(`/api/debug/toggle/${routeId}`, {
+      method: "POST",
+      ...(options ? { body: JSON.stringify(options) } : {}),
+    }).then((r) => r.data),
+
+  debugStatus: (routeId: string) =>
+    request<{ data: import("@/types/debug").DebugStatus }>(`/api/debug/status/${routeId}`).then((r) => r.data),
+
+  debugToggleApi: (apiId: string, options?: import("@/types/debug").DebugToggleOptions) =>
+    request<{ data: import("@/types/debug").ApiDebugStatus }>(`/api/debug/toggle-api/${apiId}`, {
+      method: "POST",
+      ...(options ? { body: JSON.stringify(options) } : {}),
+    }).then((r) => r.data),
+
+  debugUpdateCapture: (apiId: string, options: import("@/types/debug").DebugToggleOptions) =>
+    request<{ data: { api_id: string; include_req_body: boolean; include_resp_body: boolean } }>(`/api/debug/capture-api/${apiId}`, {
+      method: "PATCH",
+      body: JSON.stringify(options),
+    }).then((r) => r.data),
+
+  debugStatusApi: (apiId: string) =>
+    request<{ data: import("@/types/debug").ApiDebugStatus }>(`/api/debug/status-api/${apiId}`).then((r) => r.data),
+
+  debugActiveRoutes: () =>
+    request<{ data: string[] }>("/api/debug/active-routes").then((r) => r.data),
+
+  // Per-API monitoring
+  apiUpstreamHealth: (apiId: string) =>
+    request<{ data: import("@/types/apisix").UpstreamHealthChecker[] }>(`/api/apis/${apiId}/health`).then((r) => r.data),
 }

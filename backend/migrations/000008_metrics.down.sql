@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS metrics_1d;
+DROP TABLE IF EXISTS metrics_1h;
+DROP TABLE IF EXISTS metrics_1m;

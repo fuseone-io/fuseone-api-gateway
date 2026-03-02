@@ -10,6 +10,7 @@ import {
   MoreHorizontal,
   ShieldCheck,
   Search,
+  Lock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -82,16 +83,28 @@ export default function GlobalRulesPage() {
     return plugins ? Object.keys(plugins).length : 0
   }
 
+  function isSystemRule(rule: APISIXGlobalRule): boolean {
+    return rule.id === "fuseone_platform"
+  }
+
   const filtered = useMemo(() => {
-    if (!search) return rules
-    const q = search.toLowerCase()
-    return rules.filter(
-      (r) =>
-        (r.id || "").toLowerCase().includes(q) ||
-        (r.plugins
-          ? Object.keys(r.plugins).some((name) => name.toLowerCase().includes(q))
-          : false)
-    )
+    let items = rules
+    if (search) {
+      const q = search.toLowerCase()
+      items = items.filter(
+        (r) =>
+          (r.id || "").toLowerCase().includes(q) ||
+          (r.plugins
+            ? Object.keys(r.plugins).some((name) => name.toLowerCase().includes(q))
+            : false)
+      )
+    }
+    // System rules always appear first
+    return [...items].sort((a, b) => {
+      const aSystem = isSystemRule(a) ? 0 : 1
+      const bSystem = isSystemRule(b) ? 0 : 1
+      return aSystem - bSystem
+    })
   }, [rules, search])
 
   return (
@@ -156,60 +169,75 @@ export default function GlobalRulesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((rule) => (
-                <TableRow key={rule.id} className="hover:bg-muted/50">
-                  <TableCell className="font-mono text-sm">
-                    {rule.id}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {rule.plugins && Object.keys(rule.plugins).length > 0 ? (
-                        <>
-                          <Badge variant="secondary">
-                            {getPluginsCount(rule.plugins)} plugin{getPluginsCount(rule.plugins) !== 1 ? "s" : ""}
+              filtered.map((rule) => {
+                const system = isSystemRule(rule)
+                return (
+                  <TableRow key={rule.id} className={system ? "bg-muted/30 hover:bg-muted/40" : "hover:bg-muted/50"}>
+                    <TableCell className="font-mono text-sm">
+                      <div className="flex items-center gap-2">
+                        {system && (
+                          <Badge variant="secondary" className="gap-1 text-xs font-normal">
+                            <Lock className="h-3 w-3" />
+                            Platform
                           </Badge>
-                          {Object.keys(rule.plugins).slice(0, 3).map((name) => (
-                            <Badge key={name} variant="outline" className="text-xs">
-                              {name}
+                        )}
+                        {rule.id}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {rule.plugins && Object.keys(rule.plugins).length > 0 ? (
+                          <>
+                            <Badge variant="secondary">
+                              {getPluginsCount(rule.plugins)} plugin{getPluginsCount(rule.plugins) !== 1 ? "s" : ""}
                             </Badge>
-                          ))}
-                          {Object.keys(rule.plugins).length > 3 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{Object.keys(rule.plugins).length - 3} more
-                            </Badge>
-                          )}
-                        </>
+                            {Object.keys(rule.plugins).slice(0, 3).map((name) => (
+                              <Badge key={name} variant="outline" className="text-xs">
+                                {name}
+                              </Badge>
+                            ))}
+                            {Object.keys(rule.plugins).length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{Object.keys(rule.plugins).length - 3} more
+                              </Badge>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">0</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {system ? (
+                        <span className="text-xs text-muted-foreground">Read-only</span>
                       ) : (
-                        <span className="text-muted-foreground">0</span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/global-rules/${rule.id}`}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => setDeleteId(rule.id!)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                          <Link href={`/global-rules/${rule.id}`}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => setDeleteId(rule.id!)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

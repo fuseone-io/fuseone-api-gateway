@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowLeft, Save, Rocket, Clock, Download, Copy, AlertTriangle, Ban, Globe, Route, X, PenLine } from "lucide-react"
+import { ArrowLeft, BarChart3, Bug, Eye, Heart, Save, Rocket, Clock, Download, Copy, AlertTriangle, Ban, Globe, Route, X, PenLine } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -52,12 +52,6 @@ import { exportAsFuseOneJson, exportAsOpenAPIYaml } from "@/lib/openapi-converte
 import type { ApiDefinition, ApiDefRecord, LifecycleStatus, RoutingMode } from "@/types/api"
 import { api } from "@/lib/api-client"
 
-const SYNC_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive"; className: string }> = {
-  draft: { label: "Draft", variant: "secondary", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
-  synced: { label: "Synced", variant: "secondary", className: "bg-green-500/15 text-green-600 border-green-500/30" },
-  out_of_sync: { label: "Out of Sync", variant: "secondary", className: "bg-orange-500/15 text-orange-600 border-orange-500/30" },
-}
-
 const LIFECYCLE_BADGE: Record<LifecycleStatus, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-slate-500/15 text-slate-600 border-slate-500/30" },
   active: { label: "Active", className: "bg-green-500/15 text-green-600 border-green-500/30" },
@@ -80,6 +74,7 @@ export default function ApiDetailPage() {
   const [showRetireDialog, setShowRetireDialog] = useState(false)
   const [sunsetDate, setSunsetDate] = useState("")
   const [showRoutingConfig, setShowRoutingConfig] = useState(false)
+  const savedSnapshot = useRef<string>("")
 
   useEffect(() => {
     loadApi()
@@ -90,6 +85,7 @@ export default function ApiDetailPage() {
       const rec = await api.getApi(id)
       setRecord(rec)
       setApiDef(rec.definition)
+      savedSnapshot.current = JSON.stringify(rec.definition)
       if (rec.name) sessionStorage.setItem(`breadcrumb:${id}`, rec.name)
       // Load versions
       try {
@@ -116,9 +112,10 @@ export default function ApiDetailPage() {
       })
       setRecord(updated)
       setApiDef(updated.definition)
-      toast.success("Draft saved")
+      savedSnapshot.current = JSON.stringify(updated.definition)
+      toast.success("Changes saved")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save draft")
+      toast.error(err instanceof Error ? err.message : "Failed to save")
     } finally {
       setSaving(false)
     }
@@ -147,7 +144,8 @@ export default function ApiDetailPage() {
       const deployed = await api.deployApi(record.id)
       setRecord(deployed)
       setApiDef(deployed.definition)
-      toast.success("API deployed to gateway")
+      savedSnapshot.current = JSON.stringify(deployed.definition)
+      toast.success(record.lifecycle_status !== "draft" ? "Changes applied to gateway" : "API deployed to gateway")
       // Reload versions (lifecycle may have changed)
       try {
         const vers = await api.getApiVersions(record.id)
@@ -239,10 +237,11 @@ export default function ApiDetailPage() {
     )
   }
 
-  const syncBadge = SYNC_BADGE[record.sync_status] || SYNC_BADGE.draft
   const lifecycleBadge = LIFECYCLE_BADGE[record.lifecycle_status] || LIFECYCLE_BADGE.draft
-  const canDeploy = record.sync_status === "draft" || record.sync_status === "out_of_sync"
   const isRetired = record.lifecycle_status === "retired"
+  const hasBeenDeployed = record.lifecycle_status !== "draft"
+  const isDirty = apiDef ? JSON.stringify(apiDef) !== savedSnapshot.current : false
+  const needsApply = hasBeenDeployed && record.sync_status === "out_of_sync"
 
   return (
     <div className="flex flex-col -m-8 h-[calc(100vh-4rem)]">
@@ -374,11 +373,6 @@ export default function ApiDetailPage() {
             </button>
           )}
 
-          {/* Sync status badge */}
-          <Badge variant={syncBadge.variant} className={`text-[10px] ${syncBadge.className}`}>
-            {syncBadge.label}
-          </Badge>
-
           {/* Deployed timestamp */}
           {record.deployed_at && (
             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
@@ -409,7 +403,32 @@ export default function ApiDetailPage() {
             </Badge>
           )}
 
-          {/* Export */}
+          {/* Observe */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8">
+                <Eye className="mr-1.5 h-3.5 w-3.5" />
+                Observe
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => router.push(`/apis/${id}/analytics`)}>
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Analytics
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(`/apis/${id}/health`)}>
+                <Heart className="mr-2 h-4 w-4" />
+                Upstream Health
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push(`/apis/${id}/debug`)}>
+                <Bug className="mr-2 h-4 w-4" />
+                Debug Logs
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* More actions */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -417,6 +436,11 @@ export default function ApiDetailPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleClone}>
+                <Copy className="mr-2 h-4 w-4" />
+                Clone API
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => exportAsFuseOneJson(apiDef)}>
                 Export FuseOne JSON
               </DropdownMenuItem>
@@ -425,12 +449,6 @@ export default function ApiDetailPage() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Clone */}
-          <Button variant="outline" size="sm" onClick={handleClone} className="h-8">
-            <Copy className="mr-1.5 h-3.5 w-3.5" />
-            Clone
-          </Button>
 
           {/* Lifecycle actions */}
           {record.lifecycle_status === "active" && (
@@ -451,18 +469,29 @@ export default function ApiDetailPage() {
             </>
           )}
 
-          {/* Save/Deploy */}
+          {/* Save / Apply */}
           {!isRetired && (
             <Button variant="outline" onClick={handleSave} disabled={saving}>
               <Save className="mr-2 h-4 w-4" />
-              {saving ? "Saving..." : "Save Draft"}
+              {saving ? "Saving..." : "Save"}
             </Button>
           )}
 
-          {canDeploy && !isRetired && (
-            <Button onClick={handleDeploy} disabled={deploying}>
+          {!isRetired && !hasBeenDeployed && (
+            <Button onClick={handleDeploy} disabled={deploying || saving}>
               <Rocket className="mr-2 h-4 w-4" />
               {deploying ? "Deploying..." : "Deploy"}
+            </Button>
+          )}
+
+          {!isRetired && needsApply && (
+            <Button
+              onClick={handleDeploy}
+              disabled={deploying || saving}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              <Rocket className="mr-2 h-4 w-4" />
+              {deploying ? "Applying..." : "Apply"}
             </Button>
           )}
         </div>
@@ -548,13 +577,14 @@ export default function ApiDetailPage() {
                 Version Routing
               </Label>
               <Select
-                value={apiDef.routing_mode || "path"}
+                value={apiDef.routing_mode || "none"}
                 onValueChange={(v) => setApiDef({ ...apiDef, routing_mode: v as RoutingMode })}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">No Versioning (/payments/...)</SelectItem>
                   <SelectItem value="path">Version in Path (/v1/payments/...)</SelectItem>
                   <SelectItem value="header">Version by Header (X-API-Version)</SelectItem>
                   <SelectItem value="both">Path + Header (both strategies)</SelectItem>

@@ -64,6 +64,8 @@ func main() {
 	auditRepo := repository.NewAuditRepository(pool)
 	secretRepo := repository.NewSecretRepository(pool)
 	apiDefRepo := repository.NewApiDefinitionRepository(pool)
+	metricsRepo := repository.NewMetricsRepository(pool)
+	debugLogRepo := repository.NewDebugLogRepository(pool)
 
 	// Initialize services
 	authService := service.NewAuthService(userRepo, &cfg.Auth)
@@ -71,7 +73,8 @@ func main() {
 	cryptoService := service.NewCryptoService(cfg.Secrets.EncryptionKey)
 
 	// Initialize services (domain)
-	apiDefService := service.NewApiDefinitionService(apiDefRepo, apisixClient, logger)
+	secretResolver := service.NewSecretResolver(secretRepo, cryptoService)
+	apiDefService := service.NewApiDefinitionService(apiDefRepo, apisixClient, secretResolver, logger)
 
 	// Initialize middleware
 	auditLogger := middleware.NewAuditLogger(auditRepo, logger)
@@ -84,6 +87,13 @@ func main() {
 	auditHandler := handler.NewAuditHandler(auditRepo)
 	secretHandler := handler.NewSecretHandler(secretRepo, cryptoService, auditLogger)
 	apiDefHandler := handler.NewApiDefinitionHandler(apiDefService, auditLogger)
+
+	upstreamHealthHandler := handler.NewUpstreamHealthHandler(apisixClient, apiDefRepo)
+	metricsHandler := handler.NewMetricsHandler(metricsRepo)
+
+	// Debug / Troubleshooting
+	debugHub := service.NewDebugHub()
+	debugLogHandler := handler.NewDebugLogHandler(debugLogRepo, debugHub, apisixClient, auditLogger, apiDefRepo, logger, cfg.Debug.CallbackURL)
 
 	// APISIX resource handlers
 	routeHandler := handler.NewAPISIXResourceHandler(apisixClient, auditLogger, "routes")
@@ -115,6 +125,9 @@ func main() {
 	r.GET("/health/live", healthHandler.Live)
 	r.GET("/health/ready", healthHandler.Ready)
 
+	// Internal endpoints (called by APISIX, no auth)
+	r.POST("/internal/debug-logs", debugLogHandler.ReceiveLogs)
+
 	// Auth endpoints (unauthenticated)
 	auth := r.Group("/api/auth")
 	{
@@ -133,6 +146,28 @@ func main() {
 
 		// Audit
 		api.GET("/audit", middleware.RequirePermission("audit:read"), auditHandler.List)
+
+		// Monitoring
+		api.GET("/monitoring/upstream-health", middleware.RequirePermission("monitoring:read"), upstreamHealthHandler.GetHealth)
+
+		// Metrics
+		api.GET("/metrics/timeseries", middleware.RequirePermission("monitoring:read"), metricsHandler.TimeSeries)
+		api.GET("/metrics/summary", middleware.RequirePermission("monitoring:read"), metricsHandler.Summary)
+		api.GET("/metrics/top-routes", middleware.RequirePermission("monitoring:read"), metricsHandler.TopRoutes)
+
+		// Debug / Troubleshooting
+		debug := api.Group("/debug")
+		{
+			debug.GET("/logs", middleware.RequirePermission("monitoring:read"), debugLogHandler.ListLogs)
+			debug.GET("/logs/stream", middleware.RequirePermission("monitoring:read"), debugLogHandler.StreamLogs)
+			debug.GET("/logs/:id", middleware.RequirePermission("monitoring:read"), debugLogHandler.GetLog)
+			debug.POST("/toggle/:route_id", middleware.RequirePermission("monitoring:write"), debugLogHandler.ToggleDebug)
+			debug.GET("/status/:route_id", middleware.RequirePermission("monitoring:read"), debugLogHandler.DebugStatus)
+			debug.POST("/toggle-api/:api_id", middleware.RequirePermission("monitoring:write"), debugLogHandler.ToggleApiDebug)
+			debug.PATCH("/capture-api/:api_id", middleware.RequirePermission("monitoring:write"), debugLogHandler.UpdateApiCaptureOptions)
+			debug.GET("/status-api/:api_id", middleware.RequirePermission("monitoring:read"), debugLogHandler.ApiDebugStatus)
+			debug.GET("/active-routes", middleware.RequirePermission("monitoring:read"), debugLogHandler.DebugActiveRoutes)
+		}
 
 		// APISIX Resources
 		registerResourceRoutes(api, "apisix/routes", routeHandler, "routes")
@@ -167,6 +202,8 @@ func main() {
 			apis.POST("/:id/deprecate", middleware.RequirePermission("apis:write"), apiDefHandler.Deprecate)
 			apis.POST("/:id/retire", middleware.RequirePermission("apis:write"), apiDefHandler.Retire)
 			apis.POST("/:id/undeprecate", middleware.RequirePermission("apis:write"), apiDefHandler.Undeprecate)
+			// Per-API monitoring
+			apis.GET("/:id/health", middleware.RequirePermission("monitoring:read"), upstreamHealthHandler.GetHealthForAPI)
 		}
 
 		// Local Secrets vault
@@ -188,6 +225,32 @@ func main() {
 			managers.PUT("/:id", middleware.RequirePermission("secrets:write"), secretHandler.UpdateManager)
 			managers.DELETE("/:id", middleware.RequirePermission("secrets:write"), secretHandler.DeleteManager)
 		}
+	}
+
+	// Ensure platform-level global rules (best-effort, non-blocking)
+	systemPolicies := service.NewSystemPolicies(apisixClient, logger)
+	go func() {
+		if err := systemPolicies.EnsureSystemGlobalRules(context.Background()); err != nil {
+			logger.Warn("system policies init failed", zap.Error(err))
+		}
+	}()
+
+	// Start metrics scraper and rollup (background)
+	var bgCancel context.CancelFunc
+	var bgCtx context.Context
+	bgCtx, bgCancel = context.WithCancel(context.Background())
+
+	if cfg.Metrics.Enabled {
+		metricsScraper := service.NewMetricsScraper(&cfg.Metrics, metricsRepo, apisixClient, logger)
+		metricsRollup := service.NewMetricsRollup(metricsRepo, &cfg.Metrics, logger)
+		go metricsScraper.Start(bgCtx)
+		go metricsRollup.Start(bgCtx)
+	}
+
+	// Start debug log cleanup (background)
+	if cfg.Debug.Enabled {
+		debugCleanup := service.NewDebugCleanup(debugLogRepo, &cfg.Debug, logger)
+		go debugCleanup.Start(bgCtx)
 	}
 
 	// Start server
@@ -212,6 +275,7 @@ func main() {
 	<-quit
 
 	logger.Info("shutting down server...")
+	bgCancel()
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 

@@ -138,7 +138,7 @@ export interface PolicyInstance {
 // --- API Definition Record (PostgreSQL draft/deploy) ---
 
 export type LifecycleStatus = "draft" | "active" | "deprecated" | "retired"
-export type RoutingMode = "path" | "header" | "both"
+export type RoutingMode = "none" | "path" | "header" | "both"
 
 export interface ApiDefRecord {
   id: string

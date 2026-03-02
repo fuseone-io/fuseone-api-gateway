@@ -48,7 +48,8 @@ Environment: copy `.env.example` to `.env` and configure.
 - Auth types: `src/types/auth.ts`
 - Route groups: `(auth)` for login, `(dashboard)` for authenticated pages
 - Use pnpm as package manager
-- **State management**: Use **Zustand** for client-side state (auth, UI preferences, shared data). Store files go in `src/stores/` (e.g., `src/stores/auth-store.ts`). Keep stores small and focused — one per domain.
+- **State management**: **Always use Zustand** for any client-side state — never use raw `useState` for shared or persistent data. This includes auth, UI preferences (sidebar, theme), fetched data shared across components, and any state that survives navigation. Store files go in `src/stores/` — one per domain (e.g., `ui-store.ts`, `auth-store.ts`). Existing stores:
+  - `src/stores/ui-store.ts` — sidebar open/collapsed (persisted via cookie)
 
 ### Adding new APISIX resource
 1. Backend: Create a `NewAPISIXResourceHandler(apisixClient, auditLogger, "resource_name")` in main.go

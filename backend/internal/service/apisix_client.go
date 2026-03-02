@@ -17,14 +17,16 @@ import (
 type APISIXClient struct {
 	baseURL    string
 	apiKey     string
+	controlURL string
 	httpClient *http.Client
 	logger     *zap.Logger
 }
 
 func NewAPISIXClient(cfg *config.APISIXConfig, logger *zap.Logger) *APISIXClient {
 	return &APISIXClient{
-		baseURL: cfg.AdminURL,
-		apiKey:  cfg.APIKey,
+		baseURL:    cfg.AdminURL,
+		apiKey:     cfg.APIKey,
+		controlURL: cfg.ControlURL,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -217,4 +219,31 @@ func (c *APISIXClient) ValidateSchema(ctx context.Context, resource string, data
 	}
 	resp.Body.Close()
 	return nil
+}
+
+// Control API methods (port 9090, no auth required)
+
+func (c *APISIXClient) GetUpstreamHealth(ctx context.Context) (json.RawMessage, error) {
+	url := c.controlURL + "/v1/healthcheck"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating control request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("calling control API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading control response: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("control API error (%d): %s", resp.StatusCode, string(body))
+	}
+
+	return body, nil
 }

@@ -163,6 +163,7 @@ export default function ApplicationDetailPage() {
       }
 
       await api.updateResource("consumers", id, {
+        username: id,
         desc: description || undefined,
         group_id: planId && planId !== "none" ? planId : undefined,
         plugins: Object.keys(plugins).length > 0 ? plugins : undefined,

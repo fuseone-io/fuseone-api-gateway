@@ -702,7 +702,7 @@ function ObservabilitySheet({
       </div>
 
       {/* Sheet content - scrollable */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="px-4 py-3">
           {policies.length > 0 ? (
             <div className="flex flex-wrap gap-2">
@@ -852,7 +852,7 @@ function EndpointSheet({
       </div>
 
       {/* Sheet content */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="px-4 py-3 space-y-3">
           {/* Basic fields — always visible */}
           <div className="flex items-center gap-3 flex-wrap">

@@ -1215,6 +1215,508 @@ const AZURE_FUNCTIONS: PluginFormDef = {
   ],
 }
 
+// --- Additional Authentication Plugins ---
+
+const LDAP_AUTH: PluginFormDef = {
+  pluginName: "ldap-auth",
+  groups: [
+    {
+      title: "LDAP Server",
+      fields: [
+        { key: "ldap_uri", label: "LDAP URI", type: "string", required: true, placeholder: "ldap://ldap.example.com:389", description: "URI of the LDAP server" },
+        { key: "base_dn", label: "Base DN", type: "string", required: true, placeholder: "ou=users,dc=example,dc=org", description: "Base distinguished name for searches" },
+        { key: "uid", label: "UID Attribute", type: "string", defaultValue: "cn", description: "LDAP attribute used as username" },
+      ],
+    },
+    {
+      title: "Options",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "use_tls", label: "Use TLS", type: "boolean", defaultValue: false },
+        { key: "tls_verify", label: "Verify TLS", type: "boolean", defaultValue: false, description: "Verify server certificate when TLS is enabled" },
+        { key: "realm", label: "Realm", type: "string", defaultValue: "ldap", description: "Realm for WWW-Authenticate header" },
+      ],
+    },
+  ],
+}
+
+const AUTHZ_CASBIN: PluginFormDef = {
+  pluginName: "authz-casbin",
+  groups: [
+    {
+      title: "Casbin Configuration",
+      fields: [
+        { key: "username", label: "Username Header", type: "string", required: true, placeholder: "X-User", description: "Request header containing the username (subject)" },
+        { key: "model", label: "Model", type: "text", required: true, placeholder: "[request_definition]\nr = sub, obj, act\n[policy_definition]\np = sub, obj, act\n[role_definition]\ng = _, _\n[policy_effect]\ne = some(where (p.eft == allow))\n[matchers]\nm = g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act", description: "Casbin model configuration (ACL/RBAC/ABAC)" },
+        { key: "policy", label: "Policy", type: "text", required: true, placeholder: "p, admin, /*, GET\np, admin, /*, POST", description: "Casbin policy rules" },
+      ],
+    },
+  ],
+}
+
+const AUTHZ_CASDOOR: PluginFormDef = {
+  pluginName: "authz-casdoor",
+  groups: [
+    {
+      title: "Casdoor Server",
+      fields: [
+        { key: "endpoint_addr", label: "Casdoor URL", type: "string", required: true, placeholder: "https://casdoor.example.com", description: "Casdoor server URL (no trailing slash)" },
+        { key: "client_id", label: "Client ID", type: "string", required: true },
+        { key: "client_secret", label: "Client Secret", type: "password", required: true },
+        { key: "callback_url", label: "Callback URL", type: "string", required: true, placeholder: "https://api.example.com/callback", description: "OAuth2 callback URL (must be part of route URI)" },
+      ],
+    },
+  ],
+}
+
+const CAS_AUTH: PluginFormDef = {
+  pluginName: "cas-auth",
+  groups: [
+    {
+      title: "CAS Server",
+      fields: [
+        { key: "idp_uri", label: "CAS Server URI", type: "string", required: true, placeholder: "https://cas.example.com/cas", description: "Central Authentication Service endpoint" },
+        { key: "cas_callback_uri", label: "Callback URI", type: "string", required: true, placeholder: "/cas/callback", description: "Redirect URI from CAS after login/logout" },
+        { key: "logout_uri", label: "Logout URI", type: "string", required: true, placeholder: "/cas/logout", description: "URI to trigger CAS logout" },
+      ],
+    },
+  ],
+}
+
+const OPA: PluginFormDef = {
+  pluginName: "opa",
+  groups: [
+    {
+      title: "OPA Server",
+      fields: [
+        { key: "host", label: "OPA Host", type: "string", required: true, placeholder: "http://opa:8181", description: "OPA service endpoint" },
+        { key: "policy", label: "Policy Path", type: "string", required: true, placeholder: "example/allow", description: "OPA policy path (package/decision)" },
+      ],
+    },
+    {
+      title: "Request Context",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "with_route", label: "Send Route Info", type: "boolean", defaultValue: false, description: "Include route data in OPA request" },
+        { key: "with_service", label: "Send Service Info", type: "boolean", defaultValue: false, description: "Include service data in OPA request" },
+        { key: "with_consumer", label: "Send Consumer Info", type: "boolean", defaultValue: false, description: "Include consumer data (may expose credentials)" },
+      ],
+    },
+    {
+      title: "Connection",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "timeout", label: "Timeout", type: "integer", defaultValue: 3000, suffix: "ms", min: 1, max: 60000 },
+        { key: "ssl_verify", label: "Verify SSL", type: "boolean", defaultValue: true },
+        { key: "keepalive", label: "Keepalive", type: "boolean", defaultValue: true },
+        { key: "keepalive_timeout", label: "Keepalive Timeout", type: "integer", defaultValue: 60000, suffix: "ms", min: 1000 },
+        { key: "keepalive_pool", label: "Pool Size", type: "integer", defaultValue: 5, min: 1 },
+      ],
+    },
+  ],
+}
+
+// --- Additional Security Plugins ---
+
+const UA_RESTRICTION: PluginFormDef = {
+  pluginName: "ua-restriction",
+  groups: [
+    {
+      title: "User-Agent Filter",
+      fields: [
+        { key: "_mode", label: "Mode", type: "enum", defaultValue: "allowlist", options: [
+          { value: "allowlist", label: "Allowlist (permit only matching)" },
+          { value: "denylist", label: "Denylist (block matching)" },
+        ]},
+        { key: "allowlist", label: "Allowed Patterns", type: "string-array", placeholder: "Mozilla.*", description: "Regex patterns for allowed User-Agents", visibleWhen: { field: "_mode", value: "allowlist" } },
+        { key: "denylist", label: "Blocked Patterns", type: "string-array", placeholder: "curl.*|wget.*", description: "Regex patterns for blocked User-Agents", visibleWhen: { field: "_mode", value: "denylist" } },
+        { key: "bypass_missing", label: "Bypass Missing", type: "boolean", defaultValue: false, description: "Allow requests without User-Agent header" },
+        { key: "message", label: "Rejection Message", type: "string", defaultValue: "Not allowed", placeholder: "Not allowed" },
+      ],
+    },
+  ],
+}
+
+const REFERER_RESTRICTION: PluginFormDef = {
+  pluginName: "referer-restriction",
+  groups: [
+    {
+      title: "Referer Filter",
+      fields: [
+        { key: "_mode", label: "Mode", type: "enum", defaultValue: "whitelist", options: [
+          { value: "whitelist", label: "Whitelist (allow only)" },
+          { value: "blacklist", label: "Blacklist (deny only)" },
+        ]},
+        { key: "whitelist", label: "Allowed Referers", type: "string-array", placeholder: "*.example.com", description: "Hostnames to allow (supports * wildcard)", visibleWhen: { field: "_mode", value: "whitelist" } },
+        { key: "blacklist", label: "Blocked Referers", type: "string-array", placeholder: "*.spam.com", description: "Hostnames to block (supports * wildcard)", visibleWhen: { field: "_mode", value: "blacklist" } },
+        { key: "bypass_missing", label: "Bypass Missing", type: "boolean", defaultValue: false, description: "Allow requests without Referer header" },
+        { key: "message", label: "Rejection Message", type: "string", defaultValue: "Your referer host is not allowed" },
+      ],
+    },
+  ],
+}
+
+// --- Additional Traffic Plugins ---
+
+const WORKFLOW: PluginFormDef = {
+  pluginName: "workflow",
+  groups: [
+    {
+      title: "Workflow Rules",
+      description: "Define conditional actions using lua-resty-expr matching rules. Each rule has a 'case' (match condition) and 'actions' (what to do).",
+      fields: [
+        { key: "rules", label: "Rules (JSON)", type: "text", required: true, placeholder: `[
+  {
+    "case": [["uri", "==", "/blocked"]],
+    "actions": [["return", {"code": 403}]]
+  },
+  {
+    "case": [["uri", "~=", "^/api/"]],
+    "actions": [["limit-count", {"count": 100, "time_window": 60, "rejected_code": 429}]]
+  }
+]`, description: "Array of {case, actions} rules. Actions: return, limit-count, limit-conn" },
+      ],
+    },
+  ],
+}
+
+// --- Additional Transformation Plugins ---
+
+const GZIP: PluginFormDef = {
+  pluginName: "gzip",
+  groups: [
+    {
+      title: "Compression Settings",
+      fields: [
+        { key: "types", label: "MIME Types", type: "string-array", placeholder: "text/html", description: "MIME types to compress (use * for all)" },
+        { key: "min_length", label: "Min Length", type: "integer", defaultValue: 20, min: 1, suffix: "bytes", description: "Minimum response size to compress" },
+        { key: "comp_level", label: "Compression Level", type: "integer", defaultValue: 1, min: 1, max: 9, description: "1 = fastest, 9 = best compression" },
+      ],
+    },
+    {
+      title: "Advanced",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "http_version", label: "HTTP Version", type: "enum", defaultValue: "1.1", options: [
+          { value: "1.1", label: "HTTP/1.1" },
+          { value: "1.0", label: "HTTP/1.0" },
+        ]},
+        { key: "vary", label: "Add Vary Header", type: "boolean", defaultValue: false, description: "Add Vary: Accept-Encoding header" },
+        { key: "buffers.number", label: "Buffer Count", type: "integer", defaultValue: 32, min: 1 },
+        { key: "buffers.size", label: "Buffer Size", type: "integer", defaultValue: 4096, min: 1, suffix: "bytes" },
+      ],
+    },
+  ],
+}
+
+const GRPC_WEB: PluginFormDef = {
+  pluginName: "grpc-web",
+  groups: [
+    {
+      title: "gRPC-Web",
+      fields: [
+        { key: "cors_allow_headers", label: "CORS Allow Headers", type: "string", defaultValue: "content-type,x-grpc-web,x-user-agent", description: "Comma-separated headers allowed for CORS" },
+      ],
+    },
+  ],
+}
+
+const OPENWHISK: PluginFormDef = {
+  pluginName: "openwhisk",
+  groups: [
+    {
+      title: "OpenWhisk Action",
+      fields: [
+        { key: "api_host", label: "API Host", type: "string", required: true, placeholder: "https://openwhisk.example.com", description: "OpenWhisk API endpoint" },
+        { key: "service_token", label: "Service Token", type: "password", required: true, placeholder: "user:password", description: "Authentication credentials (user:pass format)" },
+        { key: "namespace", label: "Namespace", type: "string", required: true, placeholder: "guest" },
+        { key: "action", label: "Action", type: "string", required: true, placeholder: "hello", description: "OpenWhisk action to invoke" },
+      ],
+    },
+    {
+      title: "Options",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "result", label: "Result Only", type: "boolean", defaultValue: true, description: "Return only the action result (not metadata)" },
+        { key: "timeout", label: "Timeout", type: "integer", defaultValue: 60000, suffix: "ms", min: 1, max: 60000 },
+        { key: "ssl_verify", label: "Verify SSL", type: "boolean", defaultValue: true },
+        { key: "keepalive", label: "Keepalive", type: "boolean", defaultValue: true },
+        { key: "keepalive_timeout", label: "Keepalive Timeout", type: "integer", defaultValue: 60000, suffix: "ms", min: 1000 },
+        { key: "keepalive_pool", label: "Pool Size", type: "integer", defaultValue: 5, min: 1 },
+      ],
+    },
+  ],
+}
+
+// --- Additional Observability Plugins ---
+
+const SKYWALKING_LOGGER: PluginFormDef = {
+  pluginName: "skywalking-logger",
+  groups: [
+    {
+      title: "SkyWalking OAP",
+      fields: [
+        { key: "endpoint_addr", label: "OAP Endpoint", type: "string", required: true, placeholder: "http://skywalking-oap:12800/v3/logs", description: "SkyWalking OAP server log endpoint" },
+        { key: "service_name", label: "Service Name", type: "string", defaultValue: "APISIX", placeholder: "APISIX" },
+        { key: "service_instance_name", label: "Instance Name", type: "string", defaultValue: "APISIX Instance Name" },
+      ],
+    },
+    {
+      title: "Options",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "timeout", label: "Timeout", type: "integer", defaultValue: 3, suffix: "s" },
+        { key: "include_req_body", label: "Include Request Body", type: "boolean", defaultValue: false },
+        { key: "include_resp_body", label: "Include Response Body", type: "boolean", defaultValue: false },
+      ],
+    },
+  ],
+}
+
+const TCP_LOGGER: PluginFormDef = {
+  pluginName: "tcp-logger",
+  groups: [
+    {
+      title: "TCP Server",
+      fields: [
+        { key: "host", label: "Host", type: "string", required: true, placeholder: "log-server.example.com" },
+        { key: "port", label: "Port", type: "integer", required: true, min: 1, max: 65535 },
+        { key: "tls", label: "Use TLS", type: "boolean", defaultValue: false },
+      ],
+    },
+    {
+      title: "Options",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "timeout", label: "Timeout", type: "integer", defaultValue: 1000, suffix: "ms", min: 1 },
+        { key: "include_req_body", label: "Include Request Body", type: "boolean", defaultValue: false },
+        { key: "include_resp_body", label: "Include Response Body", type: "boolean", defaultValue: false },
+      ],
+    },
+  ],
+}
+
+const UDP_LOGGER: PluginFormDef = {
+  pluginName: "udp-logger",
+  groups: [
+    {
+      title: "UDP Server",
+      fields: [
+        { key: "host", label: "Host", type: "string", required: true, placeholder: "log-server.example.com" },
+        { key: "port", label: "Port", type: "integer", required: true, min: 1, max: 65535 },
+      ],
+    },
+    {
+      title: "Options",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "timeout", label: "Timeout", type: "integer", defaultValue: 3, suffix: "s", min: 1 },
+        { key: "include_req_body", label: "Include Request Body", type: "boolean", defaultValue: false },
+        { key: "include_resp_body", label: "Include Response Body", type: "boolean", defaultValue: false },
+      ],
+    },
+  ],
+}
+
+const ROCKETMQ_LOGGER: PluginFormDef = {
+  pluginName: "rocketmq-logger",
+  groups: [
+    {
+      title: "RocketMQ Connection",
+      fields: [
+        { key: "nameserver_list", label: "Nameservers (JSON)", type: "text", required: true, placeholder: '{"host:port": "rocketmq:9876"}', description: "RocketMQ nameserver addresses" },
+        { key: "topic", label: "Topic", type: "string", required: true, placeholder: "apisix-logs" },
+        { key: "key", label: "Message Key", type: "string", placeholder: "route_id" },
+        { key: "tag", label: "Message Tag", type: "string" },
+      ],
+    },
+    {
+      title: "ACL Authentication",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "access_key", label: "Access Key", type: "string" },
+        { key: "secret_key", label: "Secret Key", type: "password" },
+      ],
+    },
+    {
+      title: "Options",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "use_tls", label: "Use TLS", type: "boolean", defaultValue: false },
+        { key: "timeout", label: "Timeout", type: "integer", defaultValue: 3, suffix: "s", min: 1 },
+        { key: "include_req_body", label: "Include Request Body", type: "boolean", defaultValue: false },
+        { key: "include_resp_body", label: "Include Response Body", type: "boolean", defaultValue: false },
+      ],
+    },
+  ],
+}
+
+const GOOGLE_CLOUD_LOGGING: PluginFormDef = {
+  pluginName: "google-cloud-logging",
+  groups: [
+    {
+      title: "Google Cloud Credentials",
+      fields: [
+        { key: "auth_config.client_email", label: "Service Account Email", type: "string", required: true, placeholder: "sa@project.iam.gserviceaccount.com" },
+        { key: "auth_config.private_key", label: "Private Key", type: "password", required: true, description: "PEM private key from service account JSON" },
+        { key: "auth_config.project_id", label: "Project ID", type: "string", required: true, placeholder: "my-gcp-project" },
+      ],
+    },
+    {
+      title: "Logging Options",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "auth_config.token_uri", label: "Token URI", type: "string", defaultValue: "https://oauth2.googleapis.com/token" },
+        { key: "log_id", label: "Log ID", type: "string", defaultValue: "apisix.apache.org%2Flogs" },
+        { key: "resource.type", label: "Resource Type", type: "string", defaultValue: "global" },
+        { key: "ssl_verify", label: "Verify SSL", type: "boolean", defaultValue: true },
+      ],
+    },
+  ],
+}
+
+const SPLUNK_HEC_LOGGING: PluginFormDef = {
+  pluginName: "splunk-hec-logging",
+  groups: [
+    {
+      title: "Splunk HEC",
+      fields: [
+        { key: "endpoint.uri", label: "HEC Endpoint URI", type: "string", required: true, placeholder: "https://splunk:8088/services/collector", description: "Splunk HTTP Event Collector endpoint" },
+        { key: "endpoint.token", label: "HEC Token", type: "password", required: true, description: "Splunk HEC authentication token" },
+        { key: "endpoint.channel", label: "Channel", type: "string", description: "HEC data channel identifier" },
+      ],
+    },
+    {
+      title: "Options",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "endpoint.timeout", label: "Timeout", type: "integer", defaultValue: 10, suffix: "s" },
+        { key: "ssl_verify", label: "Verify SSL", type: "boolean", defaultValue: true },
+        { key: "batch_max_size", label: "Batch Max Size", type: "integer", defaultValue: 1000, min: 1 },
+      ],
+    },
+  ],
+}
+
+const LOGGLY: PluginFormDef = {
+  pluginName: "loggly",
+  groups: [
+    {
+      title: "Loggly",
+      fields: [
+        { key: "customer_token", label: "Customer Token", type: "password", required: true, description: "Loggly customer token for log ingestion" },
+        { key: "severity", label: "Severity", type: "enum", defaultValue: "INFO", options: [
+          { value: "DEBUG", label: "DEBUG" },
+          { value: "INFO", label: "INFO" },
+          { value: "NOTICE", label: "NOTICE" },
+          { value: "WARNING", label: "WARNING" },
+          { value: "ERR", label: "ERR" },
+          { value: "CRIT", label: "CRIT" },
+          { value: "ALERT", label: "ALERT" },
+          { value: "EMERG", label: "EMERG" },
+        ]},
+        { key: "tags", label: "Tags", type: "string-array", placeholder: "gateway", description: "Tags for filtering in Loggly" },
+      ],
+    },
+    {
+      title: "Options",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "include_req_body", label: "Include Request Body", type: "boolean", defaultValue: false },
+        { key: "include_resp_body", label: "Include Response Body", type: "boolean", defaultValue: false },
+      ],
+    },
+  ],
+}
+
+const SLS_LOGGER: PluginFormDef = {
+  pluginName: "sls-logger",
+  groups: [
+    {
+      title: "Alibaba Cloud SLS",
+      fields: [
+        { key: "host", label: "SLS Endpoint", type: "string", required: true, placeholder: "cn-hangzhou.log.aliyuncs.com" },
+        { key: "port", label: "Port", type: "integer", required: true, defaultValue: 10009, min: 1, max: 65535 },
+        { key: "project", label: "Project", type: "string", required: true, placeholder: "my-project" },
+        { key: "logstore", label: "Logstore", type: "string", required: true, placeholder: "my-logstore" },
+      ],
+    },
+    {
+      title: "Credentials",
+      fields: [
+        { key: "access_key_id", label: "Access Key ID", type: "password", required: true },
+        { key: "access_key_secret", label: "Access Key Secret", type: "password", required: true },
+      ],
+    },
+    {
+      title: "Options",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "include_req_body", label: "Include Request Body", type: "boolean", defaultValue: false },
+        { key: "include_resp_body", label: "Include Response Body", type: "boolean", defaultValue: false },
+      ],
+    },
+  ],
+}
+
+const TENCENT_CLOUD_CLS: PluginFormDef = {
+  pluginName: "tencent-cloud-cls",
+  groups: [
+    {
+      title: "Tencent Cloud CLS",
+      fields: [
+        { key: "cls_host", label: "CLS API Host", type: "string", required: true, placeholder: "ap-guangzhou.cls.tencentcs.com", description: "CLS regional API host" },
+        { key: "cls_topic", label: "Topic ID", type: "string", required: true, description: "CLS topic identifier" },
+      ],
+    },
+    {
+      title: "Credentials",
+      fields: [
+        { key: "secret_id", label: "Secret ID", type: "password", required: true },
+        { key: "secret_key", label: "Secret Key", type: "password", required: true },
+      ],
+    },
+    {
+      title: "Options",
+      collapsible: true,
+      defaultOpen: false,
+      fields: [
+        { key: "sample_ratio", label: "Sample Ratio", type: "number", defaultValue: 1, min: 0.00001, max: 1, step: 0.01 },
+        { key: "include_req_body", label: "Include Request Body", type: "boolean", defaultValue: false },
+        { key: "include_resp_body", label: "Include Response Body", type: "boolean", defaultValue: false },
+      ],
+    },
+  ],
+}
+
+const FILE_LOGGER: PluginFormDef = {
+  pluginName: "file-logger",
+  groups: [
+    {
+      title: "File Logger",
+      fields: [
+        { key: "path", label: "Log File Path", type: "string", required: true, placeholder: "/var/log/apisix/access.log", description: "Absolute path to the log file" },
+        { key: "include_req_body", label: "Include Request Body", type: "boolean", defaultValue: false },
+        { key: "include_resp_body", label: "Include Response Body", type: "boolean", defaultValue: false },
+      ],
+    },
+  ],
+}
+
 // --- AI Gateway Plugins ---
 
 const AI_PROVIDER_OPTIONS = [
@@ -1504,6 +2006,11 @@ export const PLUGIN_FORM_REGISTRY: Record<string, PluginFormDef> = {
   "forward-auth": FORWARD_AUTH,
   "authz-keycloak": AUTHZ_KEYCLOAK,
   "wolf-rbac": WOLF_RBAC,
+  "ldap-auth": LDAP_AUTH,
+  "authz-casbin": AUTHZ_CASBIN,
+  "authz-casdoor": AUTHZ_CASDOOR,
+  "cas-auth": CAS_AUTH,
+  "opa": OPA,
   // Security
   "ip-restriction": IP_RESTRICTION,
   "uri-blocker": URI_BLOCKER,
@@ -1511,6 +2018,8 @@ export const PLUGIN_FORM_REGISTRY: Record<string, PluginFormDef> = {
   "csrf": CSRF,
   "consumer-restriction": CONSUMER_RESTRICTION,
   "request-validation": REQUEST_VALIDATION,
+  "ua-restriction": UA_RESTRICTION,
+  "referer-restriction": REFERER_RESTRICTION,
   // Traffic Control
   "limit-req": LIMIT_REQ,
   "limit-conn": LIMIT_CONN,
@@ -1522,6 +2031,7 @@ export const PLUGIN_FORM_REGISTRY: Record<string, PluginFormDef> = {
   "proxy-mirror": PROXY_MIRROR,
   "client-control": CLIENT_CONTROL,
   "real-ip": REAL_IP,
+  "workflow": WORKFLOW,
   // Transformation
   "proxy-rewrite": PROXY_REWRITE,
   "response-rewrite": RESPONSE_REWRITE,
@@ -1532,6 +2042,9 @@ export const PLUGIN_FORM_REGISTRY: Record<string, PluginFormDef> = {
   "mocking": MOCKING,
   "serverless-pre-function": SERVERLESS_PRE_FUNCTION,
   "serverless-post-function": SERVERLESS_POST_FUNCTION,
+  "gzip": GZIP,
+  "grpc-web": GRPC_WEB,
+  "openwhisk": OPENWHISK,
   // Observability
   "prometheus": PROMETHEUS,
   "http-logger": HTTP_LOGGER,
@@ -1543,6 +2056,16 @@ export const PLUGIN_FORM_REGISTRY: Record<string, PluginFormDef> = {
   "opentelemetry": OPENTELEMETRY,
   "skywalking": SKYWALKING,
   "datadog": DATADOG,
+  "skywalking-logger": SKYWALKING_LOGGER,
+  "tcp-logger": TCP_LOGGER,
+  "udp-logger": UDP_LOGGER,
+  "rocketmq-logger": ROCKETMQ_LOGGER,
+  "google-cloud-logging": GOOGLE_CLOUD_LOGGING,
+  "splunk-hec-logging": SPLUNK_HEC_LOGGING,
+  "loggly": LOGGLY,
+  "sls-logger": SLS_LOGGER,
+  "tencent-cloud-cls": TENCENT_CLOUD_CLS,
+  "file-logger": FILE_LOGGER,
   // Serverless
   "aws-lambda": AWS_LAMBDA,
   "azure-functions": AZURE_FUNCTIONS,

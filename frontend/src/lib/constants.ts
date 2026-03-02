@@ -53,6 +53,11 @@ export const PLUGINS: PluginDefinition[] = [
   { name: "forward-auth", label: "Forward Auth", description: "Forward authentication to external service", category: "authentication", phase: "request", icon: "ArrowRightLeft" },
   { name: "authz-keycloak", label: "Keycloak Auth", description: "Keycloak UMA resource-level authorization", category: "authentication", phase: "request", icon: "ShieldCheck" },
   { name: "wolf-rbac", label: "Wolf RBAC", description: "Role-based access control via Wolf server", category: "authentication", phase: "request", icon: "ShieldCheck" },
+  { name: "ldap-auth", label: "LDAP Auth", description: "Authenticate against LDAP directory server", category: "authentication", phase: "request", icon: "Server" },
+  { name: "authz-casbin", label: "Casbin RBAC", description: "Policy-based access control via Casbin", category: "authentication", phase: "request", icon: "Scale" },
+  { name: "authz-casdoor", label: "Casdoor SSO", description: "Single sign-on via Casdoor identity platform", category: "authentication", phase: "request", icon: "LogIn" },
+  { name: "cas-auth", label: "CAS Auth", description: "Central Authentication Service (CAS) SSO", category: "authentication", phase: "request", icon: "KeyRound" },
+  { name: "opa", label: "OPA", description: "Policy authorization via Open Policy Agent", category: "authentication", phase: "request", icon: "Scale" },
 
   // Security (request phase)
   { name: "ip-restriction", label: "IP Restriction", description: "Allow or deny access by IP address", category: "security", phase: "request", icon: "Shield" },
@@ -61,6 +66,8 @@ export const PLUGINS: PluginDefinition[] = [
   { name: "csrf", label: "CSRF", description: "Cross-Site Request Forgery protection", category: "security", phase: "request", icon: "ShieldAlert" },
   { name: "consumer-restriction", label: "Consumer Restriction", description: "Restrict access to specific consumers", category: "security", phase: "request", icon: "UserX" },
   { name: "request-validation", label: "Request Validation", description: "Validate request headers and body with JSON Schema", category: "security", phase: "request", icon: "CheckSquare" },
+  { name: "ua-restriction", label: "User-Agent Filter", description: "Allow or deny access by User-Agent header", category: "security", phase: "request", icon: "Monitor" },
+  { name: "referer-restriction", label: "Referer Filter", description: "Allow or deny access by Referer header", category: "security", phase: "request", icon: "Link" },
 
   // Traffic Control (request phase)
   { name: "limit-req", label: "Rate Limit", description: "Limit request rate per time window", category: "traffic", phase: "request", icon: "Gauge" },
@@ -73,6 +80,7 @@ export const PLUGINS: PluginDefinition[] = [
   { name: "proxy-mirror", label: "Traffic Mirror", description: "Mirror traffic to a secondary upstream", category: "traffic", phase: "request", icon: "Copy" },
   { name: "client-control", label: "Client Control", description: "Control client request constraints", category: "traffic", phase: "request", icon: "SlidersHorizontal" },
   { name: "real-ip", label: "Real IP", description: "Detect real client IP from proxy headers", category: "traffic", phase: "request", icon: "MapPin" },
+  { name: "workflow", label: "Workflow", description: "Conditional actions based on matching rules", category: "traffic", phase: "request", icon: "Workflow" },
 
   // Transformation
   { name: "proxy-rewrite", label: "Proxy Rewrite", description: "Rewrite URI, host, or headers before proxying", category: "transformation", phase: "request", icon: "Replace" },
@@ -86,6 +94,9 @@ export const PLUGINS: PluginDefinition[] = [
   { name: "serverless-post-function", label: "Serverless Post", description: "Execute custom Lua code after proxying", category: "transformation", phase: "response", icon: "Code" },
   { name: "aws-lambda", label: "AWS Lambda", description: "Proxy requests to AWS Lambda functions", category: "transformation", phase: "request", icon: "Cloud" },
   { name: "azure-functions", label: "Azure Functions", description: "Proxy requests to Azure Functions", category: "transformation", phase: "request", icon: "Cloud" },
+  { name: "openwhisk", label: "OpenWhisk", description: "Proxy requests to Apache OpenWhisk actions", category: "transformation", phase: "request", icon: "Cloud" },
+  { name: "gzip", label: "Gzip", description: "Compress response body with gzip", category: "transformation", phase: "response", icon: "FileArchive" },
+  { name: "grpc-web", label: "gRPC-Web", description: "Enable gRPC-Web protocol for browser clients", category: "transformation", phase: "request", icon: "ArrowLeftRight" },
 
   // Observability (log phase)
   { name: "prometheus", label: "Prometheus", description: "Export metrics to Prometheus", category: "observability", phase: "observability", icon: "BarChart3" },
@@ -98,6 +109,16 @@ export const PLUGINS: PluginDefinition[] = [
   { name: "clickhouse-logger", label: "ClickHouse Logger", description: "Send access logs to ClickHouse", category: "observability", phase: "observability", icon: "Database" },
   { name: "skywalking", label: "SkyWalking", description: "Distributed tracing with Apache SkyWalking", category: "observability", phase: "observability", icon: "Satellite" },
   { name: "datadog", label: "Datadog", description: "Export metrics to Datadog", category: "observability", phase: "observability", icon: "BarChart3" },
+  { name: "skywalking-logger", label: "SkyWalking Logger", description: "Send access logs to SkyWalking OAP", category: "observability", phase: "observability", icon: "Satellite" },
+  { name: "tcp-logger", label: "TCP Logger", description: "Send access logs via TCP", category: "observability", phase: "observability", icon: "Cable" },
+  { name: "udp-logger", label: "UDP Logger", description: "Send access logs via UDP", category: "observability", phase: "observability", icon: "Cable" },
+  { name: "rocketmq-logger", label: "RocketMQ Logger", description: "Send access logs to Apache RocketMQ", category: "observability", phase: "observability", icon: "Radio" },
+  { name: "google-cloud-logging", label: "Google Cloud Logging", description: "Send logs to Google Cloud Logging", category: "observability", phase: "observability", icon: "Cloud" },
+  { name: "splunk-hec-logging", label: "Splunk HEC", description: "Send logs to Splunk via HTTP Event Collector", category: "observability", phase: "observability", icon: "Search" },
+  { name: "loggly", label: "Loggly", description: "Send logs to Loggly via syslog", category: "observability", phase: "observability", icon: "FileText" },
+  { name: "sls-logger", label: "Alibaba SLS", description: "Send logs to Alibaba Cloud Log Service", category: "observability", phase: "observability", icon: "Cloud" },
+  { name: "tencent-cloud-cls", label: "Tencent CLS", description: "Send logs to Tencent Cloud Log Service", category: "observability", phase: "observability", icon: "Cloud" },
+  { name: "file-logger", label: "File Logger", description: "Write access logs to local file", category: "observability", phase: "observability", icon: "FileText" },
 
   // AI Gateway (request phase)
   { name: "ai-proxy", label: "AI Proxy", description: "Proxy requests to LLMs (OpenAI, DeepSeek, Claude, Gemini)", category: "ai", phase: "request", icon: "Bot" },
@@ -118,6 +139,7 @@ export const PLUGINS: PluginDefinition[] = [
  */
 export const GLOBAL_POLICY_EXCLUDED_PLUGINS = [
   "key-auth", "basic-auth", "jwt-auth", "hmac-auth", "openid-connect", "forward-auth",
+  "authz-keycloak", "wolf-rbac", "ldap-auth", "authz-casbin", "authz-casdoor", "cas-auth", "opa",
   "proxy-rewrite", "grpc-transcode", "redirect", "traffic-split", "consumer-restriction",
 ] as const
 

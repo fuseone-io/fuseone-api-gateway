@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
+  Bug,
   Plus,
   Search,
   MoreHorizontal,
@@ -81,6 +82,7 @@ export default function ApisPage() {
   const [lifecycleFilter, setLifecycleFilter] = useState<string>("all")
   const [deleteTarget, setDeleteTarget] = useState<ApiDefRecord | null>(null)
   const [deploying, setDeploying] = useState<string | null>(null)
+  const [debugActiveRouteIds, setDebugActiveRouteIds] = useState<Set<string>>(new Set())
 
   const loadApis = async () => {
     try {
@@ -101,6 +103,13 @@ export default function ApisPage() {
     const timer = setTimeout(loadApis, search ? 300 : 0)
     return () => clearTimeout(timer)
   }, [search, syncFilter, lifecycleFilter])
+
+  // Fetch debug-active route IDs (single APISIX call) to show debug badges
+  useEffect(() => {
+    api.debugActiveRoutes()
+      .then((routeIds) => setDebugActiveRouteIds(new Set(routeIds || [])))
+      .catch(() => {}) // silent — badge is informational
+  }, [records])
 
   const handleDelete = async () => {
     if (!deleteTarget) return
@@ -135,6 +144,11 @@ export default function ApisPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to clone API")
     }
+  }
+
+  const hasDebugActive = (record: ApiDefRecord): boolean => {
+    if (!record.apisix_route_ids || debugActiveRouteIds.size === 0) return false
+    return record.apisix_route_ids.some((rid) => debugActiveRouteIds.has(rid))
   }
 
   // Client-side status filter (status is inside the definition JSON)
@@ -284,9 +298,17 @@ export default function ApisPage() {
                           <Cable className="h-4 w-4" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium truncate" title={record.name}>
-                            {record.name || "Untitled API"}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium truncate" title={record.name}>
+                              {record.name || "Untitled API"}
+                            </p>
+                            {hasDebugActive(record) && (
+                              <Badge variant="outline" className="text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/30 gap-1 shrink-0">
+                                <Bug className="h-3 w-3" />
+                                Debug
+                              </Badge>
+                            )}
+                          </div>
                           {record.description && (
                             <p className="text-xs text-muted-foreground truncate mt-0.5" title={record.description}>
                               {record.description}
@@ -338,6 +360,9 @@ export default function ApisPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}`)}>
                             <Eye className="mr-2 h-3.5 w-3.5" /> View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}/debug`)}>
+                            <Bug className="mr-2 h-3.5 w-3.5" /> Debug
                           </DropdownMenuItem>
                           {(record.sync_status === "draft" || record.sync_status === "out_of_sync") && (
                             <DropdownMenuItem

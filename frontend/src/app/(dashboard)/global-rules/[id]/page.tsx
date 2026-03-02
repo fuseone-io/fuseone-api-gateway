@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react"
+import { ArrowLeft, Lock, Plus, Save, Trash2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -125,6 +126,8 @@ export default function GlobalPolicyDetailPage() {
     )
   }
 
+  const isSystem = id === "fuseone_platform"
+
   if (!rule) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
@@ -139,18 +142,34 @@ export default function GlobalPolicyDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Global Policy: ${id}`}
-        description="Edit policies applied globally to all API traffic"
+        title={
+          isSystem
+            ? "Platform Policy"
+            : `Global Policy: ${id}`
+        }
+        description={
+          isSystem
+            ? "Platform-managed policy applied to all API traffic (read-only)"
+            : "Edit policies applied globally to all API traffic"
+        }
         actions={
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {isSystem && (
+              <Badge variant="secondary" className="gap-1">
+                <Lock className="h-3 w-3" />
+                Read-only
+              </Badge>
+            )}
             <Button variant="outline" onClick={() => router.push("/global-rules")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              <Save className="mr-2 h-4 w-4" />
-              {saving ? "Saving..." : "Save"}
-            </Button>
+            {!isSystem && (
+              <Button onClick={handleSave} disabled={saving}>
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? "Saving..." : "Save"}
+              </Button>
+            )}
           </div>
         }
       />
@@ -187,41 +206,45 @@ export default function GlobalPolicyDetailPage() {
                         <p className="text-xs text-muted-foreground">{def?.description}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEditingPlugin(pluginName)
-                          setEditingConfig(config)
-                          if (!PLUGIN_FORM_REGISTRY[pluginName]) {
-                            setJsonFallback(JSON.stringify(config, null, 2))
-                          }
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive"
-                        onClick={() => handleRemovePlugin(pluginName)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                    {!isSystem && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingPlugin(pluginName)
+                            setEditingConfig(config)
+                            if (!PLUGIN_FORM_REGISTRY[pluginName]) {
+                              setJsonFallback(JSON.stringify(config, null, 2))
+                            }
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={() => handleRemovePlugin(pluginName)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )
               })
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowPicker(true)}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Policy
-            </Button>
+            {!isSystem && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPicker(true)}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Policy
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>

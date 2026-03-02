@@ -17,8 +17,12 @@ services:
     depends_on:
       etcd:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "9080:9080"
+      - "9090:9090"
+      - "9091:9091"
       - "9180:9180"
       - "9443:9443"
     volumes:

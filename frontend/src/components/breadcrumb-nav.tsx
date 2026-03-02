@@ -29,6 +29,9 @@ const LABELS: Record<string, string> = {
   users: "Users",
   roles: "Roles",
   new: "New",
+  debug: "Debug",
+  analytics: "Analytics",
+  health: "Health",
 }
 
 export function BreadcrumbNav() {

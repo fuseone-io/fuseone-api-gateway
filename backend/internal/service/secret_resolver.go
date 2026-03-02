@@ -5,13 +5,19 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/fuseone/api-gateway/internal/model"
 	"github.com/fuseone/api-gateway/internal/repository"
 )
+
+// SecretLookup is the interface needed by SecretResolver to fetch secrets.
+type SecretLookup interface {
+	GetByName(ctx context.Context, name string) (*model.Secret, []byte, error)
+}
 
 // SecretResolver resolves $secret://local/... references to plaintext values.
 // External references ($secret://vault/..., $secret://aws/...) are passed through.
 type SecretResolver struct {
-	repo   *repository.SecretRepository
+	repo   SecretLookup
 	crypto *CryptoService
 }
 
