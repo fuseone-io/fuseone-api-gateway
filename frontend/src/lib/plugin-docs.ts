@@ -1126,7 +1126,61 @@ export const PLUGIN_DOCS: Record<string, PluginDoc> = {
         },
       },
     ],
-    relatedPlugins: ["forward-auth", "proxy-rewrite", "serverless-pre-function"],
+    relatedPlugins: ["forward-auth", "proxy-rewrite", "serverless-pre-function", "api-composition"],
+  },
+
+  "api-composition": {
+    overview:
+      "API Composition orchestrates multiple backend HTTP calls and aggregates their responses into a single unified response. It supports sequential execution (where each step can use results from previous steps) and parallel execution (for independent calls). Each step can extract data via JSONPath and make it available to subsequent steps or the response template. Built-in SSRF protection, configurable timeouts, and per-step error handling (skip, abort, or fallback) make it production-ready for service composition patterns.",
+    useCases: [
+      "Aggregate data from multiple microservices into a single BFF (Backend-for-Frontend) response",
+      "Call a user service and an orders service in parallel, then merge results",
+      "Implement an orchestration pattern where step 2 depends on the result of step 1",
+      "Build a composite API endpoint that enriches data from multiple sources",
+      "Create a gateway-level aggregation layer without writing custom backend code",
+    ],
+    bestPractices: [
+      "Use parallel execution when steps are independent for better performance",
+      "Set appropriate timeouts for each step based on the target service SLA",
+      "Use 'skip' error handling for non-critical enrichment steps",
+      "Use 'abort' error handling for steps that are essential to the response",
+      "Keep step IDs descriptive (e.g., 'get_user', 'fetch_orders') for readable response templates",
+    ],
+    cautions: [
+      "Each step adds latency — keep the number of steps reasonable (2-5)",
+      "Parallel execution uses nginx threads which have pool limits",
+      "Response template uses simple variable substitution, not full Lua templating",
+      "SSRF protection blocks calls to private IPs by default",
+    ],
+    examples: [
+      {
+        title: "Parallel: User + Orders aggregation",
+        description: "Fetch user profile and orders simultaneously, merge into one response",
+        config: {
+          steps: [
+            { id: "user", uri: "http://user-svc:8080/api/users/$http_x_user_id", method: "GET", timeout: 3000, extract: [], on_error: "abort" },
+            { id: "orders", uri: "http://order-svc:8080/api/orders?user_id=$http_x_user_id", method: "GET", timeout: 5000, extract: [], on_error: "skip" },
+          ],
+          execution: "parallel",
+          response_template: '{"user": $ctx.user, "orders": $ctx.orders}',
+          response_status: 200,
+        },
+      },
+      {
+        title: "Sequential: Enrich with external data",
+        description: "Get product, then fetch reviews using the product category",
+        config: {
+          steps: [
+            { id: "product", uri: "http://catalog-svc/api/products/$uri_arg_id", method: "GET", timeout: 3000, extract: [{ source: "$.category", target: "category" }], on_error: "abort" },
+            { id: "reviews", uri: "http://review-svc/api/reviews?category=$ctx.category", method: "GET", timeout: 3000, extract: [], on_error: "fallback", fallback_value: "[]" },
+          ],
+          execution: "sequential",
+          response_template: '{"product": $ctx.product, "reviews": $ctx.reviews}',
+          response_status: 200,
+        },
+      },
+    ],
+    relatedPlugins: ["http-callout", "serverless-pre-function", "proxy-rewrite"],
   },
 
   "data-masking": {
@@ -1260,5 +1314,574 @@ export const PLUGIN_DOCS: Record<string, PluginDoc> = {
       },
     ],
     relatedPlugins: ["request-validation", "ip-restriction", "uri-blocker", "data-masking"],
+  },
+
+  // ─── AI Gateway ─────────────────────────────────────────────
+
+  "ai-proxy": {
+    overview:
+      "AI Proxy routes requests to Large Language Model providers using the OpenAI-compatible chat completions format. It translates a unified request format into provider-specific API calls, so your consumers use one standard interface regardless of the backend LLM. Supports streaming (SSE), token counting, and automatic response normalization.",
+    useCases: [
+      "Expose a single API endpoint that routes to OpenAI, Anthropic, Gemini, or DeepSeek behind the scenes",
+      "Centralize LLM API key management — consumers never see the provider key",
+      "Switch LLM providers without changing client code",
+      "Enable token-based rate limiting and cost tracking by placing the proxy in front of all LLM calls",
+      "Run local models via Ollama or vLLM through the same gateway interface",
+    ],
+    bestPractices: [
+      "Store API keys in the Secrets manager and reference them via $secret:// variables instead of hardcoding",
+      "Enable 'logging.summaries' to track token usage per route without logging sensitive prompt content",
+      "Set a reasonable timeout (30-120s) — LLM responses can be slow for large prompts",
+      "Use SSL verification in production to prevent MITM attacks on LLM API calls",
+      "Pair with ai-rate-limiting to prevent token budget overruns",
+    ],
+    cautions: [
+      "API keys are stored in APISIX configuration — use the Secrets manager for production deployments",
+      "Streaming responses (SSE) may not work with all observability plugins that buffer the full response",
+      "Some providers (Vertex AI, Bedrock) require additional authentication configuration beyond simple API keys",
+      "Token counts in response headers are estimates and may differ slightly from provider billing",
+    ],
+    examples: [
+      {
+        title: "OpenAI GPT-4o",
+        description: "Route to OpenAI with API key authentication",
+        config: {
+          provider: "openai",
+          options: { model: "gpt-4o" },
+          auth: { header: { Authorization: "Bearer sk-..." } },
+          logging: { summaries: true },
+        },
+      },
+      {
+        title: "Anthropic Claude",
+        description: "Route to Anthropic Claude with the x-api-key header",
+        config: {
+          provider: "anthropic",
+          options: { model: "claude-sonnet-4-20250514" },
+          auth: { header: { "x-api-key": "sk-ant-..." } },
+        },
+      },
+      {
+        title: "Local Ollama",
+        description: "Route to a self-hosted Ollama instance for private LLM inference",
+        config: {
+          provider: "openai-compatible",
+          options: { model: "llama3" },
+          override: { endpoint: "http://ollama:11434/v1" },
+          ssl_verify: false,
+        },
+      },
+    ],
+    relatedPlugins: ["ai-proxy-multi", "ai-rate-limiting", "ai-prompt-guard"],
+  },
+
+  "ai-proxy-multi": {
+    overview:
+      "AI Multi-LLM load balances requests across multiple LLM instances with automatic failover. It supports weighted round-robin and consistent hashing algorithms, allowing you to distribute traffic across providers or models based on cost, speed, or reliability. When an instance fails or returns rate-limit errors, traffic is automatically shifted to healthy instances.",
+    useCases: [
+      "Distribute AI traffic across multiple OpenAI instances to avoid per-account rate limits",
+      "Set up a primary provider (e.g., GPT-4o) with a fallback (e.g., Claude) for high availability",
+      "A/B test different models by routing a percentage of traffic to each",
+      "Route to cheaper models for low-priority requests and premium models for high-priority ones",
+      "Gradually migrate from one LLM provider to another with weighted traffic shifting",
+    ],
+    bestPractices: [
+      "Start with 'instance_health_and_rate_limiting' fallback strategy — it handles both crashes and HTTP 429 errors",
+      "Assign higher weights to your primary provider and lower weights to fallback instances",
+      "Monitor per-instance token usage in the AI Dashboard to optimize weight distribution",
+      "Use consistent hashing (chash) when you need the same user to always hit the same model for cache efficiency",
+      "Test failover behavior by temporarily removing one instance's API key",
+    ],
+    cautions: [
+      "Different LLM providers may return slightly different response formats — test all instances with your client",
+      "Fallback adds latency — the first request must fail before the next instance is tried",
+      "Consistent hashing requires a hash key (e.g., consumer name) — without it, it behaves like round-robin",
+      "Weight changes take effect immediately and may cause traffic spikes on newly weighted instances",
+    ],
+    examples: [
+      {
+        title: "Primary + Fallback",
+        description: "GPT-4o as primary with Claude as fallback on errors",
+        config: {
+          balancer: { algorithm: "roundrobin" },
+          fallback: { strategy: "instance_health_and_rate_limiting" },
+          instances: [
+            { name: "primary-openai", provider: "openai", weight: 80, auth: { header: { Authorization: "Bearer sk-..." } }, options: { model: "gpt-4o" } },
+            { name: "fallback-claude", provider: "anthropic", weight: 20, auth: { header: { "x-api-key": "sk-ant-..." } }, options: { model: "claude-sonnet-4-20250514" } },
+          ],
+        },
+      },
+      {
+        title: "Multi-Instance Load Balancing",
+        description: "Spread traffic across three OpenAI accounts to avoid rate limits",
+        config: {
+          balancer: { algorithm: "roundrobin" },
+          instances: [
+            { name: "openai-1", provider: "openai", weight: 34, auth: { header: { Authorization: "Bearer sk-1..." } }, options: { model: "gpt-4o" } },
+            { name: "openai-2", provider: "openai", weight: 33, auth: { header: { Authorization: "Bearer sk-2..." } }, options: { model: "gpt-4o" } },
+            { name: "openai-3", provider: "openai", weight: 33, auth: { header: { Authorization: "Bearer sk-3..." } }, options: { model: "gpt-4o" } },
+          ],
+        },
+      },
+    ],
+    relatedPlugins: ["ai-proxy", "ai-rate-limiting", "traffic-split"],
+  },
+
+  "ai-prompt-guard": {
+    overview:
+      "Prompt Guard filters LLM prompts using regex allow/deny patterns to prevent prompt injection, data exfiltration, and misuse. It inspects the 'messages' array in chat completion requests and can block or allow based on pattern matching. Patterns are applied to user messages, system prompts, or the full conversation history.",
+    useCases: [
+      "Block prompt injection attempts that try to override system instructions",
+      "Prevent users from requesting harmful, illegal, or off-topic content",
+      "Enforce that prompts include required context (e.g., a specific system prefix)",
+      "Filter out PII patterns (SSN, credit card numbers) from being sent to external LLMs",
+      "Create topic guardrails that restrict the LLM to specific domains",
+    ],
+    bestPractices: [
+      "Start with deny patterns for known attack vectors: 'ignore previous', 'system prompt', 'jailbreak'",
+      "Use allow patterns sparingly — they require ALL messages to match, which can be overly restrictive",
+      "Enable 'match_all_conversation_history' to scan the entire conversation, not just the latest message",
+      "Test patterns against real conversation examples before deploying to production",
+      "Combine with ai-aws-content-moderation for ML-based detection that catches patterns regex can't",
+    ],
+    cautions: [
+      "Regex patterns alone cannot catch all prompt injection techniques — use as one layer of defense",
+      "Overly broad deny patterns may block legitimate requests (e.g., blocking 'ignore' may affect normal conversation)",
+      "Allow patterns with 'match_all_roles' will also check system messages, which may not match your patterns",
+      "Pattern matching adds latency proportional to the number of patterns and message length",
+    ],
+    examples: [
+      {
+        title: "Block Prompt Injection",
+        description: "Deny common prompt injection phrases",
+        config: {
+          deny_patterns: [
+            "ignore (all |any )?previous",
+            "disregard (your |all )?instructions",
+            "you are now",
+            "act as (a |an )?",
+            "system prompt",
+            "jailbreak",
+          ],
+          match_all_conversation_history: true,
+        },
+      },
+      {
+        title: "PII Filter",
+        description: "Block requests containing SSN or credit card patterns",
+        config: {
+          deny_patterns: [
+            "\\d{3}-\\d{2}-\\d{4}",
+            "\\d{4}[- ]?\\d{4}[- ]?\\d{4}[- ]?\\d{4}",
+          ],
+          match_all_roles: false,
+        },
+      },
+    ],
+    relatedPlugins: ["ai-proxy", "ai-aws-content-moderation", "ai-request-rewrite"],
+  },
+
+  "ai-request-rewrite": {
+    overview:
+      "AI Request Rewrite transforms incoming requests using LLM-powered prompts before they reach the upstream. It sends the original request through a configured LLM with a system prompt that instructs the model to rewrite, summarize, translate, or restructure the input. The LLM's response replaces the original request body.",
+    useCases: [
+      "Automatically translate user prompts to English before sending to an English-only LLM",
+      "Summarize long input documents to fit within model context limits",
+      "Normalize different input formats into a standard schema expected by the upstream",
+      "Add safety wrappers or context to user prompts before they reach the main LLM",
+      "Implement prompt templating where user input is embedded into a structured prompt",
+    ],
+    bestPractices: [
+      "Use a fast, cheap model (e.g., gpt-4o-mini) for rewrites to minimize latency and cost overhead",
+      "Keep the rewrite system prompt concise — it runs on every request and adds to token costs",
+      "Set a short timeout (5-10s) for the rewrite LLM to avoid blocking the main request too long",
+      "Test the rewrite output thoroughly — LLM rewrites are non-deterministic and may occasionally alter meaning",
+    ],
+    cautions: [
+      "Every request pays double LLM cost — once for the rewrite, once for the main model",
+      "Rewrite adds significant latency (1-5s typical) since it makes an extra LLM call",
+      "The rewrite model may occasionally produce unexpected output that breaks downstream processing",
+      "Sensitive data in the request will be sent to the rewrite LLM provider — ensure compliance",
+    ],
+    examples: [
+      {
+        title: "Prompt Translation",
+        description: "Translate all user messages to English before the main LLM",
+        config: {
+          prompt: "Translate the following user message to English. Return ONLY the translated text, nothing else.",
+          provider: "openai",
+          options: { model: "gpt-4o-mini" },
+          auth: { header: { Authorization: "Bearer sk-..." } },
+          timeout: 5000,
+        },
+      },
+    ],
+    relatedPlugins: ["ai-proxy", "ai-prompt-guard"],
+  },
+
+  "ai-rate-limiting": {
+    overview:
+      "AI Rate Limiting enforces token-based rate limits on LLM requests, preventing budget overruns and ensuring fair usage across consumers. Unlike traditional request-count rate limiting, it counts prompt tokens, completion tokens, or total tokens to accurately reflect LLM resource consumption. Limits are applied per consumer or per route.",
+    useCases: [
+      "Set a daily token budget per consumer to prevent cost overruns",
+      "Enforce fair usage across teams sharing a single LLM gateway",
+      "Differentiate rate plans — free tier gets 10K tokens/hour, premium gets 1M",
+      "Protect against runaway scripts that make excessive LLM calls",
+      "Implement token quotas that align with your LLM provider billing limits",
+    ],
+    bestPractices: [
+      "Use 'total_tokens' strategy for simple budget enforcement",
+      "Use 'prompt_tokens' strategy when you want to limit input size regardless of output",
+      "Set time windows that match your billing cycle (e.g., 24h for daily budgets)",
+      "Enable rate limit headers so clients can track their remaining quota",
+      "Pair with ai-proxy logging to correlate token usage with specific requests",
+    ],
+    cautions: [
+      "Token counting relies on response headers from the LLM provider — if the upstream doesn't report tokens, limiting won't work",
+      "Rate limits are approximate — streaming responses may report final token counts after the response is already sent",
+      "Very short time windows (< 1 minute) may not be accurate due to counter synchronization across APISIX workers",
+      "The rejected response code and message should be informative so clients can implement retry-after logic",
+    ],
+    examples: [
+      {
+        title: "Daily Token Budget",
+        description: "Limit each consumer to 100K total tokens per day",
+        config: {
+          limit: 100000,
+          time_window: 86400,
+          limit_strategy: "total_tokens",
+          rejected_code: 429,
+          rejected_msg: "Token quota exceeded. Resets daily.",
+        },
+      },
+      {
+        title: "Hourly Prompt Limit",
+        description: "Limit prompt tokens to 50K per hour to control input costs",
+        config: {
+          limit: 50000,
+          time_window: 3600,
+          limit_strategy: "prompt_tokens",
+          show_limit_quota_header: true,
+        },
+      },
+    ],
+    relatedPlugins: ["ai-proxy", "ai-proxy-multi", "limit-count"],
+  },
+
+  "ai-rag": {
+    overview:
+      "AI RAG (Retrieval-Augmented Generation) enriches LLM prompts with relevant context from a vector database before sending them to the model. It generates embeddings from the user's query, searches a vector index for similar documents, and injects the retrieved context into the system prompt. This dramatically improves LLM response accuracy for domain-specific questions.",
+    useCases: [
+      "Build a knowledge base chatbot that answers questions from your documentation",
+      "Enhance customer support AI with product-specific information from your database",
+      "Create an internal assistant that can reference company policies and procedures",
+      "Improve code generation by providing relevant code examples from your codebase",
+    ],
+    bestPractices: [
+      "Use a dedicated embeddings model (e.g., text-embedding-3-small) — it's cheaper and faster than using a chat model for embeddings",
+      "Index your documents in chunks of 512-1024 tokens for optimal retrieval granularity",
+      "Set a reasonable top_k (3-5 results) to provide enough context without overwhelming the model's context window",
+      "Test retrieval quality separately from generation quality to identify which component needs improvement",
+    ],
+    cautions: [
+      "Currently supports Azure OpenAI for embeddings and Azure AI Search for vector search — other providers planned",
+      "RAG adds latency for embedding generation and vector search (typically 200-500ms)",
+      "Retrieved context consumes tokens from the model's context window — very long documents may hit limits",
+      "Embedding quality depends on the model used — ensure your embedding model matches your use case language",
+    ],
+    examples: [
+      {
+        title: "Azure RAG Pipeline",
+        description: "Connect to Azure OpenAI embeddings and Azure AI Search",
+        config: {
+          embeddings: {
+            source: "azure_openai",
+            azure_openai: {
+              endpoint: "https://my-oai.openai.azure.com",
+              api_key: "...",
+            },
+          },
+          vector_search: {
+            source: "azure_ai_search",
+            azure_ai_search: {
+              endpoint: "https://my-search.search.windows.net",
+              api_key: "...",
+            },
+          },
+        },
+      },
+    ],
+    relatedPlugins: ["ai-proxy", "ai-prompt-guard"],
+  },
+
+  "ai-aws-content-moderation": {
+    overview:
+      "Content Moderation uses AWS Comprehend to analyze LLM prompts and responses for harmful content. It detects profanity, hate speech, insults, harassment, sexual content, and violence using ML-based classification. You can set per-category confidence thresholds and block requests that exceed them.",
+    useCases: [
+      "Filter user prompts for harmful content before they reach the LLM",
+      "Ensure LLM responses don't contain inappropriate content before returning to users",
+      "Meet compliance requirements for content safety in regulated industries",
+      "Protect your brand by preventing the AI from generating offensive outputs",
+    ],
+    bestPractices: [
+      "Start with a moderate default threshold (0.7) and adjust per category based on your requirements",
+      "Set lower thresholds for HATE_SPEECH and VIOLENCE_OR_THREAT (0.5) to catch borderline content",
+      "Set higher thresholds for PROFANITY (0.8) to avoid false positives on casual language",
+      "Test with real examples from your domain to calibrate thresholds appropriately",
+      "Use in combination with ai-prompt-guard for layered defense (regex + ML)",
+    ],
+    cautions: [
+      "AWS Comprehend calls add latency (100-300ms) and cost to every request",
+      "Moderation is not perfect — some harmful content may pass, and some benign content may be flagged",
+      "Requires valid AWS credentials with access to the Comprehend API",
+      "Content moderation works best in English — accuracy may vary for other languages",
+    ],
+    examples: [
+      {
+        title: "Standard Content Filter",
+        description: "Moderate with balanced thresholds across all categories",
+        config: {
+          access_key: "AKIA...",
+          secret_key: "...",
+          region: "us-east-1",
+          default_threshold: 0.7,
+        },
+      },
+      {
+        title: "Strict Moderation",
+        description: "Low thresholds for a child-safe application",
+        config: {
+          access_key: "AKIA...",
+          secret_key: "...",
+          region: "us-east-1",
+          default_threshold: 0.5,
+          categories: {
+            PROFANITY: 0.4,
+            HATE_SPEECH: 0.3,
+            SEXUAL: 0.3,
+            VIOLENCE_OR_THREAT: 0.3,
+          },
+        },
+      },
+    ],
+    relatedPlugins: ["ai-prompt-guard", "ai-proxy"],
+  },
+
+  // ─── GraphQL ────────────────────────────────────────────────
+
+  "degraphql": {
+    overview:
+      "The DeGraphQL plugin converts RESTful API endpoints into GraphQL queries behind the scenes. You define a GraphQL query template on a route, and the plugin transforms incoming REST requests (with path/query parameters) into GraphQL queries that are sent to your upstream GraphQL server. The response is returned as a standard REST JSON response. This lets you expose a clean REST API to consumers while leveraging an existing GraphQL backend.",
+    useCases: [
+      "Expose a simplified REST facade over a complex GraphQL backend",
+      "Let mobile or IoT clients consume a REST endpoint instead of constructing GraphQL queries",
+      "Create resource-specific REST endpoints (GET /users/:id) backed by GraphQL resolvers",
+      "Gradually migrate from GraphQL to REST (or vice versa) without client changes",
+    ],
+    bestPractices: [
+      "Keep GraphQL query templates simple and focused on one resource or operation",
+      "Use variables in the template to map REST path/query parameters to GraphQL arguments",
+      "Add caching (proxy-cache) on top for read-heavy endpoints to reduce upstream load",
+      "Combine with graphql-depth-limit on the upstream to protect against crafted queries",
+    ],
+    cautions: [
+      "The plugin sends the full GraphQL query to the upstream — ensure the upstream enforces its own auth and rate limits",
+      "Complex GraphQL responses with deeply nested data may not map cleanly to REST conventions",
+      "Error handling differs between REST and GraphQL; the plugin returns GraphQL errors as-is in the response body",
+    ],
+    examples: [
+      {
+        title: "REST-to-GraphQL User Lookup",
+        description: "Convert GET /users/:id into a GraphQL query",
+        config: {
+          query: "query($id: ID!) { user(id: $id) { id name email } }",
+          variables: ["id"],
+        },
+      },
+      {
+        title: "Product List Endpoint",
+        description: "Convert GET /products?category=X into a filtered GraphQL query",
+        config: {
+          query: "query($category: String) { products(filter: { category: $category }) { id name price } }",
+          variables: ["category"],
+        },
+      },
+    ],
+    relatedPlugins: ["graphql-depth-limit", "graphql-complexity", "proxy-cache"],
+  },
+
+  "graphql-depth-limit": {
+    overview:
+      "The GraphQL Depth Limit plugin protects your GraphQL upstream from deeply nested queries that can cause excessive resource consumption and potential denial-of-service. It scans the incoming GraphQL query body, counts the maximum brace nesting depth, and rejects (or logs) queries that exceed the configured threshold. This is a lightweight, first-line defense that runs before the query reaches your resolver layer.",
+    useCases: [
+      "Prevent deeply nested query attacks on public-facing GraphQL APIs",
+      "Enforce consistent query depth limits across all GraphQL routes",
+      "Log deep queries in audit mode before switching to enforcement",
+      "Protect backend resolvers from exponential data loading on nested relationships",
+    ],
+    bestPractices: [
+      "Start with a generous limit (e.g., 10-15) and monitor logs to find the real maximum depth your legitimate queries use",
+      "Use 'log' action initially to discover deep queries without breaking existing clients",
+      "Combine with graphql-complexity for a more nuanced cost-based protection",
+      "Set different limits for different routes if some APIs have naturally deeper schemas",
+    ],
+    cautions: [
+      "The depth calculation uses brace counting, which is a heuristic — fragments or aliased fields may produce different depth than expected",
+      "Very low limits (< 3) may block legitimate queries that use standard nested patterns like { user { posts { title } } }",
+      "This plugin only analyzes the query string in the JSON body — GET-based GraphQL queries (query parameter) are not analyzed",
+    ],
+    examples: [
+      {
+        title: "Standard Depth Limit",
+        description: "Reject queries deeper than 10 levels",
+        config: { max_depth: 10, action: "reject" },
+      },
+      {
+        title: "Audit Mode",
+        description: "Log deep queries without blocking (for initial rollout)",
+        config: { max_depth: 8, action: "log" },
+      },
+      {
+        title: "Strict Public API",
+        description: "Very strict limit for public-facing GraphQL endpoint",
+        config: { max_depth: 5, action: "reject" },
+      },
+    ],
+    relatedPlugins: ["graphql-complexity", "graphql-allowlist", "graphql-introspection-guard"],
+  },
+
+  "graphql-complexity": {
+    overview:
+      "The GraphQL Complexity plugin performs cost-based analysis on incoming GraphQL queries. Each field selection is assigned a cost (configurable per field or using a default), and list arguments like 'first' or 'limit' act as multipliers. If the total estimated cost exceeds the configured maximum, the request is rejected or logged. This provides more nuanced protection than depth limiting alone, catching queries that are wide rather than deep.",
+    useCases: [
+      "Prevent expensive queries that fetch large lists of nested objects (e.g., users { posts { comments } } with first: 1000)",
+      "Assign higher costs to computationally expensive fields (e.g., full-text search, aggregations)",
+      "Enforce fair usage across API consumers by limiting query complexity",
+      "Protect against GraphQL query-based denial of service without a full AST parser",
+    ],
+    bestPractices: [
+      "Map your most expensive resolvers to higher field_costs values (database joins, external API calls, aggregations)",
+      "Start with a high max_complexity and monitor actual query costs in logs before tightening",
+      "Use the 'log' action during rollout to understand your query cost distribution",
+      "Combine with depth limiting for defense in depth — complexity catches wide queries, depth catches deep ones",
+    ],
+    cautions: [
+      "The complexity calculation is heuristic-based (field name scanning) rather than full AST parsing — it may over- or under-count in edge cases",
+      "Fragment spreads and inline fragments may not be perfectly accounted for in the cost calculation",
+      "The list_size_argument detection looks for the first match in the query, not necessarily the one closest to each field",
+    ],
+    examples: [
+      {
+        title: "Basic Complexity Limit",
+        description: "Default cost per field, reject above 1000 total",
+        config: { max_complexity: 1000, default_field_cost: 1, action: "reject" },
+      },
+      {
+        title: "Weighted Field Costs",
+        description: "Assign higher costs to expensive fields",
+        config: {
+          max_complexity: 500,
+          default_field_cost: 1,
+          field_costs: { search: 10, analytics: 20, export: 50 },
+          list_size_argument: "first",
+          action: "reject",
+        },
+      },
+      {
+        title: "Audit Mode with Low Threshold",
+        description: "Log all queries exceeding a low threshold to learn usage patterns",
+        config: { max_complexity: 200, default_field_cost: 1, action: "log" },
+      },
+    ],
+    relatedPlugins: ["graphql-depth-limit", "graphql-allowlist", "limit-count"],
+  },
+
+  "graphql-allowlist": {
+    overview:
+      "The GraphQL Allowlist plugin enforces persisted queries by only allowing pre-registered GraphQL operations. Each incoming query is normalized (whitespace collapsed), hashed (MD5), and checked against a configured list of allowed hashes. Unknown queries are either rejected (in enforce mode) or logged (in audit mode). This is the strongest defense against arbitrary query abuse, ensuring only known, reviewed queries can execute.",
+    useCases: [
+      "Lock down a production GraphQL API to only allow queries used by your own frontend",
+      "Prevent arbitrary data exfiltration through crafted GraphQL queries",
+      "Implement a 'query review' workflow where new queries must be explicitly approved before deployment",
+      "Audit which queries are being used before switching to enforcement mode",
+    ],
+    bestPractices: [
+      "Start with enforce=false to discover all queries in use, then build the allowlist from logs",
+      "Automate hash generation in your CI/CD pipeline — extract queries from frontend code and generate hashes",
+      "The rejection response includes the query hash, making it easy to add new queries to the allowlist",
+      "Combine with graphql-introspection-guard to prevent schema discovery alongside query restriction",
+    ],
+    cautions: [
+      "Adding this plugin with enforce=true immediately blocks all queries not in the list — roll out carefully",
+      "Query normalization only collapses whitespace — semantically equivalent queries with different field order will have different hashes",
+      "The MD5 hash is used for performance, not security — it is not cryptographically resistant to collision attacks",
+    ],
+    examples: [
+      {
+        title: "Audit Mode (Discover Queries)",
+        description: "Log unknown queries without blocking — use to build your initial allowlist",
+        config: {
+          enforce: false,
+          allowed_queries: [],
+        },
+      },
+      {
+        title: "Enforced Allowlist",
+        description: "Only allow known queries, reject everything else",
+        config: {
+          enforce: true,
+          allowed_queries: [
+            { name: "GetCurrentUser", hash: "a1b2c3d4e5f6..." },
+            { name: "ListProducts", hash: "f6e5d4c3b2a1..." },
+            { name: "CreateOrder", hash: "1a2b3c4d5e6f..." },
+          ],
+        },
+      },
+    ],
+    relatedPlugins: ["graphql-introspection-guard", "graphql-depth-limit", "graphql-complexity"],
+  },
+
+  "graphql-introspection-guard": {
+    overview:
+      "The GraphQL Introspection Guard blocks introspection queries (__schema, __type) from reaching your upstream GraphQL server. Introspection is essential during development but exposes your entire schema to potential attackers in production. This plugin detects introspection fields in the query body and rejects or logs the request. An optional bypass list allows specific named operations to still perform introspection (e.g., for internal monitoring tools).",
+    useCases: [
+      "Block schema discovery on public-facing GraphQL APIs",
+      "Allow introspection only from internal tooling by using the operation name bypass list",
+      "Gradually disable introspection by starting in log mode",
+      "Comply with security policies that require schema opacity in production",
+    ],
+    bestPractices: [
+      "Always enable this plugin on production routes — introspection is one of the first things attackers try",
+      "Use the allowed_operation_names bypass for known internal tools that need schema access",
+      "Deploy in 'log' mode first to identify any legitimate introspection usage before blocking",
+      "Combine with graphql-allowlist for maximum protection — block both schema discovery and arbitrary queries",
+    ],
+    cautions: [
+      "Blocking introspection will break GraphQL IDE tools (GraphiQL, Apollo Explorer) for developers — ensure dev environments don't have this enabled",
+      "The detection is regex-based (__schema|__type) — it may match inside string literals in rare edge cases",
+      "This does not prevent schema discovery through other means (error messages, field suggestion errors)",
+    ],
+    examples: [
+      {
+        title: "Block All Introspection",
+        description: "Reject any query containing __schema or __type",
+        config: { block_introspection: true, action: "reject" },
+      },
+      {
+        title: "Allow Internal Tooling",
+        description: "Block introspection except for specific named operations",
+        config: {
+          block_introspection: true,
+          allowed_operation_names: ["InternalSchemaCheck", "MonitoringIntrospection"],
+          action: "reject",
+        },
+      },
+      {
+        title: "Audit Mode",
+        description: "Log introspection attempts without blocking",
+        config: { block_introspection: true, action: "log" },
+      },
+    ],
+    relatedPlugins: ["graphql-allowlist", "graphql-depth-limit", "graphql-complexity"],
   },
 }

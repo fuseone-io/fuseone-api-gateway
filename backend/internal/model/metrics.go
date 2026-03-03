@@ -8,6 +8,7 @@ type MetricsRow struct {
 	Ts               time.Time `json:"ts"`
 	RouteID          string    `json:"route_id"`
 	RouteName        string    `json:"route_name"`
+	ConsumerName     string    `json:"consumer_name"`
 	RequestsTotal    int       `json:"requests_total"`
 	Status2xx        int       `json:"status_2xx"`
 	Status3xx        int       `json:"status_3xx"`
@@ -54,6 +55,16 @@ type MetricsSummary struct {
 type TopRoute struct {
 	RouteID          string  `json:"route_id"`
 	RouteName        string  `json:"route_name"`
+	RequestsTotal    int64   `json:"requests_total"`
+	AvgLatencyMs     float64 `json:"avg_latency_ms"`
+	ErrorRate        float64 `json:"error_rate"`
+	BandwidthIngress int64   `json:"bandwidth_ingress"`
+	BandwidthEgress  int64   `json:"bandwidth_egress"`
+}
+
+// TopConsumer represents a consumer (application) ranked by traffic volume.
+type TopConsumer struct {
+	ConsumerName     string  `json:"consumer_name"`
 	RequestsTotal    int64   `json:"requests_total"`
 	AvgLatencyMs     float64 `json:"avg_latency_ms"`
 	ErrorRate        float64 `json:"error_rate"`

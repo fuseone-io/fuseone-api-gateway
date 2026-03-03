@@ -11,8 +11,8 @@
 /backend/tmp/
 
 # Node
-/frontend/node_modules/
-/frontend/.next/
+node_modules/
+.next/
 /frontend/out/
 
 # Environment

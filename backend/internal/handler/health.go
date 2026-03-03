@@ -4,18 +4,19 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/fuseone/api-gateway/internal/service"
 )
 
 type HealthHandler struct {
-	pool   *pgxpool.Pool
-	apisix *service.APISIXClient
+	pool     *pgxpool.Pool
+	registry *service.APISIXClientRegistry
 }
 
-func NewHealthHandler(pool *pgxpool.Pool, apisix *service.APISIXClient) *HealthHandler {
-	return &HealthHandler{pool: pool, apisix: apisix}
+func NewHealthHandler(pool *pgxpool.Pool, registry *service.APISIXClientRegistry) *HealthHandler {
+	return &HealthHandler{pool: pool, registry: registry}
 }
 
 func (h *HealthHandler) Live(c *gin.Context) {
@@ -29,7 +30,10 @@ func (h *HealthHandler) Ready(c *gin.Context) {
 	}
 
 	apisixStatus := "ok"
-	if err := h.apisix.HealthCheck(c.Request.Context()); err != nil {
+	client, err := h.registry.GetClient(c.Request.Context(), uuid.Nil)
+	if err != nil {
+		apisixStatus = "unavailable"
+	} else if err := client.HealthCheck(c.Request.Context()); err != nil {
 		apisixStatus = "unavailable"
 	}
 

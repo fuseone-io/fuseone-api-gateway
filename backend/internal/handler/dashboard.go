@@ -6,16 +6,19 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/fuseone/api-gateway/internal/middleware"
 	"github.com/fuseone/api-gateway/internal/model"
+	"github.com/fuseone/api-gateway/internal/repository"
 	"github.com/fuseone/api-gateway/internal/service"
 )
 
 type DashboardHandler struct {
-	apisix *service.APISIXClient
+	registry  *service.APISIXClientRegistry
+	alertRepo repository.AlertQuerier
 }
 
-func NewDashboardHandler(apisix *service.APISIXClient) *DashboardHandler {
-	return &DashboardHandler{apisix: apisix}
+func NewDashboardHandler(registry *service.APISIXClientRegistry, alertRepo repository.AlertQuerier) *DashboardHandler {
+	return &DashboardHandler{registry: registry, alertRepo: alertRepo}
 }
 
 type DashboardSummary struct {
@@ -27,12 +30,19 @@ type DashboardSummary struct {
 	GlobalRules    int    `json:"global_rules"`
 	Plugins        int    `json:"plugins"`
 	StreamRoutes   int    `json:"stream_routes"`
+	FiringAlerts   int    `json:"firing_alerts"`
 	APISIXStatus   string `json:"apisix_status"`
 }
 
 func (h *DashboardHandler) Summary(c *gin.Context) {
 	ctx := c.Request.Context()
 	summary := DashboardSummary{APISIXStatus: "healthy"}
+
+	client, err := h.registry.GetClient(ctx, middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -54,7 +64,7 @@ func (h *DashboardHandler) Summary(c *gin.Context) {
 		wg.Add(1)
 		go func(name string, dest *int) {
 			defer wg.Done()
-			result, err := h.apisix.List(ctx, name)
+			result, err := client.List(ctx, name)
 			if err != nil {
 				mu.Lock()
 				summary.APISIXStatus = "degraded"
@@ -69,8 +79,15 @@ func (h *DashboardHandler) Summary(c *gin.Context) {
 
 	wg.Wait()
 
-	if err := h.apisix.HealthCheck(ctx); err != nil {
+	if err := client.HealthCheck(ctx); err != nil {
 		summary.APISIXStatus = "unhealthy"
+	}
+
+	// Firing alerts count (best-effort)
+	if h.alertRepo != nil {
+		if count, err := h.alertRepo.CountFiring(ctx); err == nil {
+			summary.FiringAlerts = count
+		}
 	}
 
 	c.JSON(http.StatusOK, model.NewDataResponse(summary))

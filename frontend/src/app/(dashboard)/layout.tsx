@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
+import { EnvironmentSwitcher } from "@/components/environment-switcher"
 import { api } from "@/lib/api-client"
 import { useUIStore } from "@/stores/ui-store"
 import type { User } from "@/types/auth"
@@ -56,6 +57,7 @@ export default function DashboardLayout({
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4 !self-auto" />
           <BreadcrumbNav />
+          <EnvironmentSwitcher />
           <div className="flex-1" />
           <ThemeToggle />
         </header>

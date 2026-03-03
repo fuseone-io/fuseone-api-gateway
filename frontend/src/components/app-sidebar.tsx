@@ -3,21 +3,38 @@
 import {
   Activity,
   AppWindow,
+  ArrowRightLeft,
+  BookOpen,
+  Bot,
+  ChevronRight,
   CreditCard,
+  FileBarChart,
   FileJson,
+  FlaskConical,
   KeyRound,
   LayoutDashboard,
   Lock,
+  Network,
   Puzzle,
+  Radio,
   ScrollText,
+  Settings,
   ShieldCheck,
-  Sliders,
+  SlidersHorizontal,
   Wifi,
   Workflow,
   type LucideIcon,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useEffect } from "react"
+import { useAlertStore } from "@/stores/alert-store"
+import { Badge } from "@/components/ui/badge"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 
 import {
   Sidebar,
@@ -38,10 +55,12 @@ type NavItem = {
   path: string
   label: string
   icon: LucideIcon
+  badge?: "firing"
 }
 
 type NavGroup = {
   label: string
+  collapsible?: boolean
   items: NavItem[]
 }
 
@@ -50,12 +69,14 @@ const navGroups: NavGroup[] = [
     label: "API Management",
     items: [
       { path: "/apis", label: "APIs", icon: Workflow },
+      { path: "/promotions", label: "Promotions", icon: ArrowRightLeft },
       { path: "/applications", label: "Applications", icon: AppWindow },
       { path: "/plans", label: "Plans", icon: CreditCard },
     ],
   },
   {
     label: "Configuration",
+    collapsible: true,
     items: [
       { path: "/plugins", label: "Policy Catalog", icon: Puzzle },
       { path: "/plugin-configs", label: "Policy Templates", icon: FileJson },
@@ -66,17 +87,41 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "System",
+    label: "Integrations",
+    collapsible: true,
     items: [
-      { path: "/monitoring", label: "Monitoring", icon: Activity },
+      { path: "/ai", label: "AI Dashboard", icon: Bot },
+      { path: "/ai/settings", label: "AI Cost Models", icon: SlidersHorizontal },
+      { path: "/kafka", label: "Kafka", icon: Radio },
+      { path: "/mesh", label: "Service Mesh", icon: Network },
+    ],
+  },
+  {
+    label: "Observability",
+    collapsible: true,
+    items: [
+      { path: "/testing", label: "Testing", icon: FlaskConical },
+      { path: "/monitoring", label: "Monitoring", icon: Activity, badge: "firing" },
+      { path: "/reports", label: "Reports", icon: FileBarChart },
+    ],
+  },
+  {
+    label: "Administration",
+    items: [
       { path: "/audit", label: "Audit Log", icon: ScrollText },
-      { path: "/settings", label: "Settings", icon: Sliders },
+      { path: "/settings", label: "Settings", icon: Settings },
     ],
   },
 ]
 
 export function AppSidebar({ user }: { user: User | null }) {
   const pathname = usePathname()
+  const firingCount = useAlertStore((s) => s.firingCount)
+  const startPolling = useAlertStore((s) => s.startPolling)
+
+  useEffect(() => {
+    startPolling()
+  }, [startPolling])
 
   return (
     <Sidebar collapsible="icon">
@@ -113,28 +158,120 @@ export function AppSidebar({ user }: { user: User | null }) {
         </SidebarGroup>
 
         {/* Grouped items */}
-        {navGroups.map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-            <SidebarMenu>
-              {group.items.map((item) => (
-                <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton asChild isActive={pathname.startsWith(item.path)}>
-                    <Link href={item.path}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroup>
-        ))}
+        {navGroups.map((group) =>
+          group.collapsible ? (
+            <CollapsibleNavGroup
+              key={group.label}
+              group={group}
+              pathname={pathname}
+              firingCount={firingCount}
+            />
+          ) : (
+            <FlatNavGroup
+              key={group.label}
+              group={group}
+              pathname={pathname}
+              firingCount={firingCount}
+            />
+          )
+        )}
       </SidebarContent>
       <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={pathname.startsWith("/docs")}>
+              <Link href="/docs">
+                <BookOpen />
+                <span>Documentacao</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
+  )
+}
+
+/** Flat group — items rendered directly under the label */
+function FlatNavGroup({
+  group,
+  pathname,
+  firingCount,
+}: {
+  group: NavGroup
+  pathname: string
+  firingCount: number
+}) {
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+      <SidebarMenu>
+        {group.items.map((item) => (
+          <NavItemButton key={item.path} item={item} pathname={pathname} firingCount={firingCount} />
+        ))}
+      </SidebarMenu>
+    </SidebarGroup>
+  )
+}
+
+/** Collapsible group — auto-opens when any child route is active */
+function CollapsibleNavGroup({
+  group,
+  pathname,
+  firingCount,
+}: {
+  group: NavGroup
+  pathname: string
+  firingCount: number
+}) {
+  const isActive = group.items.some((item) => pathname.startsWith(item.path))
+
+  return (
+    <Collapsible defaultOpen={isActive} className="group/collapsible">
+      <SidebarGroup>
+        <SidebarGroupLabel asChild>
+          <CollapsibleTrigger className="flex w-full items-center">
+            {group.label}
+            <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+          </CollapsibleTrigger>
+        </SidebarGroupLabel>
+        <CollapsibleContent>
+          <SidebarMenu>
+            {group.items.map((item) => (
+              <NavItemButton key={item.path} item={item} pathname={pathname} firingCount={firingCount} />
+            ))}
+          </SidebarMenu>
+        </CollapsibleContent>
+      </SidebarGroup>
+    </Collapsible>
+  )
+}
+
+/** Single nav item button (shared between flat and collapsible) */
+function NavItemButton({
+  item,
+  pathname,
+  firingCount,
+}: {
+  item: NavItem
+  pathname: string
+  firingCount: number
+}) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={pathname.startsWith(item.path)}>
+        <Link href={item.path}>
+          <item.icon />
+          <span>{item.label}</span>
+          {item.badge === "firing" && firingCount > 0 && (
+            <Badge variant="destructive" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px]">
+              {firingCount}
+            </Badge>
+          )}
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   )
 }

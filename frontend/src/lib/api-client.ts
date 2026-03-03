@@ -23,6 +23,12 @@ function clearTokens() {
   localStorage.removeItem("refresh_token")
 }
 
+function getActiveEnvironmentId(): string | null {
+  if (typeof document === "undefined") return null
+  const match = document.cookie.match(/(?:^|;\s*)active_environment_id=([^;]*)/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken()
   const headers: HeadersInit = {
@@ -32,6 +38,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (token) {
     ;(headers as Record<string, string>)["Authorization"] = `Bearer ${token}`
+  }
+
+  const envId = getActiveEnvironmentId()
+  if (envId) {
+    ;(headers as Record<string, string>)["X-Environment-ID"] = envId
   }
 
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -139,9 +150,10 @@ export const api = {
     request<{ data: import("@/types/apisix").UpstreamHealthChecker[] }>("/api/monitoring/upstream-health").then((r) => r.data),
 
   // Metrics
-  metricsTimeSeries: (params: { route_ids?: string[]; range?: import("@/types/metrics").TimeRange; from?: string; to?: string }) => {
+  metricsTimeSeries: (params: { route_ids?: string[]; consumer_names?: string[]; range?: import("@/types/metrics").TimeRange; from?: string; to?: string }) => {
     const qs = new URLSearchParams()
     if (params.route_ids?.length) qs.set("route_ids", params.route_ids.join(","))
+    if (params.consumer_names?.length) qs.set("consumer_names", params.consumer_names.join(","))
     if (params.from) {
       qs.set("from", params.from)
       if (params.to) qs.set("to", params.to)
@@ -151,9 +163,10 @@ export const api = {
     return request<{ data: import("@/types/metrics").TimeSeriesPoint[] }>(`/api/metrics/timeseries?${qs}`).then((r) => r.data)
   },
 
-  metricsSummary: (params?: { route_ids?: string[]; range?: import("@/types/metrics").TimeRange; from?: string; to?: string }) => {
+  metricsSummary: (params?: { route_ids?: string[]; consumer_names?: string[]; range?: import("@/types/metrics").TimeRange; from?: string; to?: string }) => {
     const qs = new URLSearchParams()
     if (params?.route_ids?.length) qs.set("route_ids", params.route_ids.join(","))
+    if (params?.consumer_names?.length) qs.set("consumer_names", params.consumer_names.join(","))
     if (params?.from) {
       qs.set("from", params.from)
       if (params.to) qs.set("to", params.to)
@@ -163,9 +176,10 @@ export const api = {
     return request<{ data: import("@/types/metrics").MetricsSummary }>(`/api/metrics/summary?${qs}`).then((r) => r.data)
   },
 
-  metricsTopRoutes: (params?: { route_ids?: string[]; range?: import("@/types/metrics").TimeRange; from?: string; to?: string; limit?: number }) => {
+  metricsTopRoutes: (params?: { route_ids?: string[]; consumer_names?: string[]; range?: import("@/types/metrics").TimeRange; from?: string; to?: string; limit?: number }) => {
     const qs = new URLSearchParams()
     if (params?.route_ids?.length) qs.set("route_ids", params.route_ids.join(","))
+    if (params?.consumer_names?.length) qs.set("consumer_names", params.consumer_names.join(","))
     if (params?.from) {
       qs.set("from", params.from)
       if (params.to) qs.set("to", params.to)
@@ -174,6 +188,67 @@ export const api = {
     }
     if (params?.limit) qs.set("limit", String(params.limit))
     return request<{ data: import("@/types/metrics").TopRoute[] }>(`/api/metrics/top-routes?${qs}`).then((r) => r.data)
+  },
+
+  metricsTopConsumers: (params?: { route_ids?: string[]; consumer_names?: string[]; range?: import("@/types/metrics").TimeRange; from?: string; to?: string; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (params?.route_ids?.length) qs.set("route_ids", params.route_ids.join(","))
+    if (params?.consumer_names?.length) qs.set("consumer_names", params.consumer_names.join(","))
+    if (params?.from) {
+      qs.set("from", params.from)
+      if (params.to) qs.set("to", params.to)
+    } else {
+      qs.set("range", params?.range || "24h")
+    }
+    if (params?.limit) qs.set("limit", String(params.limit))
+    return request<{ data: import("@/types/metrics").TopConsumer[] }>(`/api/metrics/top-consumers?${qs}`).then((r) => r.data)
+  },
+
+  // AI Metrics
+  aiMetricsTimeSeries: (params?: { range?: import("@/types/metrics").TimeRange; from?: string; to?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.from) {
+      qs.set("from", params.from)
+      if (params.to) qs.set("to", params.to)
+    } else {
+      qs.set("range", params?.range || "1h")
+    }
+    return request<{ data: import("@/types/ai-metrics").AITokenTimeSeries[] }>(`/api/ai/metrics/timeseries?${qs}`).then((r) => r.data)
+  },
+
+  aiMetricsSummary: (params?: { range?: import("@/types/metrics").TimeRange; from?: string; to?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.from) {
+      qs.set("from", params.from)
+      if (params.to) qs.set("to", params.to)
+    } else {
+      qs.set("range", params?.range || "24h")
+    }
+    return request<{ data: import("@/types/ai-metrics").AITokenSummary }>(`/api/ai/metrics/summary?${qs}`).then((r) => r.data)
+  },
+
+  aiTopProviders: (params?: { range?: import("@/types/metrics").TimeRange; from?: string; to?: string; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (params?.from) {
+      qs.set("from", params.from)
+      if (params.to) qs.set("to", params.to)
+    } else {
+      qs.set("range", params?.range || "24h")
+    }
+    if (params?.limit) qs.set("limit", String(params.limit))
+    return request<{ data: import("@/types/ai-metrics").TopProvider[] }>(`/api/ai/metrics/top-providers?${qs}`).then((r) => r.data)
+  },
+
+  aiTopModels: (params?: { range?: import("@/types/metrics").TimeRange; from?: string; to?: string; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (params?.from) {
+      qs.set("from", params.from)
+      if (params.to) qs.set("to", params.to)
+    } else {
+      qs.set("range", params?.range || "24h")
+    }
+    if (params?.limit) qs.set("limit", String(params.limit))
+    return request<{ data: import("@/types/ai-metrics").TopModel[] }>(`/api/ai/metrics/top-models?${qs}`).then((r) => r.data)
   },
 
   // Audit
@@ -210,6 +285,10 @@ export const api = {
 
   deleteApi: (id: string) =>
     request<{ data: unknown }>(`/api/apis/${id}`, { method: "DELETE" }),
+
+  // API Deployments
+  listApiDeployments: (id: string) =>
+    request<{ data: import("@/types/api").ApiDeployment[] }>(`/api/apis/${id}/deployments`).then((r) => r.data),
 
   // API Versioning
   cloneApi: (id: string, data?: import("@/types/api").CloneApiRequest) =>
@@ -329,4 +408,430 @@ export const api = {
   // Per-API monitoring
   apiUpstreamHealth: (apiId: string) =>
     request<{ data: import("@/types/apisix").UpstreamHealthChecker[] }>(`/api/apis/${apiId}/health`).then((r) => r.data),
+
+  // Alerts
+  listAlertRules: () =>
+    request<{ data: import("@/types/alert").AlertRule[] }>("/api/alerts/rules").then((r) => r.data),
+
+  getAlertRule: (id: string) =>
+    request<{ data: import("@/types/alert").AlertRule }>(`/api/alerts/rules/${id}`).then((r) => r.data),
+
+  createAlertRule: (data: import("@/types/alert").CreateAlertRuleRequest) =>
+    request<{ data: import("@/types/alert").AlertRule }>("/api/alerts/rules", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  updateAlertRule: (id: string, data: import("@/types/alert").UpdateAlertRuleRequest) =>
+    request<{ data: import("@/types/alert").AlertRule }>(`/api/alerts/rules/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  deleteAlertRule: (id: string) =>
+    request<{ data: unknown }>(`/api/alerts/rules/${id}`, { method: "DELETE" }),
+
+  acknowledgeAlert: (id: string) =>
+    request<{ data: unknown }>(`/api/alerts/rules/${id}/ack`, { method: "POST" }),
+
+  listAlertEvents: (params?: { rule_id?: string; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (params?.rule_id) qs.set("rule_id", params.rule_id)
+    if (params?.limit) qs.set("limit", String(params.limit))
+    const query = qs.toString()
+    return request<{ data: import("@/types/alert").AlertEvent[] }>(`/api/alerts/events${query ? "?" + query : ""}`).then((r) => r.data)
+  },
+
+  alertFiringCount: () =>
+    request<{ data: { count: number } }>("/api/alerts/firing-count").then((r) => r.data.count),
+
+  // Reports (CSV downloads via fetch → blob)
+  downloadReport: async (path: string, filename: string) => {
+    const token = getToken()
+    const headers: HeadersInit = {}
+    if (token) headers["Authorization"] = `Bearer ${token}`
+    const res = await fetch(`${BASE_URL}${path}`, { headers })
+    if (!res.ok) throw new Error(`Report download failed (${res.status})`)
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+
+  reportUsageCSV: (params: { range?: string; from?: string; to?: string }) => {
+    const qs = new URLSearchParams()
+    if (params.from) { qs.set("from", params.from); if (params.to) qs.set("to", params.to) }
+    else if (params.range) qs.set("range", params.range)
+    return api.downloadReport(`/api/reports/usage/csv?${qs}`, `usage-report.csv`)
+  },
+
+  reportConsumerCSV: (params: { range?: string; from?: string; to?: string }) => {
+    const qs = new URLSearchParams()
+    if (params.from) { qs.set("from", params.from); if (params.to) qs.set("to", params.to) }
+    else if (params.range) qs.set("range", params.range)
+    return api.downloadReport(`/api/reports/consumers/csv?${qs}`, `consumer-report.csv`)
+  },
+
+  reportTimeSeriesCSV: (params: { range?: string; from?: string; to?: string }) => {
+    const qs = new URLSearchParams()
+    if (params.from) { qs.set("from", params.from); if (params.to) qs.set("to", params.to) }
+    else if (params.range) qs.set("range", params.range)
+    return api.downloadReport(`/api/reports/timeseries/csv?${qs}`, `timeseries-report.csv`)
+  },
+
+  // Notification Contacts
+  listNotificationContacts: () =>
+    request<{ data: import("@/types/notification-contact").NotificationContact[] }>("/api/notification-contacts").then((r) => r.data),
+
+  createNotificationContact: (data: import("@/types/notification-contact").CreateNotificationContactRequest) =>
+    request<{ data: import("@/types/notification-contact").NotificationContact }>("/api/notification-contacts", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  updateNotificationContact: (id: string, data: import("@/types/notification-contact").UpdateNotificationContactRequest) =>
+    request<{ data: import("@/types/notification-contact").NotificationContact }>(`/api/notification-contacts/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  deleteNotificationContact: (id: string) =>
+    request<{ data: unknown }>(`/api/notification-contacts/${id}`, { method: "DELETE" }),
+
+  testNotificationContact: (id: string) =>
+    request<{ data: { message: string } }>(`/api/notification-contacts/${id}/test`, { method: "POST" }).then((r) => r.data),
+
+  // Promotions
+  listPromotions: (params?: { status?: string; api_definition_id?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.status) qs.set("status", params.status)
+    if (params?.api_definition_id) qs.set("api_definition_id", params.api_definition_id)
+    const query = qs.toString()
+    return request<{ data: import("@/types/promotion").PromotionRequest[] }>(`/api/promotions${query ? "?" + query : ""}`).then((r) => r.data)
+  },
+
+  getPromotion: (id: string) =>
+    request<{ data: import("@/types/promotion").PromotionRequest }>(`/api/promotions/${id}`).then((r) => r.data),
+
+  createPromotion: (data: import("@/types/promotion").CreatePromotionRequest) =>
+    request<{ data: import("@/types/promotion").PromotionRequest }>("/api/promotions", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  reviewPromotion: (id: string, data: import("@/types/promotion").ReviewPromotionRequest) =>
+    request<{ data: import("@/types/promotion").PromotionRequest }>(`/api/promotions/${id}/review`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  executePromotion: (id: string) =>
+    request<{ data: import("@/types/promotion").PromotionRequest }>(`/api/promotions/${id}/execute`, {
+      method: "POST",
+    }).then((r) => r.data),
+
+  // Environments
+  listEnvironments: () =>
+    request<{ data: import("@/types/environment").Environment[] }>("/api/environments").then((r) => r.data),
+
+  createEnvironment: (data: import("@/types/environment").CreateEnvironmentRequest) =>
+    request<{ data: import("@/types/environment").Environment }>("/api/environments", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  updateEnvironment: (id: string, data: import("@/types/environment").UpdateEnvironmentRequest) =>
+    request<{ data: import("@/types/environment").Environment }>(`/api/environments/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  deleteEnvironment: (id: string) =>
+    request<{ data: unknown }>(`/api/environments/${id}`, { method: "DELETE" }),
+
+  setDefaultEnvironment: (id: string) =>
+    request<{ data: import("@/types/environment").Environment }>(`/api/environments/${id}/set-default`, {
+      method: "POST",
+    }).then((r) => r.data),
+
+  testEnvironmentConnection: (id: string) =>
+    request<{ data: import("@/types/environment").TestConnectionResult }>(`/api/environments/${id}/test-connection`, {
+      method: "POST",
+    }).then((r) => r.data),
+
+  // Users
+  listUsers: (params?: { search?: string; page?: number; page_size?: number }) => {
+    const qs = new URLSearchParams()
+    if (params?.search) qs.set("search", params.search)
+    if (params?.page) qs.set("page", String(params.page))
+    if (params?.page_size) qs.set("page_size", String(params.page_size))
+    const query = qs.toString()
+    return request<{ data: import("@/types/auth").User[]; total: number }>(`/api/users${query ? "?" + query : ""}`)
+  },
+
+  getUser: (id: string) =>
+    request<{ data: import("@/types/auth").User }>(`/api/users/${id}`).then((r) => r.data),
+
+  createUser: (data: import("@/types/auth").CreateUserRequest) =>
+    request<{ data: import("@/types/auth").User }>("/api/users", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  updateUser: (id: string, data: import("@/types/auth").UpdateUserRequest) =>
+    request<{ data: import("@/types/auth").User }>(`/api/users/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  resetPassword: (id: string, data: import("@/types/auth").ResetPasswordRequest) =>
+    request<{ data: { message: string } }>(`/api/users/${id}/reset-password`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  deleteUser: (id: string) =>
+    request<{ data: unknown }>(`/api/users/${id}`, { method: "DELETE" }),
+
+  // Roles
+  listRoles: () =>
+    request<{ data: import("@/types/auth").Role[] }>("/api/roles").then((r) => r.data),
+
+  getRole: (id: string) =>
+    request<{ data: import("@/types/auth").Role }>(`/api/roles/${id}`).then((r) => r.data),
+
+  createRole: (data: import("@/types/auth").CreateRoleRequest) =>
+    request<{ data: import("@/types/auth").Role }>("/api/roles", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  updateRole: (id: string, data: import("@/types/auth").UpdateRoleRequest) =>
+    request<{ data: import("@/types/auth").Role }>(`/api/roles/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  deleteRole: (id: string) =>
+    request<{ data: unknown }>(`/api/roles/${id}`, { method: "DELETE" }),
+
+  // System Settings
+  getSetting: (key: string) =>
+    request<{ data: unknown }>(`/api/settings/${key}`).then((r) => r.data),
+
+  updateSetting: (key: string, value: unknown) =>
+    request<{ data: unknown }>(`/api/settings/${key}`, {
+      method: "PUT",
+      body: JSON.stringify({ value }),
+    }).then((r) => r.data),
+
+  // Subscriptions
+  listSubscriptions: (params?: { consumer_username?: string; api_definition_id?: string; status?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.consumer_username) qs.set("consumer_username", params.consumer_username)
+    if (params?.api_definition_id) qs.set("api_definition_id", params.api_definition_id)
+    if (params?.status) qs.set("status", params.status)
+    const query = qs.toString()
+    return request<{ data: import("@/types/subscription").Subscription[] }>(`/api/subscriptions${query ? "?" + query : ""}`).then((r) => r.data)
+  },
+
+  getSubscription: (id: string) =>
+    request<{ data: import("@/types/subscription").Subscription }>(`/api/subscriptions/${id}`).then((r) => r.data),
+
+  createSubscription: (data: import("@/types/subscription").CreateSubscriptionRequest) =>
+    request<{ data: import("@/types/subscription").Subscription }>("/api/subscriptions", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  reviewSubscription: (id: string, data: import("@/types/subscription").ReviewSubscriptionRequest) =>
+    request<{ data: import("@/types/subscription").Subscription }>(`/api/subscriptions/${id}/review`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  suspendSubscription: (id: string) =>
+    request<{ data: import("@/types/subscription").Subscription }>(`/api/subscriptions/${id}/suspend`, {
+      method: "POST",
+    }).then((r) => r.data),
+
+  revokeSubscription: (id: string, notes?: string) =>
+    request<{ data: import("@/types/subscription").Subscription }>(`/api/subscriptions/${id}/revoke`, {
+      method: "POST",
+      body: JSON.stringify({ notes: notes || "" }),
+    }).then((r) => r.data),
+
+  // OAuth Providers (admin)
+  listOAuthProviders: () =>
+    request<{ data: import("@/types/oauth").OAuthProvider[] }>("/api/oauth/providers").then((r) => r.data),
+
+  getOAuthProvider: (id: string) =>
+    request<{ data: import("@/types/oauth").OAuthProvider }>(`/api/oauth/providers/${id}`).then((r) => r.data),
+
+  createOAuthProvider: (data: import("@/types/oauth").CreateOAuthProviderRequest) =>
+    request<{ data: import("@/types/oauth").OAuthProvider }>("/api/oauth/providers", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  updateOAuthProvider: (id: string, data: import("@/types/oauth").UpdateOAuthProviderRequest) =>
+    request<{ data: import("@/types/oauth").OAuthProvider }>(`/api/oauth/providers/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  deleteOAuthProvider: (id: string) =>
+    request<{ data: unknown }>(`/api/oauth/providers/${id}`, { method: "DELETE" }),
+
+  // OAuth Auth (public - no token required)
+  listEnabledOAuthProviders: () =>
+    request<{ data: import("@/types/oauth").PublicOAuthProvider[] }>("/api/auth/oauth/providers").then((r) => r.data),
+
+  oauthAuthorize: (provider: string, redirectUri: string) =>
+    request<{ data: { url: string; state: string } }>(`/api/auth/oauth/${provider}/authorize?redirect_uri=${encodeURIComponent(redirectUri)}`).then((r) => r.data),
+
+  oauthCallback: (provider: string, code: string, state: string, redirectUri: string) =>
+    request<{ data: import("@/types/auth").TokenResponse }>(`/api/auth/oauth/${provider}/callback`, {
+      method: "POST",
+      body: JSON.stringify({ code, state, redirect_uri: redirectUri }),
+    }).then((r) => {
+      setToken(r.data.access_token)
+      setRefreshToken(r.data.refresh_token)
+      return r.data
+    }),
+
+  // Portal Settings (admin)
+  getPortalSettings: (apiId: string) =>
+    request<{ data: { portal_visible: boolean; portal_categories: string[]; openapi_spec: string } }>(`/api/apis/${apiId}/portal`).then((r) => r.data),
+
+  updatePortalSettings: (apiId: string, data: { portal_visible?: boolean; portal_categories?: string[]; openapi_spec?: string }) =>
+    request<{ data: unknown }>(`/api/apis/${apiId}/portal`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  // Testing - Suites
+  listTestSuites: () =>
+    request<{ data: import("@/types/testing").TestSuite[] }>("/api/testing/suites").then((r) => r.data),
+
+  getTestSuite: (id: string) =>
+    request<{ data: import("@/types/testing").TestSuite }>(`/api/testing/suites/${id}`).then((r) => r.data),
+
+  createTestSuite: (data: { name: string; description: string; api_id?: string; steps: import("@/types/testing").TestStep[]; tags: string[] }) =>
+    request<{ data: import("@/types/testing").TestSuite }>("/api/testing/suites", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  updateTestSuite: (id: string, data: { name: string; description: string; api_id?: string; steps: import("@/types/testing").TestStep[]; tags: string[] }) =>
+    request<{ data: import("@/types/testing").TestSuite }>(`/api/testing/suites/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  deleteTestSuite: (id: string) =>
+    request<{ data: unknown }>(`/api/testing/suites/${id}`, { method: "DELETE" }),
+
+  // Testing - Runs
+  listTestRuns: (suiteId: string) =>
+    request<{ data: import("@/types/testing").TestRun[] }>(`/api/testing/suites/${suiteId}/runs`).then((r) => r.data),
+
+  runTestSuite: (suiteId: string) =>
+    request<{ data: import("@/types/testing").TestRun }>(`/api/testing/suites/${suiteId}/run`, {
+      method: "POST",
+    }).then((r) => r.data),
+
+  // Testing - Synthetic Monitors
+  listSyntheticMonitors: () =>
+    request<{ data: import("@/types/testing").SyntheticMonitor[] }>("/api/testing/monitors").then((r) => r.data),
+
+  createSyntheticMonitor: (data: { name: string; description: string; suite_id: string; interval_sec: number; locations: string[] }) =>
+    request<{ data: import("@/types/testing").SyntheticMonitor }>("/api/testing/monitors", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  toggleSyntheticMonitor: (id: string, enabled: boolean) =>
+    request<{ data: import("@/types/testing").SyntheticMonitor }>(`/api/testing/monitors/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ enabled }),
+    }).then((r) => r.data),
+
+  deleteSyntheticMonitor: (id: string) =>
+    request<{ data: unknown }>(`/api/testing/monitors/${id}`, { method: "DELETE" }),
+
+  // Testing - SLA Definitions
+  listSLADefinitions: () =>
+    request<{ data: import("@/types/testing").SLADefinition[] }>("/api/testing/slas").then((r) => r.data),
+
+  createSLADefinition: (data: { name: string; description: string; api_id?: string; availability_pct: number; latency_p99_ms: number; error_rate_pct: number; eval_window: "7d" | "30d" | "90d" }) =>
+    request<{ data: import("@/types/testing").SLADefinition }>("/api/testing/slas", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  deleteSLADefinition: (id: string) =>
+    request<{ data: unknown }>(`/api/testing/slas/${id}`, { method: "DELETE" }),
+
+  // Service Mesh
+  getMeshOverview: () =>
+    request<{ data: import("@/types/mesh").MeshOverview }>("/api/mesh/overview").then((r) => r.data),
+
+  listMeshServices: () =>
+    request<{ data: import("@/types/mesh").MeshService[] }>("/api/mesh/services").then((r) => r.data),
+
+  getMeshService: (id: string) =>
+    request<{ data: import("@/types/mesh").MeshService }>(`/api/mesh/services/${id}`).then((r) => r.data),
+
+  getMeshTopology: () =>
+    request<{ data: import("@/types/mesh").MeshTopology }>("/api/mesh/topology").then((r) => r.data),
+
+  getMeshDiscoveryStatus: () =>
+    request<{ data: import("@/types/mesh").DiscoveryStatus[] }>("/api/mesh/discovery-status").then((r) => r.data),
+
+  // Kafka
+  listKafkaConnections: () =>
+    request<{ data: import("@/types/kafka").KafkaConnection[] }>("/api/kafka/connections"),
+
+  getKafkaConnection: (id: string) =>
+    request<{ data: import("@/types/kafka").KafkaConnection }>(`/api/kafka/connections/${id}`),
+
+  createKafkaConnection: (data: Partial<import("@/types/kafka").KafkaConnection>) =>
+    request<{ data: import("@/types/kafka").KafkaConnection }>("/api/kafka/connections", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateKafkaConnection: (id: string, data: Partial<import("@/types/kafka").KafkaConnection>) =>
+    request<{ data: import("@/types/kafka").KafkaConnection }>(`/api/kafka/connections/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteKafkaConnection: (id: string) =>
+    request<void>(`/api/kafka/connections/${id}`, { method: "DELETE" }),
+
+  listKafkaTopics: (connectionId: string) =>
+    request<{ data: string[] }>(`/api/kafka/${connectionId}/topics`),
+
+  getKafkaTopic: (connectionId: string, topic: string) =>
+    request<{ data: import("@/types/kafka").KafkaTopic }>(`/api/kafka/${connectionId}/topics/${topic}`),
+
+  produceKafkaMessage: (connectionId: string, topic: string, data: import("@/types/kafka").ProduceRequest) =>
+    request<{ data: unknown }>(`/api/kafka/${connectionId}/topics/${topic}/produce`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  consumeKafkaMessages: (connectionId: string, topic: string, data: import("@/types/kafka").ConsumeRequest) =>
+    request<{ data: import("@/types/kafka").KafkaMessage[] }>(`/api/kafka/${connectionId}/topics/${topic}/consume`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  listKafkaConsumerGroups: (connectionId: string) =>
+    request<{ data: import("@/types/kafka").ConsumerGroupInfo[] }>(`/api/kafka/${connectionId}/consumer-groups`),
 }

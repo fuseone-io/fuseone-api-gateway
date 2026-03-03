@@ -49,7 +49,14 @@ import {
 } from "@/components/ui/dialog"
 import { VerticalFlow } from "./vertical-flow"
 import { PolicyGallery } from "./policy-gallery"
-import { PluginConfigPanel } from "./plugin-config-panel"
+import { PluginConfigPanel, RICH_EDITOR_PLUGINS } from "./plugin-config-panel"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet"
 import { PolicyTemplateSelector } from "./policy-template-selector"
 import { getPluginDef } from "@/lib/constants"
 import type { PluginPhase } from "@/lib/constants"
@@ -387,17 +394,17 @@ export function ApiFlowEditor({ api: apiDef, onChange, readOnly = false, version
         )}
       </div>
 
-      {/* Right Panel - Gallery / Policy Config */}
+      {/* Right Panel - Gallery / Policy Config (non-rich editors only) */}
       <div className="w-[300px] shrink-0 border-l bg-card overflow-hidden">
-        {rightPanel.type === "gallery" && (
+        {(rightPanel.type === "gallery" || (configuredPolicy && RICH_EDITOR_PLUGINS.has(configuredPolicy.name))) && (
           <PolicyGallery
             onAddPolicy={addPolicy}
             existingPolicies={selectedFlow?.policies.map((p) => p.name) || []}
-            phaseFilter={rightPanel.phaseFilter}
+            phaseFilter={rightPanel.type === "gallery" ? rightPanel.phaseFilter : undefined}
           />
         )}
 
-        {configuredPolicy && (
+        {configuredPolicy && !RICH_EDITOR_PLUGINS.has(configuredPolicy.name) && (
           <PluginConfigPanel
             policy={configuredPolicy}
             onUpdateConfig={(config) => updatePolicyConfig(configuredPolicy.id, config)}
@@ -406,6 +413,26 @@ export function ApiFlowEditor({ api: apiDef, onChange, readOnly = false, version
           />
         )}
       </div>
+
+      {/* Sheet for rich custom editors (Tier 0) */}
+      {configuredPolicy && RICH_EDITOR_PLUGINS.has(configuredPolicy.name) && (
+        <Sheet open onOpenChange={(open) => { if (!open) setRightPanel({ type: "gallery" }) }}>
+          <SheetContent
+            side="right"
+            showCloseButton={false}
+            className="!w-[50vw] !max-w-none p-0 gap-0"
+            aria-describedby={undefined}
+          >
+            <SheetTitle className="sr-only">Plugin Configuration</SheetTitle>
+            <PluginConfigPanel
+              policy={configuredPolicy}
+              onUpdateConfig={(config) => updatePolicyConfig(configuredPolicy.id, config)}
+              readOnly={readOnly}
+              onClose={() => setRightPanel({ type: "gallery" })}
+            />
+          </SheetContent>
+        </Sheet>
+      )}
 
       {/* Add Flow Dialog */}
       <AddFlowDialog
@@ -1824,6 +1851,14 @@ function FlowRouteHeader({
           )}
         </div>
 
+        {/* GraphQL indicator */}
+        {flow.entrypoint.graphql?.operation && (
+          <Badge variant="outline" className="text-[9px] px-1.5 py-0 shrink-0 border-dashed border-pink-500/30 text-pink-600 dark:text-pink-400 bg-pink-500/5">
+            GQL:{flow.entrypoint.graphql.operation}
+            {flow.entrypoint.graphql.name ? ` ${flow.entrypoint.graphql.name}` : ""}
+          </Badge>
+        )}
+
         {/* Template indicator */}
         {flow.policyTemplateId && (
           <Badge variant="outline" className="text-[9px] px-1.5 py-0 shrink-0 border-dashed border-purple-500/30 text-purple-600 dark:text-purple-400 bg-purple-500/5">
@@ -1962,6 +1997,84 @@ function FlowRouteHeader({
             <p className="text-[10px] text-muted-foreground">
               Nenhum selecionado = aceita todos os metodos
             </p>
+          </div>
+
+          {/* GraphQL Matching */}
+          <div className="space-y-1.5">
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+              GraphQL Matching
+            </Label>
+            <p className="text-[10px] text-muted-foreground">
+              Filtre requisicoes GraphQL por tipo de operacao, nome da operacao ou root fields.
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Operation</Label>
+                <Select
+                  value={flow.entrypoint.graphql?.operation || "_none"}
+                  onValueChange={(v) => {
+                    const gql = { ...flow.entrypoint.graphql }
+                    if (v === "_none") {
+                      delete gql.operation
+                    } else {
+                      gql.operation = v as "query" | "mutation" | "subscription"
+                    }
+                    const hasValues = gql.operation || gql.name || (gql.root_fields && gql.root_fields.length > 0)
+                    onUpdateFlow({ entrypoint: { ...flow.entrypoint, graphql: hasValues ? gql : undefined } })
+                  }}
+                  disabled={readOnly}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Any" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">Any</SelectItem>
+                    <SelectItem value="query">Query</SelectItem>
+                    <SelectItem value="mutation">Mutation</SelectItem>
+                    <SelectItem value="subscription">Subscription</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Operation Name</Label>
+                <Input
+                  value={flow.entrypoint.graphql?.name || ""}
+                  onChange={(e) => {
+                    const gql = { ...flow.entrypoint.graphql }
+                    if (e.target.value) {
+                      gql.name = e.target.value
+                    } else {
+                      delete gql.name
+                    }
+                    const hasValues = gql.operation || gql.name || (gql.root_fields && gql.root_fields.length > 0)
+                    onUpdateFlow({ entrypoint: { ...flow.entrypoint, graphql: hasValues ? gql : undefined } })
+                  }}
+                  disabled={readOnly}
+                  placeholder="e.g. GetUser"
+                  className="h-8 text-xs font-mono"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Root Fields</Label>
+                <Input
+                  value={flow.entrypoint.graphql?.root_fields?.join(", ") || ""}
+                  onChange={(e) => {
+                    const gql = { ...flow.entrypoint.graphql }
+                    const fields = e.target.value.split(",").map((s) => s.trim()).filter(Boolean)
+                    if (fields.length > 0) {
+                      gql.root_fields = fields
+                    } else {
+                      delete gql.root_fields
+                    }
+                    const hasValues = gql.operation || gql.name || (gql.root_fields && gql.root_fields.length > 0)
+                    onUpdateFlow({ entrypoint: { ...flow.entrypoint, graphql: hasValues ? gql : undefined } })
+                  }}
+                  disabled={readOnly}
+                  placeholder="user, posts"
+                  className="h-8 text-xs font-mono"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Policy Template */}

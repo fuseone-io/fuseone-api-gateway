@@ -125,7 +125,8 @@ func (h *ApiDefinitionHandler) Deploy(c *gin.Context) {
 		return
 	}
 
-	def, err := h.svc.Deploy(c.Request.Context(), id)
+	userID, _ := middleware.GetUserID(c)
+	def, err := h.svc.Deploy(c.Request.Context(), id, middleware.GetEnvironmentID(c), &userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.NewErrorResponse("DEPLOY_ERROR", err.Error()))
 		return
@@ -280,4 +281,62 @@ func (h *ApiDefinitionHandler) Undeprecate(c *gin.Context) {
 	idStr := id.String()
 	h.audit.LogSuccess(c, "UNDEPRECATE", "api_definition", &idStr, auditDetails(""))
 	c.JSON(http.StatusOK, model.NewDataResponse(result))
+}
+
+// DiffBetweenEnvs compares the definition snapshots of an API between two environments.
+// GET /api/apis/:id/diff?env_a=UUID&env_b=UUID
+func (h *ApiDefinitionHandler) DiffBetweenEnvs(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.NewErrorResponse("BAD_REQUEST", "Invalid ID"))
+		return
+	}
+
+	envAStr := c.Query("env_a")
+	envBStr := c.Query("env_b")
+	if envAStr == "" || envBStr == "" {
+		c.JSON(http.StatusBadRequest, model.NewErrorResponse("BAD_REQUEST", "env_a and env_b query params are required"))
+		return
+	}
+
+	envA, err := uuid.Parse(envAStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.NewErrorResponse("BAD_REQUEST", "invalid env_a UUID"))
+		return
+	}
+	envB, err := uuid.Parse(envBStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.NewErrorResponse("BAD_REQUEST", "invalid env_b UUID"))
+		return
+	}
+
+	diff, err := h.svc.DiffBetweenEnvs(c.Request.Context(), id, envA, envB)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if strings.Contains(err.Error(), "not deployed") || strings.Contains(err.Error(), "not found") {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, model.NewErrorResponse("DIFF_ERROR", err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, model.NewDataResponse(diff))
+}
+
+func (h *ApiDefinitionHandler) ListDeployments(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.NewErrorResponse("BAD_REQUEST", "Invalid ID"))
+		return
+	}
+
+	deployments, err := h.svc.ListDeployments(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.NewErrorResponse("DB_ERROR", err.Error()))
+		return
+	}
+	if deployments == nil {
+		deployments = []model.ApiDeployment{}
+	}
+	c.JSON(http.StatusOK, model.NewDataResponse(deployments))
 }

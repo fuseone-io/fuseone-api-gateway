@@ -1,0 +1,17 @@
+export const PERMISSION_GROUPS = [
+  { group: "Routes", permissions: ["routes:read", "routes:write"] },
+  { group: "Services", permissions: ["services:read", "services:write"] },
+  { group: "Upstreams", permissions: ["upstreams:read", "upstreams:write"] },
+  { group: "Consumers", permissions: ["consumers:read", "consumers:write"] },
+  { group: "Plugins", permissions: ["plugins:read", "plugins:write"] },
+  { group: "SSL", permissions: ["ssl:read", "ssl:write"] },
+  { group: "Global Rules", permissions: ["global_rules:read", "global_rules:write"] },
+  { group: "Secrets", permissions: ["secrets:read", "secrets:write"] },
+  { group: "Stream Routes", permissions: ["stream_routes:read", "stream_routes:write"] },
+  { group: "APIs", permissions: ["apis:read", "apis:write"] },
+  { group: "Monitoring", permissions: ["monitoring:read", "monitoring:write"] },
+  { group: "Dashboard", permissions: ["dashboard:read"] },
+  { group: "Users", permissions: ["users:read", "users:write"] },
+  { group: "Audit", permissions: ["audit:read"] },
+  { group: "Settings", permissions: ["settings:read", "settings:write"] },
+] as const

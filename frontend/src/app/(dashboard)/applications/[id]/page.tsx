@@ -6,17 +6,23 @@ import Link from "next/link"
 import { toast } from "sonner"
 import {
   ArrowLeft,
+  BarChart3,
+  Check,
+  Clock,
   Copy,
   Eye,
   EyeOff,
   Key,
   Lock,
+  Pause,
   Plus,
   Save,
   ShieldCheck,
   Fingerprint,
   Shuffle,
   Trash2,
+  X,
+  XCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -60,8 +66,18 @@ import { PLUGINS, getCategoryMeta, AUTH_PLUGINS } from "@/lib/constants"
 import { PLUGIN_FORM_REGISTRY } from "@/lib/plugin-forms"
 import { PluginFormRenderer } from "@/components/flow/plugin-form-renderer"
 import { PolicyGallery } from "@/components/flow/policy-gallery"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { api } from "@/lib/api-client"
 import type { APISIXConsumer, APISIXConsumerGroup } from "@/types/apisix"
+import type { Subscription } from "@/types/subscription"
+import type { ApiDefRecord } from "@/types/api"
 
 type AuthMethod = (typeof AUTH_PLUGINS)[number]
 
@@ -119,6 +135,15 @@ export default function ApplicationDetailPage() {
   const [jsonFallback, setJsonFallback] = useState("")
   const [showPolicies, setShowPolicies] = useState(false)
 
+  // Subscriptions
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
+  const [showSubscribeDialog, setShowSubscribeDialog] = useState(false)
+  const [availableApis, setAvailableApis] = useState<ApiDefRecord[]>([])
+  const [selectedApiId, setSelectedApiId] = useState("")
+  const [selectedSubPlan, setSelectedSubPlan] = useState("")
+  const [subNotes, setSubNotes] = useState("")
+  const [subscribing, setSubscribing] = useState(false)
+
   useEffect(() => {
     loadData()
   }, [id])
@@ -147,10 +172,58 @@ export default function ApplicationDetailPage() {
         (n) => n.value as APISIXConsumerGroup
       )
       setPlans(groups)
+
+      // Load subscriptions
+      try {
+        const subs = await api.listSubscriptions({ consumer_username: id })
+        setSubscriptions(subs || [])
+      } catch {
+        // subscriptions endpoint may not be available yet
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load application")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const SUB_STATUS_BADGE: Record<string, { label: string; className: string }> = {
+    pending: { label: "Pending", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
+    active: { label: "Active", className: "bg-green-500/15 text-green-600 border-green-500/30" },
+    suspended: { label: "Suspended", className: "bg-blue-500/15 text-blue-600 border-blue-500/30" },
+    revoked: { label: "Revoked", className: "bg-red-500/15 text-red-600 border-red-500/30" },
+  }
+
+  const openSubscribeDialog = async () => {
+    setShowSubscribeDialog(true)
+    try {
+      const result = await api.listApis({ page_size: "100" })
+      setAvailableApis(result.data || [])
+    } catch {
+      toast.error("Failed to load APIs")
+    }
+  }
+
+  const handleSubscribe = async () => {
+    if (!selectedApiId) return
+    setSubscribing(true)
+    try {
+      const sub = await api.createSubscription({
+        consumer_username: id,
+        api_definition_id: selectedApiId,
+        plan_id: selectedSubPlan || undefined,
+        notes: subNotes || undefined,
+      })
+      setSubscriptions((prev) => [sub, ...prev])
+      setShowSubscribeDialog(false)
+      setSelectedApiId("")
+      setSelectedSubPlan("")
+      setSubNotes("")
+      toast.success("Subscription request created")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to subscribe")
+    } finally {
+      setSubscribing(false)
     }
   }
 
@@ -257,6 +330,13 @@ export default function ApplicationDetailPage() {
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/applications/${id}/analytics`)}
+            >
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Analytics
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               <Save className="mr-2 h-4 w-4" />
@@ -562,7 +642,129 @@ export default function ApplicationDetailPage() {
             </CollapsibleContent>
           </Card>
         </Collapsible>
+
+        {/* API Subscriptions */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>API Subscriptions</CardTitle>
+                <CardDescription>
+                  APIs this application is subscribed to
+                </CardDescription>
+              </div>
+              <Button size="sm" variant="outline" onClick={openSubscribeDialog}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Subscribe
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {subscriptions.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No API subscriptions yet.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>API</TableHead>
+                    <TableHead>Plan</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {subscriptions.map((sub) => {
+                    const status = SUB_STATUS_BADGE[sub.status] || SUB_STATUS_BADGE.pending
+                    return (
+                      <TableRow key={sub.id}>
+                        <TableCell>
+                          <Link
+                            href={`/apis/${sub.api_definition_id}`}
+                            className="text-sm font-medium hover:underline"
+                          >
+                            {sub.api_definition_id.slice(0, 8)}...
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {sub.plan_id || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={`text-xs ${status.className}`}>
+                            {status.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {new Date(sub.requested_at).toLocaleDateString()}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Subscribe Dialog */}
+      <Dialog open={showSubscribeDialog} onOpenChange={setShowSubscribeDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Subscribe to API</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>API</Label>
+              <Select value={selectedApiId} onValueChange={setSelectedApiId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an API..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableApis.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Plan (optional)</Label>
+              <Select value={selectedSubPlan || "none"} onValueChange={(v) => setSelectedSubPlan(v === "none" ? "" : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="No plan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No plan</SelectItem>
+                  {plans.map((p) => (
+                    <SelectItem key={p.id} value={p.id || "unknown"}>
+                      {p.desc || p.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes (optional)</Label>
+              <Input
+                value={subNotes}
+                onChange={(e) => setSubNotes(e.target.value)}
+                placeholder="Reason for subscription..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSubscribeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubscribe} disabled={!selectedApiId || subscribing}>
+              {subscribing ? "Subscribing..." : "Subscribe"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Policy Picker Sheet */}
       <Sheet open={showPicker} onOpenChange={setShowPicker}>

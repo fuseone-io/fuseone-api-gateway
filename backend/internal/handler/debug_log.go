@@ -28,7 +28,7 @@ type ApiDefReader interface {
 type DebugLogHandler struct {
 	repo        repository.DebugLogQuerier
 	hub         *service.DebugHub
-	apisix      *service.APISIXClient
+	registry    *service.APISIXClientRegistry
 	audit       *middleware.AuditLogger
 	apiDefs     ApiDefReader
 	logger      *zap.Logger
@@ -38,7 +38,7 @@ type DebugLogHandler struct {
 func NewDebugLogHandler(
 	repo repository.DebugLogQuerier,
 	hub *service.DebugHub,
-	apisix *service.APISIXClient,
+	registry *service.APISIXClientRegistry,
 	audit *middleware.AuditLogger,
 	apiDefs ApiDefReader,
 	logger *zap.Logger,
@@ -47,7 +47,7 @@ func NewDebugLogHandler(
 	return &DebugLogHandler{
 		repo:        repo,
 		hub:         hub,
-		apisix:      apisix,
+		registry:    registry,
 		audit:       audit,
 		apiDefs:     apiDefs,
 		logger:      logger,
@@ -319,10 +319,16 @@ func (h *DebugLogHandler) StreamLogs(c *gin.Context) {
 // Adds or removes the http-logger plugin from the route.
 // Accepts optional JSON body: { "include_req_body": bool, "include_resp_body": bool }
 func (h *DebugLogHandler) ToggleDebug(c *gin.Context) {
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
 	routeID := c.Param("route_id")
 	opts := parseCaptureOptions(c)
 
-	newState, err := h.toggleRouteDebug(c.Request.Context(), routeID, opts)
+	newState, err := h.toggleRouteDebug(c.Request.Context(), client, routeID, opts)
 	if err != nil {
 		h.logger.Error("failed to toggle debug", zap.Error(err), zap.String("route_id", routeID))
 		c.JSON(http.StatusBadGateway, model.NewErrorResponse("APISIX_ERROR", err.Error()))
@@ -347,6 +353,12 @@ func (h *DebugLogHandler) ToggleDebug(c *gin.Context) {
 // Toggles debug on ALL routes belonging to the API definition.
 // Accepts optional JSON body: { "include_req_body": bool, "include_resp_body": bool }
 func (h *DebugLogHandler) ToggleApiDebug(c *gin.Context) {
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
 	apiID := c.Param("api_id")
 	opts := parseCaptureOptions(c)
 
@@ -361,15 +373,15 @@ func (h *DebugLogHandler) ToggleApiDebug(c *gin.Context) {
 	}
 
 	// Check current state of first route to determine direction
-	currentlyEnabled := h.isRouteDebugEnabled(c.Request.Context(), routeIDs[0])
+	currentlyEnabled := h.isRouteDebugEnabled(c.Request.Context(), client, routeIDs[0])
 	targetState := !currentlyEnabled
 
 	results := make([]map[string]interface{}, 0, len(routeIDs))
 	for _, rid := range routeIDs {
-		enabled := h.isRouteDebugEnabled(c.Request.Context(), rid)
+		enabled := h.isRouteDebugEnabled(c.Request.Context(), client, rid)
 		// Only toggle if needed (ensure all routes end up in same state)
 		if enabled != targetState {
-			newState, err := h.toggleRouteDebug(c.Request.Context(), rid, opts)
+			newState, err := h.toggleRouteDebug(c.Request.Context(), client, rid, opts)
 			if err != nil {
 				h.logger.Warn("failed to toggle route debug", zap.Error(err), zap.String("route_id", rid))
 				results = append(results, map[string]interface{}{"route_id": rid, "enabled": enabled, "error": err.Error()})
@@ -399,6 +411,12 @@ func (h *DebugLogHandler) ToggleApiDebug(c *gin.Context) {
 // UpdateApiCaptureOptions handles PATCH /api/debug/capture-api/:api_id.
 // Updates capture options on all enabled routes without toggling.
 func (h *DebugLogHandler) UpdateApiCaptureOptions(c *gin.Context) {
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
 	apiID := c.Param("api_id")
 	opts := parseCaptureOptions(c)
 
@@ -409,8 +427,8 @@ func (h *DebugLogHandler) UpdateApiCaptureOptions(c *gin.Context) {
 	}
 
 	for _, rid := range routeIDs {
-		if h.isRouteDebugEnabled(c.Request.Context(), rid) {
-			if err := h.updateRouteCaptureOptions(c.Request.Context(), rid, opts); err != nil {
+		if h.isRouteDebugEnabled(c.Request.Context(), client, rid) {
+			if err := h.updateRouteCaptureOptions(c.Request.Context(), client, rid, opts); err != nil {
 				h.logger.Warn("failed to update capture options", zap.Error(err), zap.String("route_id", rid))
 			}
 		}
@@ -425,6 +443,12 @@ func (h *DebugLogHandler) UpdateApiCaptureOptions(c *gin.Context) {
 
 // ApiDebugStatus handles GET /api/debug/status-api/:api_id.
 func (h *DebugLogHandler) ApiDebugStatus(c *gin.Context) {
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
 	apiID := c.Param("api_id")
 
 	routeIDs, err := h.resolveApiRouteIDs(c.Request.Context(), apiID)
@@ -441,11 +465,11 @@ func (h *DebugLogHandler) ApiDebugStatus(c *gin.Context) {
 
 	routes := make([]map[string]interface{}, 0, len(routeIDs))
 	for _, rid := range routeIDs {
-		enabled := h.isRouteDebugEnabled(c.Request.Context(), rid)
+		enabled := h.isRouteDebugEnabled(c.Request.Context(), client, rid)
 		if enabled {
 			anyEnabled = true
 			if !captureRead {
-				includeReqBody, includeRespBody = h.getRouteCaptureOptions(c.Request.Context(), rid)
+				includeReqBody, includeRespBody = h.getRouteCaptureOptions(c.Request.Context(), client, rid)
 				captureRead = true
 			}
 		}
@@ -463,10 +487,16 @@ func (h *DebugLogHandler) ApiDebugStatus(c *gin.Context) {
 
 // DebugStatus handles GET /api/debug/status/:route_id.
 func (h *DebugLogHandler) DebugStatus(c *gin.Context) {
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
 	routeID := c.Param("route_id")
 
-	enabled := h.isRouteDebugEnabled(c.Request.Context(), routeID)
-	includeReqBody, includeRespBody := h.getRouteCaptureOptions(c.Request.Context(), routeID)
+	enabled := h.isRouteDebugEnabled(c.Request.Context(), client, routeID)
+	includeReqBody, includeRespBody := h.getRouteCaptureOptions(c.Request.Context(), client, routeID)
 
 	c.JSON(http.StatusOK, model.NewDataResponse(map[string]interface{}{
 		"route_id":          routeID,
@@ -510,8 +540,8 @@ func parseCaptureOptions(c *gin.Context) captureOptions {
 
 // toggleRouteDebug toggles the http-logger plugin on a single route and returns the new state.
 // When enabling, uses the provided capture options. Uses merge-patch to only modify http-logger.
-func (h *DebugLogHandler) toggleRouteDebug(ctx context.Context, routeID string, opts captureOptions) (bool, error) {
-	enabled := h.isRouteDebugEnabled(ctx, routeID)
+func (h *DebugLogHandler) toggleRouteDebug(ctx context.Context, client *service.APISIXClient, routeID string, opts captureOptions) (bool, error) {
+	enabled := h.isRouteDebugEnabled(ctx, client, routeID)
 
 	var patchPlugins map[string]interface{}
 	if enabled {
@@ -539,7 +569,7 @@ func (h *DebugLogHandler) toggleRouteDebug(ctx context.Context, routeID string, 
 		zap.String("patch", string(patchData)),
 	)
 
-	if _, err := h.apisix.Patch(ctx, "routes", routeID, patchData); err != nil {
+	if _, err := client.Patch(ctx, "routes", routeID, patchData); err != nil {
 		return false, fmt.Errorf("APISIX patch failed for route %s: %w", routeID, err)
 	}
 
@@ -547,7 +577,7 @@ func (h *DebugLogHandler) toggleRouteDebug(ctx context.Context, routeID string, 
 }
 
 // updateRouteCaptureOptions patches only the capture options on an already-enabled route.
-func (h *DebugLogHandler) updateRouteCaptureOptions(ctx context.Context, routeID string, opts captureOptions) error {
+func (h *DebugLogHandler) updateRouteCaptureOptions(ctx context.Context, client *service.APISIXClient, routeID string, opts captureOptions) error {
 	patchPlugins := map[string]interface{}{
 		"http-logger": map[string]interface{}{
 			"uri":               h.callbackURL,
@@ -558,15 +588,15 @@ func (h *DebugLogHandler) updateRouteCaptureOptions(ctx context.Context, routeID
 		},
 	}
 	patchData, _ := json.Marshal(map[string]interface{}{"plugins": patchPlugins})
-	if _, err := h.apisix.Patch(ctx, "routes", routeID, patchData); err != nil {
+	if _, err := client.Patch(ctx, "routes", routeID, patchData); err != nil {
 		return fmt.Errorf("APISIX patch failed for route %s: %w", routeID, err)
 	}
 	return nil
 }
 
 // isRouteDebugEnabled checks if a route has our http-logger.
-func (h *DebugLogHandler) isRouteDebugEnabled(ctx context.Context, routeID string) bool {
-	routeRaw, err := h.apisix.Get(ctx, "routes", routeID)
+func (h *DebugLogHandler) isRouteDebugEnabled(ctx context.Context, client *service.APISIXClient, routeID string) bool {
+	routeRaw, err := client.Get(ctx, "routes", routeID)
 	if err != nil {
 		return false
 	}
@@ -583,11 +613,11 @@ func (h *DebugLogHandler) isRouteDebugEnabled(ctx context.Context, routeID strin
 
 // getRouteCaptureOptions reads include_req_body / include_resp_body from the http-logger config.
 // Returns (true, true) as defaults if the route can't be read or debug is off.
-func (h *DebugLogHandler) getRouteCaptureOptions(ctx context.Context, routeID string) (includeReqBody, includeRespBody bool) {
+func (h *DebugLogHandler) getRouteCaptureOptions(ctx context.Context, client *service.APISIXClient, routeID string) (includeReqBody, includeRespBody bool) {
 	includeReqBody = true
 	includeRespBody = true
 
-	routeRaw, err := h.apisix.Get(ctx, "routes", routeID)
+	routeRaw, err := client.Get(ctx, "routes", routeID)
 	if err != nil {
 		return
 	}
@@ -644,7 +674,13 @@ func (h *DebugLogHandler) resolveApiRouteIDs(ctx context.Context, apiIDStr strin
 // Returns all APISIX route IDs that currently have our http-logger (debug) enabled.
 // The frontend uses this to show debug badges on the API listing by matching route IDs locally.
 func (h *DebugLogHandler) DebugActiveRoutes(c *gin.Context) {
-	listResp, err := h.apisix.List(c.Request.Context(), "routes")
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
+	listResp, err := client.List(c.Request.Context(), "routes")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.NewErrorResponse("APISIX_ERROR", "Failed to list routes"))
 		return

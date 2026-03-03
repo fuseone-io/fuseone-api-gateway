@@ -5,8 +5,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/fuseone/api-gateway/internal/model"
 	"go.uber.org/zap"
 )
+
+// ensure model import is used
+var _ model.MetricsRow
 
 func TestParseFamilies(t *testing.T) {
 	input := `# HELP apisix_http_status HTTP status codes per service in APISIX
@@ -145,9 +149,9 @@ apisix_http_status{code="301",route="api-v1",matched_uri="/v1/*",matched_host=""
 	families2, _ := parseFamilies(strings.NewReader(input2))
 	s.processMetrics(families2)
 
-	acc, ok := s.accumulators["api-v1"]
+	acc, ok := s.accumulators["api-v1|"]
 	if !ok {
-		t.Fatal("expected accumulator for api-v1")
+		t.Fatal("expected accumulator for api-v1|")
 	}
 
 	// Delta: 200: +10, 201: +5, 404: +3, 500: +1, 301: +1
@@ -195,9 +199,9 @@ apisix_http_status{code="200",route="test",matched_uri="/t/*",matched_host="",se
 	families2, _ := parseFamilies(strings.NewReader(scrape2))
 	s.processMetrics(families2)
 
-	acc := s.accumulators["test"]
+	acc := s.accumulators["test|"]
 	if acc == nil {
-		t.Fatal("expected accumulator for test")
+		t.Fatal("expected accumulator for test|")
 	}
 	if acc.statusCounts[200] != 25 {
 		t.Errorf("expected delta of 25, got %d", acc.statusCounts[200])
@@ -232,9 +236,9 @@ apisix_http_status{code="200",route="test",matched_uri="/t/*",matched_host="",se
 	families3, _ := parseFamilies(strings.NewReader(scrape3))
 	s.processMetrics(families3)
 
-	acc := s.accumulators["test"]
+	acc := s.accumulators["test|"]
 	if acc == nil {
-		t.Fatal("expected accumulator for test")
+		t.Fatal("expected accumulator for test|")
 	}
 	// 50 (from second scrape delta) + 10 (from counter reset: use current value)
 	if acc.statusCounts[200] != 60 {
@@ -318,6 +322,119 @@ apisix_http_latency_count{type="apisix",route="api-v1",service_id="",consumer=""
 	}
 }
 
+func TestProcessMetrics_ConsumerLabel(t *testing.T) {
+	s := &MetricsScraper{
+		accumulators: make(map[string]*routeAccumulator),
+		prevCounters: make(map[string]float64),
+		firstScrape:  true,
+	}
+
+	// Scrape 1: two consumers on the same route
+	scrape1 := `# TYPE apisix_http_status counter
+apisix_http_status{code="200",route="api-v1",matched_uri="/v1/*",matched_host="",service="",consumer="app-mobile",node="10.0.0.1:80"} 50
+apisix_http_status{code="200",route="api-v1",matched_uri="/v1/*",matched_host="",service="",consumer="app-web",node="10.0.0.1:80"} 30
+apisix_http_status{code="200",route="api-v1",matched_uri="/v1/*",matched_host="",service="",consumer="",node="10.0.0.1:80"} 20
+`
+	families1, _ := parseFamilies(strings.NewReader(scrape1))
+	s.processMetrics(families1)
+
+	// Scrape 2: counters increase
+	scrape2 := `# TYPE apisix_http_status counter
+apisix_http_status{code="200",route="api-v1",matched_uri="/v1/*",matched_host="",service="",consumer="app-mobile",node="10.0.0.1:80"} 70
+apisix_http_status{code="200",route="api-v1",matched_uri="/v1/*",matched_host="",service="",consumer="app-web",node="10.0.0.1:80"} 45
+apisix_http_status{code="200",route="api-v1",matched_uri="/v1/*",matched_host="",service="",consumer="",node="10.0.0.1:80"} 25
+`
+	families2, _ := parseFamilies(strings.NewReader(scrape2))
+	s.processMetrics(families2)
+
+	// Should have 3 separate accumulators: route|consumer combinations
+	if len(s.accumulators) != 3 {
+		t.Fatalf("expected 3 accumulators (per route|consumer), got %d", len(s.accumulators))
+	}
+
+	mobileAcc := s.accumulators["api-v1|app-mobile"]
+	if mobileAcc == nil {
+		t.Fatal("expected accumulator for api-v1|app-mobile")
+	}
+	if mobileAcc.consumerName != "app-mobile" {
+		t.Errorf("expected consumerName=app-mobile, got %s", mobileAcc.consumerName)
+	}
+	if mobileAcc.statusCounts[200] != 20 {
+		t.Errorf("expected mobile delta=20, got %d", mobileAcc.statusCounts[200])
+	}
+
+	webAcc := s.accumulators["api-v1|app-web"]
+	if webAcc == nil {
+		t.Fatal("expected accumulator for api-v1|app-web")
+	}
+	if webAcc.consumerName != "app-web" {
+		t.Errorf("expected consumerName=app-web, got %s", webAcc.consumerName)
+	}
+	if webAcc.statusCounts[200] != 15 {
+		t.Errorf("expected web delta=15, got %d", webAcc.statusCounts[200])
+	}
+
+	anonAcc := s.accumulators["api-v1|"]
+	if anonAcc == nil {
+		t.Fatal("expected accumulator for api-v1| (anonymous)")
+	}
+	if anonAcc.statusCounts[200] != 5 {
+		t.Errorf("expected anon delta=5, got %d", anonAcc.statusCounts[200])
+	}
+}
+
+func TestFlush_ConsumerInRows(t *testing.T) {
+	s := &MetricsScraper{
+		accumulators:  make(map[string]*routeAccumulator),
+		prevCounters:  make(map[string]float64),
+		firstScrape:   true,
+		routeResolver: NewRouteNameResolver(nil, zap.NewNop()),
+	}
+
+	scrape1 := `# TYPE apisix_http_status counter
+apisix_http_status{code="200",route="orders",matched_uri="/orders/*",matched_host="",service="",consumer="app-mobile",node="10.0.0.1:80"} 100
+apisix_http_status{code="200",route="orders",matched_uri="/orders/*",matched_host="",service="",consumer="",node="10.0.0.1:80"} 50
+`
+	families1, _ := parseFamilies(strings.NewReader(scrape1))
+	s.processMetrics(families1)
+
+	scrape2 := `# TYPE apisix_http_status counter
+apisix_http_status{code="200",route="orders",matched_uri="/orders/*",matched_host="",service="",consumer="app-mobile",node="10.0.0.1:80"} 120
+apisix_http_status{code="200",route="orders",matched_uri="/orders/*",matched_host="",service="",consumer="",node="10.0.0.1:80"} 60
+`
+	families2, _ := parseFamilies(strings.NewReader(scrape2))
+	s.processMetrics(families2)
+
+	rows := s.buildRows()
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 rows (one per consumer), got %d", len(rows))
+	}
+
+	// Find mobile row
+	var mobileRow, anonRow *model.MetricsRow
+	for i := range rows {
+		if rows[i].ConsumerName == "app-mobile" {
+			mobileRow = &rows[i]
+		} else if rows[i].ConsumerName == "" {
+			anonRow = &rows[i]
+		}
+	}
+
+	if mobileRow == nil {
+		t.Fatal("expected row with consumer_name=app-mobile")
+	}
+	if mobileRow.RequestsTotal != 20 {
+		t.Errorf("expected mobile requests=20, got %d", mobileRow.RequestsTotal)
+	}
+
+	if anonRow == nil {
+		t.Fatal("expected row with consumer_name='' (anonymous)")
+	}
+	if anonRow.RequestsTotal != 10 {
+		t.Errorf("expected anon requests=10, got %d", anonRow.RequestsTotal)
+	}
+}
+
 func TestProcessMetrics_MultiNode(t *testing.T) {
 	s := &MetricsScraper{
 		accumulators: make(map[string]*routeAccumulator),
@@ -341,9 +458,9 @@ apisix_http_status{code="200",route="api",matched_uri="/api/*",matched_host="",s
 	families2, _ := parseFamilies(strings.NewReader(scrape2))
 	s.processMetrics(families2)
 
-	acc := s.accumulators["api"]
+	acc := s.accumulators["api|"]
 	if acc == nil {
-		t.Fatal("expected accumulator for api")
+		t.Fatal("expected accumulator for api|")
 	}
 	// Total delta: 5 + 3 = 8
 	if acc.statusCounts[200] != 8 {

@@ -59,7 +59,14 @@ import {
 import { api } from "@/lib/api-client"
 import { PageHeader } from "@/components/page-header"
 import { exportAsFuseOneJson, exportAsOpenAPIYaml } from "@/lib/openapi-converter"
-import type { ApiDefRecord } from "@/types/api"
+import { useEnvironmentStore } from "@/stores/environment-store"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import type { ApiDefRecord, ApiDeployment } from "@/types/api"
 
 const SYNC_BADGE: Record<string, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
@@ -85,6 +92,9 @@ export default function ApisPage() {
   const [deleteTarget, setDeleteTarget] = useState<ApiDefRecord | null>(null)
   const [deploying, setDeploying] = useState<string | null>(null)
   const [debugActiveRouteIds, setDebugActiveRouteIds] = useState<Set<string>>(new Set())
+  const [deploymentsMap, setDeploymentsMap] = useState<Record<string, ApiDeployment[]>>({})
+  const { environments } = useEnvironmentStore()
+  const multiEnv = environments.length > 1
 
   const loadApis = async () => {
     try {
@@ -105,6 +115,24 @@ export default function ApisPage() {
     const timer = setTimeout(loadApis, search ? 300 : 0)
     return () => clearTimeout(timer)
   }, [search, syncFilter, lifecycleFilter])
+
+  // Load deployments per API when multi-env
+  useEffect(() => {
+    if (!multiEnv || records.length === 0) return
+    const load = async () => {
+      const map: Record<string, ApiDeployment[]> = {}
+      await Promise.all(
+        records.map(async (rec) => {
+          try {
+            const deps = await api.listApiDeployments(rec.id)
+            if (deps?.length) map[rec.id] = deps
+          } catch {}
+        })
+      )
+      setDeploymentsMap(map)
+    }
+    load()
+  }, [records, multiEnv])
 
   // Fetch debug-active route IDs (single APISIX call) to show debug badges
   useEffect(() => {
@@ -271,6 +299,7 @@ export default function ApisPage() {
                 <TableHead className="w-[90px] text-center">Policies</TableHead>
                 <TableHead className="w-[100px] text-center">Lifecycle</TableHead>
                 <TableHead className="w-[110px] text-center">Sync</TableHead>
+                {multiEnv && <TableHead className="w-[80px] text-center">Envs</TableHead>}
                 <TableHead className="w-[60px]" />
               </TableRow>
             </TableHeader>
@@ -352,6 +381,31 @@ export default function ApisPage() {
                         {syncInfo.label}
                       </Badge>
                     </TableCell>
+                    {multiEnv && (
+                      <TableCell className="text-center">
+                        <TooltipProvider delayDuration={200}>
+                          <div className="flex items-center justify-center gap-1">
+                            {(deploymentsMap[record.id] || []).map((dep) => {
+                              const env = environments.find((e) => e.id === dep.environment_id)
+                              if (!env) return null
+                              return (
+                                <Tooltip key={dep.id}>
+                                  <TooltipTrigger asChild>
+                                    <span
+                                      className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-border"
+                                      style={{ backgroundColor: env.color }}
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" className="text-xs">
+                                    {env.name}
+                                  </TooltipContent>
+                                </Tooltip>
+                              )
+                            })}
+                          </div>
+                        </TooltipProvider>
+                      </TableCell>
+                    )}
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

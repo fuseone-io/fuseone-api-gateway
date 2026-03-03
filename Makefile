@@ -1,8 +1,11 @@
-.PHONY: dev stop backend frontend infra build clean test-plugins sync-plugins
+.PHONY: dev stop backend frontend portal infra build clean test-plugins sync-plugins
 
 # Start infrastructure (APISIX + etcd + PostgreSQL)
 infra:
 	docker compose up -d
+
+infra-kafka:
+	docker compose --profile kafka up -d
 
 infra-down:
 	docker compose down
@@ -20,12 +23,19 @@ backend-build:
 backend-test:
 	cd backend && go test ./...
 
-# Frontend
+# Frontend (Admin Dashboard)
 frontend:
 	cd frontend && pnpm dev
 
 frontend-build:
 	cd frontend && pnpm build
+
+# Developer Portal
+portal:
+	cd developer-portal && pnpm dev
+
+portal-build:
+	cd developer-portal && pnpm build
 
 # Development: starts infra, waits for readiness, then runs backend + frontend
 dev:
@@ -65,3 +75,4 @@ clean:
 	rm -f backend/gateway-api
 	rm -rf backend/tmp
 	rm -rf frontend/.next
+	rm -rf developer-portal/.next

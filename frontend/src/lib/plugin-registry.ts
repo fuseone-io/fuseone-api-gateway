@@ -60,6 +60,11 @@ const EXTRA_DESCRIPTIONS: Record<string, string> = {
   "http-callout": "Call external services during request processing",
   "data-masking": "Redact PII from API response bodies",
   "threat-protection": "Detect and block payload-based attacks",
+  "degraphql": "Convert REST endpoints into GraphQL queries",
+  "graphql-depth-limit": "Limit GraphQL query nesting depth",
+  "graphql-complexity": "Cost-based GraphQL query complexity analysis",
+  "graphql-allowlist": "Persisted query allowlist for GraphQL",
+  "graphql-introspection-guard": "Block GraphQL introspection in production",
 }
 
 // --- Heuristic classification for unknown plugins ---
@@ -83,6 +88,9 @@ export function classifyPlugin(name: string): { category: PluginCategory | null;
   } else if (name.includes("logger") || name.includes("log") || name === "prometheus" || name === "datadog" || name === "zipkin" || name === "skywalking" || name === "opentelemetry" || name === "node-status") {
     category = "observability"
     phase = "observability"
+  } else if (name.includes("graphql") || name === "degraphql") {
+    category = "graphql"
+    phase = "request"
   }
 
   return { category, phase }
@@ -141,7 +149,17 @@ export async function fetchAllPlugins(): Promise<EnrichedPlugin[]> {
     .listPlugins()
     .then((data) => {
       if (Array.isArray(data)) {
+        const apisixNames = new Set(data as string[])
         const enriched = (data as string[]).map(enrichPlugin)
+
+        // Merge plugins defined in constants.ts that APISIX doesn't report
+        // (custom plugins like api-composition, http-callout, data-masking, etc.)
+        for (const p of PLUGINS) {
+          if (!apisixNames.has(p.name)) {
+            enriched.push(enrichPlugin(p.name))
+          }
+        }
+
         enriched.sort((a, b) => {
           const aMgd = PLUGINS.some((p) => p.name === a.name) ? 0 : 1
           const bMgd = PLUGINS.some((p) => p.name === b.name) ? 0 : 1

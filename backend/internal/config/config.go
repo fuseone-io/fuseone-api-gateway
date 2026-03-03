@@ -15,6 +15,26 @@ type Config struct {
 	Secrets  SecretsConfig  `mapstructure:"secrets"`
 	Metrics  MetricsConfig  `mapstructure:"metrics"`
 	Debug    DebugConfig    `mapstructure:"debug"`
+	Alerts   AlertConfig    `mapstructure:"alerts"`
+	Testing  TestingConfig  `mapstructure:"testing"`
+	Kafka    KafkaConfig    `mapstructure:"kafka"`
+}
+
+type KafkaConfig struct {
+	Enabled       bool   `mapstructure:"enabled"`
+	DefaultBridge string `mapstructure:"default_bridge_url"`
+}
+
+type TestingConfig struct {
+	SyntheticEnabled bool `mapstructure:"synthetic_enabled"`
+	SyntheticIntervalSec int `mapstructure:"synthetic_interval_sec"`
+	SLAEnabled       bool `mapstructure:"sla_enabled"`
+	SLAIntervalSec   int  `mapstructure:"sla_interval_sec"`
+}
+
+type AlertConfig struct {
+	Enabled         bool `mapstructure:"enabled"`
+	EvalIntervalSec int  `mapstructure:"eval_interval_sec"`
 }
 
 type MetricsConfig struct {
@@ -84,7 +104,7 @@ func Load() (*Config, error) {
 
 	// Server defaults
 	v.SetDefault("server.port", 8080)
-	v.SetDefault("server.cors_origins", []string{"http://localhost:3000"})
+	v.SetDefault("server.cors_origins", []string{"http://localhost:3000", "http://localhost:3001"})
 
 	// Database defaults
 	v.SetDefault("database.host", "localhost")
@@ -123,6 +143,16 @@ func Load() (*Config, error) {
 	v.SetDefault("debug.retention_hours", 48)
 	v.SetDefault("debug.max_rows", 50000)
 
+	// Alerts defaults
+	v.SetDefault("alerts.enabled", true)
+	v.SetDefault("alerts.eval_interval_sec", 60)
+
+	// Testing defaults
+	v.SetDefault("testing.synthetic_enabled", true)
+	v.SetDefault("testing.synthetic_interval_sec", 60)
+	v.SetDefault("testing.sla_enabled", true)
+	v.SetDefault("testing.sla_interval_sec", 300)
+
 	// Bind environment variables explicitly
 	v.BindEnv("database.host", "DB_HOST")
 	v.BindEnv("database.port", "DB_PORT")
@@ -149,6 +179,18 @@ func Load() (*Config, error) {
 	v.BindEnv("debug.callback_url", "DEBUG_CALLBACK_URL")
 	v.BindEnv("debug.retention_hours", "DEBUG_RETENTION_HOURS")
 	v.BindEnv("debug.max_rows", "DEBUG_MAX_ROWS")
+	v.BindEnv("alerts.enabled", "ALERTS_ENABLED")
+	v.BindEnv("alerts.eval_interval_sec", "ALERTS_EVAL_INTERVAL_SEC")
+	v.BindEnv("testing.synthetic_enabled", "TESTING_SYNTHETIC_ENABLED")
+	v.BindEnv("testing.synthetic_interval_sec", "TESTING_SYNTHETIC_INTERVAL_SEC")
+	v.BindEnv("testing.sla_enabled", "TESTING_SLA_ENABLED")
+	v.BindEnv("testing.sla_interval_sec", "TESTING_SLA_INTERVAL_SEC")
+
+	// Kafka defaults
+	v.SetDefault("kafka.enabled", false)
+	v.SetDefault("kafka.default_bridge_url", "http://localhost:8082")
+	v.BindEnv("kafka.enabled", "KAFKA_ENABLED")
+	v.BindEnv("kafka.default_bridge_url", "KAFKA_DEFAULT_BRIDGE_URL")
 
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {

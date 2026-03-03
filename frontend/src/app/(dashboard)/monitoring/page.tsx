@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import {
   AlertTriangle,
   BarChart3,
+  Bell,
   CheckCircle2,
   Clock,
   Heart,
@@ -37,8 +38,10 @@ import { api } from "@/lib/api-client"
 import type { UpstreamHealthChecker, UpstreamHealthNode } from "@/types/apisix"
 import { toast } from "sonner"
 import { useUIStore } from "@/stores/ui-store"
+import { useAlertStore } from "@/stores/alert-store"
 import { AnalyticsTab } from "./analytics-tab"
 import { TroubleshootingTab } from "./troubleshooting-tab"
+import { AlertsTab } from "./alerts-tab"
 
 const AUTO_REFRESH_INTERVAL = 10_000
 
@@ -341,12 +344,18 @@ function UpstreamHealthTab() {
 export default function MonitoringPage() {
   const monitoringTab = useUIStore((s) => s.monitoringTab)
   const setMonitoringTab = useUIStore((s) => s.setMonitoringTab)
+  const firingCount = useAlertStore((s) => s.firingCount)
+  const startPolling = useAlertStore((s) => s.startPolling)
+
+  useEffect(() => {
+    startPolling()
+  }, [startPolling])
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Monitoring"
-        description="Health status, troubleshooting, and analytics for your API Gateway"
+        description="Health status, troubleshooting, analytics, and alerts for your API Gateway"
       />
 
       <Tabs value={monitoringTab} onValueChange={setMonitoringTab}>
@@ -363,6 +372,15 @@ export default function MonitoringPage() {
             <BarChart3 className="h-4 w-4" />
             Analytics
           </TabsTrigger>
+          <TabsTrigger value="alerts" className="gap-1.5">
+            <Bell className="h-4 w-4" />
+            Alerts
+            {firingCount > 0 && (
+              <Badge variant="destructive" className="ml-1 h-5 min-w-[20px] px-1.5 text-[10px]">
+                {firingCount}
+              </Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="upstream-health" className="mt-4">
@@ -375,6 +393,10 @@ export default function MonitoringPage() {
 
         <TabsContent value="analytics" className="mt-4">
           <AnalyticsTab />
+        </TabsContent>
+
+        <TabsContent value="alerts" className="mt-4">
+          <AlertsTab />
         </TabsContent>
       </Tabs>
     </div>

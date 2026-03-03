@@ -4,6 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -19,6 +24,7 @@ import {
   Clock,
   RefreshCw,
   TrendingUp,
+  Users,
   Zap,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -51,7 +57,7 @@ import {
   dateRangeToParams,
   dateRangeSpanHours,
 } from "@/lib/metrics-utils"
-import type { TimeSeriesPoint, MetricsSummary, TopRoute, DateRangeValue } from "@/types/metrics"
+import type { TimeSeriesPoint, MetricsSummary, TopRoute, TopConsumer, DateRangeValue } from "@/types/metrics"
 import { toast } from "sonner"
 
 const AUTO_REFRESH_INTERVAL = 30_000
@@ -62,6 +68,7 @@ export function AnalyticsTab() {
   const [timeSeries, setTimeSeries] = useState<TimeSeriesPoint[]>([])
   const [summary, setSummary] = useState<MetricsSummary | null>(null)
   const [topRoutes, setTopRoutes] = useState<TopRoute[]>([])
+  const [topConsumers, setTopConsumers] = useState<TopConsumer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
@@ -75,14 +82,16 @@ export function AnalyticsTab() {
   const fetchData = useCallback(async () => {
     const rangeParams = dateRangeToParams(dateRange)
     try {
-      const [ts, sum, routes] = await Promise.all([
+      const [ts, sum, routes, consumers] = await Promise.all([
         api.metricsTimeSeries(rangeParams),
         api.metricsSummary(rangeParams),
         api.metricsTopRoutes({ ...rangeParams, limit: 10 }),
+        api.metricsTopConsumers({ ...rangeParams, limit: 10 }),
       ])
       setTimeSeries(ts)
       setSummary(sum)
       setTopRoutes(routes)
+      setTopConsumers(consumers)
       setError(null)
       setLastRefresh(new Date())
     } catch (err) {
@@ -373,12 +382,90 @@ export function AnalyticsTab() {
             </CardContent>
           </Card>
 
+          {/* Top Routes & Applications side-by-side */}
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+            {/* Top Routes Bar Chart */}
+            {topRoutes.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Top Routes by Traffic</CardTitle>
+                  <CardDescription>Most active API routes</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={Math.max(200, topRoutes.length * 36)}>
+                    <BarChart data={topRoutes.slice(0, 10)} layout="vertical" margin={{ left: 8, right: 16 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        type="category"
+                        dataKey="route_name"
+                        width={120}
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(v: string, i: number) => v || topRoutes[i]?.route_id || ""}
+                      />
+                      <Tooltip
+                        {...tooltipStyle}
+                        formatter={(value) => [formatNumber(Number(value ?? 0)), "Requests"]}
+                      />
+                      <Bar dataKey="requests_total" fill="var(--primary)" radius={[0, 4, 4, 0]} name="Requests" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Status Distribution Pie Chart */}
+            {summary && summary.total_requests > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Status Distribution</CardTitle>
+                  <CardDescription>HTTP response status breakdown</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: "2xx", value: summary.status_2xx, fill: "#22c55e" },
+                          { name: "3xx", value: summary.status_3xx, fill: "#3b82f6" },
+                          { name: "4xx", value: summary.status_4xx, fill: "#f59e0b" },
+                          { name: "5xx", value: summary.status_5xx, fill: "#ef4444" },
+                        ].filter((d) => d.value > 0)}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                      >
+                        {[
+                          { name: "2xx", value: summary.status_2xx, fill: "#22c55e" },
+                          { name: "3xx", value: summary.status_3xx, fill: "#3b82f6" },
+                          { name: "4xx", value: summary.status_4xx, fill: "#f59e0b" },
+                          { name: "5xx", value: summary.status_5xx, fill: "#ef4444" },
+                        ].filter((d) => d.value > 0).map((entry) => (
+                          <Cell key={entry.name} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        {...tooltipStyle}
+                        formatter={(value) => [formatNumber(Number(value ?? 0)), "Responses"]}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
           {/* Top Routes Table */}
           {topRoutes.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Top Routes by Traffic</CardTitle>
-                <CardDescription>Most active API routes</CardDescription>
+                <CardTitle className="text-base">Top Routes</CardTitle>
+                <CardDescription>Detailed route-level metrics</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
@@ -415,6 +502,62 @@ export function AnalyticsTab() {
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">
                           {formatBytes(route.bandwidth_ingress + route.bandwidth_egress)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Top Applications Table */}
+          {topConsumers.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <CardTitle className="text-base">Top Applications by Traffic</CardTitle>
+                    <CardDescription>Consumer-level traffic breakdown</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Application</TableHead>
+                      <TableHead className="text-right">Requests</TableHead>
+                      <TableHead className="text-right">Avg Latency</TableHead>
+                      <TableHead className="text-right">Error Rate</TableHead>
+                      <TableHead className="text-right">Bandwidth</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {topConsumers.map((consumer) => (
+                      <TableRow key={consumer.consumer_name}>
+                        <TableCell>
+                          <span className="font-medium text-sm font-mono">
+                            {consumer.consumer_name}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatNumber(consumer.requests_total)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatLatency(consumer.avg_latency_ms)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge
+                            variant={consumer.error_rate > 0.05 ? "destructive" : "secondary"}
+                            className="font-mono"
+                          >
+                            {formatErrorRate(consumer.error_rate)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatBytes(consumer.bandwidth_ingress + consumer.bandwidth_egress)}
                         </TableCell>
                       </TableRow>
                     ))}

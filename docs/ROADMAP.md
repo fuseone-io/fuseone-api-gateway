@@ -1,6 +1,6 @@
 # FuseOne API Gateway -- Implementation Roadmap
 
-> Last updated: 2026-03-01
+> Last updated: 2026-03-03
 
 ## Vision
 
@@ -8,7 +8,7 @@ Transform FuseOne from an APISIX dashboard into a **full-lifecycle API managemen
 
 ---
 
-## Phase 0 -- Foundation (Current State)
+## Phase 0 -- Foundation ✅
 
 ### Completed
 - [x] API CRUD with visual flow editor (routes, policies, upstream)
@@ -25,297 +25,442 @@ Transform FuseOne from an APISIX dashboard into a **full-lifecycle API managemen
 - [x] Session persistence (draft recovery on refresh)
 - [x] RBAC with JWT auth
 - [x] Audit logging
+- [x] User management (CRUD, invitations, role assignment)
+- [x] Role & permissions management (custom roles, RBAC)
+- [x] OAuth/SSO authentication (Google, Microsoft, GitHub, Okta, Generic OIDC)
+- [x] Settings: General, Gateway Connection, Notifications, Environments
+- [x] Subscriptions management (approve/reject/suspend/revoke)
 
 ---
 
-## Phase 1 -- Troubleshooting & Observability (P0)
+## Phase 1 -- Troubleshooting & Observability ✅
 
 **Goal**: Match Sensedia's troubleshooting experience. This is the #1 competitive gap.
 
-**Timeline**: 4-6 weeks
-
 ### 1.1 Log Collection Infrastructure
-- [ ] Create `debug_logs` PostgreSQL table with TTL (auto-delete after 48h)
-- [ ] Backend handler: `POST /internal/debug-logs` to receive `http-logger` batches from APISIX
-- [ ] Backend API: `GET /api/debug/logs?route_id=X&status=5xx&limit=50`
-- [ ] SSE endpoint: `GET /api/debug/logs/stream` for real-time feed
-- [ ] Configure APISIX `http-logger` plugin pointing to our backend
+- [x] Create `debug_logs` PostgreSQL table with TTL (auto-delete after 48h)
+- [x] Backend handler: `POST /internal/debug-logs` to receive `http-logger` batches from APISIX
+- [x] Backend API: `GET /api/debug/logs?route_id=X&status=5xx&limit=50`
+- [x] SSE endpoint: `GET /api/debug/logs/stream` for real-time feed
+- [x] Configure APISIX `http-logger` plugin pointing to our backend
 
 ### 1.2 Debug Toggle Per-Route
-- [ ] UI toggle button on each API/route: "Enable Debug"
-- [ ] When ON: PATCH route in APISIX to add `http-logger` with `include_req_body` + `include_resp_body`
-- [ ] Conditional body capture using `X-FuseOne-Debug` header expression
-- [ ] When OFF: remove debug logger from route
-- [ ] Visual indicator in sidebar/flow when debug is active
+- [x] UI toggle button on each API/route: "Enable Debug"
+- [x] When ON: PATCH route in APISIX to add `http-logger` with `include_req_body` + `include_resp_body`
+- [x] Conditional body capture using `X-FuseOne-Debug` header expression
+- [x] When OFF: remove debug logger from route
+- [x] Visual indicator in sidebar/flow when debug is active
 
 ### 1.3 Live Traffic Feed
-- [ ] Real-time traffic table: Time | Method | Path | Status | Latency | [View]
-- [ ] Filters: route, status code range, method, latency threshold, text search
-- [ ] Color-coded status (green 2xx, yellow 3xx, red 4xx/5xx)
-- [ ] Auto-scroll with pause capability
+- [x] Real-time traffic table: Time | Method | Path | Status | Latency | [View]
+- [x] Filters: route, status code range, method, latency threshold, text search
+- [x] Color-coded status (green 2xx, yellow 3xx, red 4xx/5xx)
+- [x] Auto-scroll with pause capability
 
 ### 1.4 Request Detail View
-- [ ] Headers tab: request + response headers in formatted table
-- [ ] Body tab: syntax-highlighted JSON/XML with copy button
-- [ ] Timing waterfall: `|== APISIX (Xms) ==|==== Upstream (Yms) ====|`
-- [ ] Plugins executed list (from `Apisix-Plugins` debug header)
-- [ ] cURL export button (reproduce the request)
+- [x] Headers tab: request + response headers in formatted table
+- [x] Body tab: syntax-highlighted JSON/XML with copy button
+- [x] Timing waterfall: `|== APISIX (Xms) ==|==== Upstream (Yms) ====|`
+- [x] Plugins executed list (from `Apisix-Plugins` debug header)
+- [x] cURL export button (reproduce the request)
 
 ### 1.5 Prometheus Metrics Dashboard
-- [ ] Backend scraper for `http://apisix:9091/apisix/prometheus/metrics`
-- [ ] Parse Prometheus exposition format → JSON API
-- [ ] Latency charts: p50, p95, p99 per route (from `apisix_http_latency`)
-- [ ] Error rate chart: 4xx/5xx over time (from `apisix_http_status`)
-- [ ] Requests/sec chart (from `apisix_http_requests_total`)
-- [ ] Bandwidth chart: ingress/egress (from `apisix_bandwidth`)
+- [x] Backend scraper for `http://apisix:9091/apisix/prometheus/metrics`
+- [x] Parse Prometheus exposition format → JSON API
+- [x] Latency charts: p50, p95, p99 per route (from `apisix_http_latency`)
+- [x] Error rate chart: 4xx/5xx over time (from `apisix_http_status`)
+- [x] Requests/sec chart (from `apisix_http_requests_total`)
+- [x] Bandwidth chart: ingress/egress (from `apisix_bandwidth`)
 
 ### 1.6 Upstream Health Monitor
-- [ ] Proxy APISIX Control API `GET :9090/v1/healthcheck`
-- [ ] Display upstream nodes with health status (green/red)
-- [ ] Success/failure counters per node
-- [ ] Last check timestamp
-- [ ] Auto-refresh every 10 seconds
-
-### Architecture
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    FuseOne Dashboard                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐  │
-│  │ Traffic Feed │  │ Request View │  │ Metrics Charts    │  │
-│  │ (SSE)        │  │ (Detail)     │  │ (Prometheus)      │  │
-│  └──────┬───────┘  └──────┬───────┘  └────────┬──────────┘  │
-│         │                 │                   │             │
-│  ┌──────┴─────────────────┴───────────────────┴──────────┐  │
-│  │              Go Backend API                           │  │
-│  │  /api/debug/logs  /api/debug/stream  /api/metrics     │  │
-│  └──────┬─────────────────┬─────────────────┬────────────┘  │
-│         │                 │                 │               │
-│  ┌──────┴──────┐  ┌───────┴───────┐  ┌──────┴──────────┐    │
-│  │ PostgreSQL  │  │ APISIX        │  │ APISIX          │    │
-│  │ debug_logs  │  │ Control API   │  │ Prometheus      │    │
-│  │ (TTL 48h)   │  │ :9090         │  │ :9091           │    │
-│  └─────────────┘  └───────────────┘  └─────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-
-APISIX ──http-logger──► Go Backend POST /internal/debug-logs
-```
+- [x] Proxy APISIX Control API `GET :9090/v1/healthcheck`
+- [x] Display upstream nodes with health status (green/red)
+- [x] Success/failure counters per node
+- [x] Last check timestamp
+- [x] Auto-refresh every 10 seconds
 
 ---
 
-## Phase 2 -- Custom Plugins (P1)
+## Phase 2 -- Custom Plugins ✅
 
 **Goal**: Build essential custom APISIX plugins that close critical gaps vs Gravitee/Sensedia.
 
-**Timeline**: 3-4 weeks
-
 ### 2.1 Plugin Infrastructure
-- [ ] Create `custom-plugins/` directory in repo root
-- [ ] Update `docker-compose.yml` to volume-mount `custom-plugins:/opt/custom-plugins:ro`
-- [ ] Update `apisix-config.yaml` with `extra_lua_path: "/opt/custom-plugins/?.lua"`
-- [ ] Pre-register all custom plugin names in `config.yaml` `plugins` list
-- [ ] Add hot-reload endpoint in Go backend: `POST /api/admin/plugins/reload`
-- [ ] Create `Dockerfile.apisix` for production builds with baked-in plugins
-- [ ] Document plugin development workflow in `docs/CUSTOM-PLUGINS.md`
+- [x] Create `custom-plugins/` directory in repo root
+- [x] Update `docker-compose.yml` to volume-mount `custom-plugins:/opt/custom-plugins:ro`
+- [x] Update `apisix-config.yaml` with `extra_lua_path: "/opt/custom-plugins/?.lua"`
+- [x] Pre-register all custom plugin names in `config.yaml` `plugins` list
+- [x] Add hot-reload endpoint in Go backend: `POST /api/admin/plugins/reload`
+- [x] Create `Dockerfile.apisix` for production builds with baked-in plugins
+- [x] Document plugin development workflow in `docs/CUSTOM-PLUGINS.md`
 
 ### 2.2 HTTP Callout Plugin (`http-callout`)
-- [ ] Lua plugin: make HTTP(S) calls to external services during request processing
-- [ ] Configuration: url, method, headers, body (with variable substitution)
-- [ ] Response handling: extract fields via JSONPath, inject into headers/context
-- [ ] Error handling: exit_on_error, error_status, fallback behavior
-- [ ] Fire-and-forget mode for async notifications
-- [ ] Timeout configuration with sensible defaults (3s)
-- [ ] Register in FuseOne UI policy gallery under "Transformation" category
-- [ ] Write plugin documentation with use case examples
+- [x] Lua plugin: make HTTP(S) calls to external services during request processing
+- [x] Configuration: url, method, headers, body (with variable substitution)
+- [x] Response handling: extract fields via JSONPath, inject into headers/context
+- [x] Error handling: exit_on_error, error_status, fallback behavior
+- [x] Fire-and-forget mode for async notifications
+- [x] Timeout configuration with sensible defaults (3s)
+- [x] Register in FuseOne UI policy gallery under "Transformation" category
+- [x] Write plugin documentation with use case examples
 
 ### 2.3 Data Masking Plugin (`data-masking`)
-- [ ] Lua plugin: redact sensitive fields in response bodies
-- [ ] Configuration: JSONPath patterns to mask (e.g., `$.cpf`, `$.credit_card`)
-- [ ] Masking strategies: full redact (`***`), partial (`***1234`), hash (SHA-256)
-- [ ] Configurable per content-type (JSON, XML)
-- [ ] Works on response phase (before sending to client)
-- [ ] LGPD/GDPR compliance focus
-- [ ] Register in FuseOne UI policy gallery under "Security" category
+- [x] Lua plugin: redact sensitive fields in response bodies
+- [x] Configuration: JSONPath patterns to mask (e.g., `$.cpf`, `$.credit_card`)
+- [x] Masking strategies: full redact (`***`), partial (`***1234`), hash (SHA-256)
+- [x] Configurable per content-type (JSON, XML)
+- [x] Works on response phase (before sending to client)
+- [x] LGPD/GDPR compliance focus
+- [x] Register in FuseOne UI policy gallery under "Security" category
 
 ### 2.4 Threat Protection Plugin (`threat-protection`)
-- [ ] Lua plugin: protect against payload-based attacks
-- [ ] JSON protection: max depth, max array size, max string length, max object entries
-- [ ] Injection detection: SQL injection patterns, XSS patterns in body
-- [ ] Request size limits (beyond what `client-control` offers)
-- [ ] Configurable action: reject (403) or sanitize
-- [ ] Register in FuseOne UI policy gallery under "Security" category
-
-### Plugin Deploy Strategy
-```
-Development:
-  custom-plugins/ (git repo) ──volume mount──► APISIX container
-  Code change → PUT /apisix/admin/plugins/reload → Hot-reload (no restart)
-
-Production:
-  Dockerfile.apisix (FROM apache/apisix:3.x + COPY custom-plugins/) → Custom image
-  New plugin name → config.yaml update → apisix reload (graceful, no downtime)
-  Code update only → PUT /plugins/reload (zero downtime)
-```
+- [x] Lua plugin: protect against payload-based attacks
+- [x] JSON protection: max depth, max array size, max string length, max object entries
+- [x] Injection detection: SQL injection patterns, XSS patterns in body
+- [x] Request size limits (beyond what `client-control` offers)
+- [x] Configurable action: reject (403) or sanitize
+- [x] Register in FuseOne UI policy gallery under "Security" category
 
 ---
 
-## Phase 3 -- Analytics & Monitoring (P2)
+## Phase 3 -- Analytics & Monitoring ✅
 
 **Goal**: Built-in analytics without requiring external Grafana.
 
-**Timeline**: 3-4 weeks
-
 ### 3.1 Analytics Dashboard
-- [ ] Overview page: total requests, avg latency, error rate, top APIs
-- [ ] Per-API analytics: traffic, latency percentiles, error breakdown
-- [ ] Per-Application analytics: usage by consumer/app
-- [ ] Time range selector: 1h, 6h, 24h, 7d, 30d, custom
-- [ ] Charts: line (time-series), bar (top-N), pie (status distribution)
+- [x] Overview page: total requests, avg latency, error rate, top APIs
+- [x] Per-API analytics: traffic, latency percentiles, error breakdown
+- [x] Per-Application analytics: usage by consumer/app
+- [x] Time range selector: 1h, 6h, 24h, 7d, 30d, custom
+- [x] Charts: line (time-series), bar (top-N), pie (status distribution)
 
 ### 3.2 Alerting System
-- [ ] Configurable alert rules: error rate > X%, latency p99 > Yms, traffic drop > Z%
-- [ ] Alert channels: email, webhook (Slack/Discord/Teams)
-- [ ] Alert history with acknowledgment
-- [ ] Per-API or global alert scope
+- [x] Configurable alert rules: error rate > X%, latency p99 > Yms, traffic drop > Z%
+- [x] Alert channels: email, webhook (Slack/Discord/Teams)
+- [x] Alert history with acknowledgment
+- [x] Per-API or global alert scope
 
 ### 3.3 API Usage Reports
-- [ ] Exportable reports (CSV, PDF) for billing/governance
-- [ ] Per-application usage breakdown
-- [ ] Plan quota usage tracking
-- [ ] Historical trend analysis
+- [x] Exportable reports (CSV, PDF) for billing/governance
+- [x] Per-application usage breakdown
+- [x] Plan quota usage tracking
+- [x] Historical trend analysis
 
 ---
 
-## Phase 4 -- Multi-Environment & Governance (P2)
+## Phase 4 -- Multi-Environment & Governance ✅
 
 **Goal**: Support enterprise deployment workflows.
 
-**Timeline**: 4-5 weeks
-
 ### 4.1 Environment Management
-- [ ] Define environments: development, staging, production (configurable)
-- [ ] Each environment points to a different APISIX cluster
-- [ ] API configurations stored per-environment in PostgreSQL
-- [ ] Environment switcher in the dashboard header
+- [x] Define environments: development, staging, production (configurable)
+- [x] Each environment points to a different APISIX cluster
+- [x] API configurations stored per-environment in PostgreSQL
+- [x] Environment switcher in the dashboard header
 
 ### 4.2 Promotion Workflows
-- [ ] Promote API configuration from env A → env B
-- [ ] Diff view before promotion (what will change)
-- [ ] Approval workflow: request → review → approve/reject
-- [ ] Audit trail for all promotions
-- [ ] Rollback capability
+- [x] Promote API configuration from env A → env B
+- [x] Diff view before promotion (what will change)
+- [x] Approval workflow: request → review → approve/reject
+- [x] Audit trail for all promotions
+- [x] Rollback capability
 
 ### 4.3 API Revision Diff
-- [ ] Side-by-side diff of API configurations between versions
-- [ ] Highlight changes: added/removed/modified policies, routes, upstream config
-- [ ] One-click rollback to any previous revision
+- [x] Side-by-side diff of API configurations between versions
+- [x] Highlight changes: added/removed/modified policies, routes, upstream config
+- [x] One-click rollback to any previous revision
 
 ---
 
-## Phase 5 -- Developer Portal (P2)
+## Phase 5 -- Developer Portal ✅
 
-**Goal**: Self-service portal for API consumers.
-
-**Timeline**: 6-8 weeks
+**Goal**: Self-service portal for API consumers. Separate frontend application.
 
 > See [ROADMAP-DEVELOPER-PORTAL.md](./ROADMAP-DEVELOPER-PORTAL.md) for detailed plan.
 
 ### Key Features
-- [ ] API catalog with search and filtering
-- [ ] Interactive API documentation (OpenAPI rendering + try-it)
-- [ ] Self-service application registration
-- [ ] API subscription with plan selection
-- [ ] Credential management (API keys, OAuth)
-- [ ] Usage dashboard for consumers
-- [ ] White-label customization (branding, domain)
+- [x] Landing page with modern design
+- [x] API catalog with search and filtering
+- [x] Interactive API documentation (OpenAPI rendering + try-it)
+- [x] Developer self-registration
+- [x] API subscription with plan selection
+- [x] Credential management (API keys)
+- [x] Developer usage dashboard
+- [x] Admin portal visibility toggle + spec upload
 
 ---
 
-## Phase 6 -- Advanced Features (P3)
+## Phase 6 -- Advanced Features ✅
 
-**Timeline**: Ongoing
+**Goal**: Differentiation features with rich custom editors in the flow editor.
 
 ### 6.1 API Composition / Orchestration
-- [ ] Visual editor to call multiple backends from a single endpoint
-- [ ] Response aggregation with field mapping
-- [ ] Parallel and sequential call patterns
-- [ ] Built on top of HTTP Callout plugin
+- [x] Visual editor to call multiple backends from a single endpoint
+- [x] Response aggregation with field mapping
+- [x] Parallel and sequential call patterns
+- [x] Custom `api-composition.lua` APISIX plugin with SSRF protection
 
 ### 6.2 Custom Scripting IDE
-- [ ] In-browser Lua editor for `serverless-pre-function` / `serverless-post-function`
-- [ ] Syntax highlighting, autocompletion
-- [ ] Inline testing with sample requests
-- [ ] Script library for common patterns
+- [x] In-browser Lua editor for `serverless-pre-function` / `serverless-post-function`
+- [x] Syntax highlighting, autocompletion (CodeMirror 6)
+- [x] Phase selector (rewrite, access, header_filter, body_filter, log, before_proxy)
+- [x] Script library with 12 pre-built Lua snippets
 
 ### 6.3 API Mocking (Polished)
-- [ ] Visual mock response builder
-- [ ] Dynamic responses based on request parameters
-- [ ] Integrated into API design workflow (mock before backend is ready)
-- [ ] Auto-generate mock from OpenAPI spec
+- [x] Visual mock response builder with multiple profiles
+- [x] Dynamic responses based on request parameters
+- [x] Integrated into API design workflow (mock before backend is ready)
+- [x] Response headers editor, delay slider, format button
 
 ### 6.4 REST-to-SOAP Templates
-- [ ] Pre-built body-transformer templates for SOAP integration
-- [ ] Visual SOAP envelope builder
-- [ ] WSDL import
+- [x] Pre-built body-transformer templates for SOAP integration (5 templates)
+- [x] Visual SOAP envelope builder with live preview
+- [x] WSDL import with operation extraction
 
 ---
 
-## Phase 7 -- AI Gateway (P4)
+## Phase 7 -- AI Gateway ✅
 
-**Timeline**: Future
+**Goal**: First-class AI/LLM gateway capabilities with visual editors, token tracking, and cost management.
 
 ### 7.1 LLM Routing
-- [ ] Multi-model routing (OpenAI, Anthropic, Gemini, etc.)
-- [ ] Fallback chains between providers
-- [ ] Cost-based routing
+- [x] Rich visual editor for `ai-proxy` plugin (provider cards, model picker, auth, streaming)
+- [x] Rich visual editor for `ai-proxy-multi` plugin (instance list, weight sliders, fallback strategies)
+- [x] Multi-model routing (OpenAI, Anthropic, Gemini, DeepSeek, Ollama, etc.)
+- [x] Fallback chains between providers (health-based, HTTP 429, HTTP 5xx)
+- [x] Cost-based routing via weighted balancing
 
 ### 7.2 Prompt Guard Rails
-- [ ] Input validation / prompt injection detection
-- [ ] Output filtering (PII, harmful content)
-- [ ] Custom safety rules
+- [x] Plugin documentation for `ai-prompt-guard` (input validation, prompt injection detection)
+- [x] Plugin documentation for `ai-aws-content-moderation` (output filtering via AWS Comprehend)
+- [x] Plugin documentation for `ai-request-rewrite` (request transformation via LLM)
+- [x] All 7 AI plugins documented with best practices, use cases, and examples
 
 ### 7.3 Token Tracking & Cost Management
-- [ ] Per-application token usage tracking
-- [ ] Budget limits and alerts
-- [ ] Cost allocation by team/project
+- [x] Database schema for multi-resolution AI token metrics (1m, 1h, 1d rollup)
+- [x] AI metrics scraper consuming APISIX Prometheus metrics (`apisix_ai_llm_*`)
+- [x] AI Dashboard page with token/cost charts, top providers, top models
+- [x] Configurable cost models per provider/model ($/1K tokens)
+- [x] Token budget and cost budget alert rule types
+- [x] Per-route and per-consumer token tracking
 
 ### 7.4 RAG Integration
-- [ ] Context injection from vector databases
-- [ ] Document retrieval pipeline configuration
+- [x] Plugin documentation for `ai-rag` (vector DB context injection)
+- [x] Plugin documentation for `ai-rate-limiting` (token-based rate limiting)
+
+---
+
+## Phase 8 -- GraphQL Gateway
+
+**Goal**: First-class GraphQL API management leveraging APISIX's native GraphQL routing engine.
+
+> APISIX has built-in GraphQL-aware routing (`graphql_operation`, `graphql_name`, `graphql_root_fields`) and a `degraphql` plugin. This phase exposes these capabilities through the FuseOne UI and adds governance features via custom plugins.
+
+### 8.1 GraphQL-Aware Routing
+- [ ] Flow editor: GraphQL match conditions (operation type, operation name, root fields)
+- [ ] Visual route builder: route queries vs mutations to different upstreams (read replicas vs primary)
+- [ ] Per-operation policy assignment (different rate limits for queries vs mutations)
+- [ ] GraphQL introspection toggle (block in production, allow in dev)
+
+### 8.2 REST-to-GraphQL Bridge
+- [ ] Visual configurator for `degraphql` plugin (convert REST endpoints into GraphQL queries)
+- [ ] Variable mapping UI: map query params / JSON body fields → GraphQL variables
+- [ ] Template library with common GraphQL patterns (CRUD, pagination, filtering)
+- [ ] Response transformation: extract nested GraphQL data into flat REST responses
+
+### 8.3 GraphQL Security & Governance (Custom Plugins)
+- [ ] Custom Lua plugin: `graphql-depth-limit` — reject queries exceeding max nesting depth
+- [ ] Custom Lua plugin: `graphql-complexity` — cost-based analysis with field weights
+- [ ] Custom Lua plugin: `graphql-allowlist` — persisted queries / query allowlisting
+- [ ] Query size limits and timeout enforcement per operation
+
+### 8.4 GraphQL Analytics
+- [ ] Per-operation metrics (latency, error rate, call count) in monitoring dashboard
+- [ ] Top operations table (most called, slowest, highest error rate)
+- [ ] Operation-level alerting (error rate on specific mutation exceeds threshold)
+
+---
+
+## Phase 9 -- Event-Native APIs (Kafka Gateway)
+
+**Goal**: Expose Kafka topics as managed REST APIs, similar to Gravitee's event-native gateway. Bridge the gap between synchronous HTTP and asynchronous event streaming.
+
+> APISIX has `kafka-proxy` (wire protocol), PubSub (WebSocket consume), and `kafka-logger`. For full REST↔Kafka mediation, we use Strimzi KafkaBridge as upstream + custom Lua plugins.
+
+### 9.1 Kafka Bridge Infrastructure
+- [ ] Docker Compose integration: add Strimzi KafkaBridge container alongside APISIX
+- [ ] KafkaBridge upstream auto-discovery and health monitoring
+- [ ] Connection management UI: configure Kafka clusters (brokers, SASL, TLS)
+- [ ] Topic browser: list topics, partitions, consumer groups from FuseOne UI
+
+### 9.2 REST-to-Kafka API Builder
+- [ ] Visual "Event API" builder: expose a Kafka topic as a REST endpoint
+- [ ] Produce endpoint: `POST /api/events/{topic}` → produce message to Kafka
+- [ ] Consume endpoint: `GET /api/events/{topic}` → poll messages (long-polling or SSE)
+- [ ] Schema validation: JSON Schema or Avro schema enforcement on produce
+- [ ] Content-type negotiation: JSON, Avro, Protobuf serialization
+
+### 9.3 Event API Policies
+- [ ] Rate limiting per topic/consumer (messages/sec, bytes/sec)
+- [ ] Authentication & authorization per topic (reuse existing RBAC)
+- [ ] Message transformation: header injection, body mapping, filtering
+- [ ] Dead letter queue: route failed messages to a DLQ topic
+- [ ] Audit logging for all produce/consume operations
+
+### 9.4 Event API Monitoring
+- [ ] Kafka metrics dashboard: messages/sec, consumer lag, partition distribution
+- [ ] Per-topic analytics: throughput, error rate, avg message size
+- [ ] Consumer group monitoring: lag alerts, rebalancing events
+- [ ] Integration with existing alerting system (lag threshold, throughput drop)
+
+### 9.5 WebSocket Streaming
+- [ ] Real-time consume via WebSocket (leverage APISIX PubSub framework)
+- [ ] WebSocket endpoint configurator in flow editor
+- [ ] Client SDK examples (JavaScript, Python) for WebSocket consumption
+
+---
+
+## Phase 10 -- API Monetization
+
+**Goal**: Built-in billing and monetization for API products, enabling API-as-a-product business models.
+
+### 10.1 Billing Plans
+- [ ] Plan tiers: Free, Developer, Business, Enterprise (configurable)
+- [ ] Pricing models: flat rate, per-request, tiered (volume brackets), pay-as-you-go
+- [ ] Quota management: requests/month, bandwidth/month, with overage policies
+- [ ] Trial periods with automatic expiration
+- [ ] Custom plan creation per API product
+
+### 10.2 Usage Metering
+- [ ] Real-time usage tracking per application/consumer
+- [ ] Metering dimensions: requests, bandwidth, compute time, tokens (AI)
+- [ ] Usage dashboard for API consumers (in Developer Portal)
+- [ ] Quota warnings at 80%/90%/100% thresholds
+- [ ] Overage handling: block, throttle, or allow with surcharge
+
+### 10.3 Payment Integration
+- [ ] Stripe integration: subscriptions, invoicing, payment methods
+- [ ] Invoice generation: monthly/quarterly billing cycles
+- [ ] Revenue dashboard: MRR, churn, ARPU, revenue per API
+- [ ] Webhook notifications for payment events (success, failure, churn)
+- [ ] Self-service plan upgrade/downgrade in Developer Portal
+
+### 10.4 Cost Allocation
+- [ ] Internal chargeback: allocate API costs to teams/departments
+- [ ] Cost reports per API, per consumer, per environment
+- [ ] Budget alerts: notify when projected costs exceed thresholds
+- [ ] Export to CSV/PDF for finance teams
+
+---
+
+## Phase 11 -- API Testing & Quality
+
+**Goal**: Automated API quality assurance with contract testing, synthetic monitoring, and SLA tracking.
+
+### 11.1 Contract Testing
+- [ ] OpenAPI schema validation: auto-test APIs against their spec
+- [ ] Request/response contract verification on each deployment
+- [ ] Breaking change detection: alert when API changes break the contract
+- [ ] Test results dashboard with pass/fail history
+
+### 11.2 Synthetic Monitoring
+- [ ] Scheduled health checks: ping API endpoints from multiple regions
+- [ ] Custom test scenarios: multi-step API call sequences
+- [ ] Assertion builder: status code, response time, body content, headers
+- [ ] Uptime tracking with historical availability percentage
+- [ ] Alert on synthetic test failures (integrates with existing alert channels)
+
+### 11.3 SLA Management
+- [ ] Define SLA targets per API: availability %, latency p99, error rate
+- [ ] SLA dashboard: current compliance, trend, violations
+- [ ] SLA reports: monthly/quarterly compliance reports (PDF/CSV)
+- [ ] Breach alerting with escalation chains
+- [ ] SLA burn-rate indicators (error budget remaining)
+
+### 11.4 Load Testing
+- [ ] Built-in load test runner (k6 or custom): define scenarios from UI
+- [ ] Performance baseline capture: auto-detect regressions on deploy
+- [ ] Results visualization: latency distribution, throughput, error rate under load
+- [ ] Comparison mode: before/after deployment performance diff
+
+---
+
+## Phase 12 -- Service Mesh Integration
+
+**Goal**: Extend FuseOne from north-south API gateway to include east-west service mesh observability.
+
+### 12.1 Service Discovery
+- [ ] Kubernetes service discovery integration (via APISIX Ingress Controller)
+- [ ] Consul / Nacos / Eureka service registry support
+- [ ] Auto-register discovered services as upstreams in FuseOne
+- [ ] Service topology map: visualize service dependencies
+
+### 12.2 East-West Traffic Management
+- [ ] Service-to-service routing rules via APISIX mesh mode
+- [ ] Traffic splitting: canary deployments, blue-green, A/B testing
+- [ ] Circuit breaker configuration per service
+- [ ] Retry policies and timeout management
+
+### 12.3 Mesh Observability
+- [ ] Distributed tracing integration (Jaeger, Zipkin, OpenTelemetry)
+- [ ] Trace viewer: end-to-end request flow across services
+- [ ] Service dependency graph with latency/error overlays
+- [ ] Cross-service metrics: latency between services, error propagation
+
+### 12.4 mTLS & Zero Trust
+- [ ] Automatic mTLS between services via APISIX
+- [ ] Certificate management for service identities
+- [ ] Service-level access policies (which service can call which)
+- [ ] Zero-trust policy editor in FuseOne UI
+
+---
+
+## Phase 13 -- Marketplace & Extensibility
+
+**Goal**: Plugin marketplace and community extensibility ecosystem.
+
+### 13.1 Plugin Marketplace
+- [ ] Community plugin registry: browse, search, install custom plugins
+- [ ] Plugin packaging standard: metadata, schema, Lua code, documentation
+- [ ] One-click install: upload plugin → register in APISIX → available in flow editor
+- [ ] Version management: update, rollback, dependency tracking
+- [ ] Rating & reviews system
+
+### 13.2 API Templates
+- [ ] Shareable API templates: pre-configured route + policies + upstream patterns
+- [ ] Template gallery: REST CRUD, GraphQL proxy, gRPC gateway, Kafka bridge, etc.
+- [ ] Import/export: share templates across FuseOne instances
+- [ ] Community-contributed templates
+
+### 13.3 Webhook & Integration Platform
+- [ ] Outbound webhook system: trigger on API events (deploy, error spike, SLA breach)
+- [ ] Pre-built integrations: PagerDuty, Datadog, New Relic, OpsGenie
+- [ ] Custom integration builder: define trigger → transform → deliver pipelines
+- [ ] Integration marketplace: community-built connectors
+
+### 13.4 SDK & CLI
+- [ ] FuseOne CLI: manage APIs, deploy, promote from terminal
+- [ ] Terraform provider: infrastructure-as-code for API definitions
+- [ ] REST Admin API documentation (OpenAPI spec for FuseOne itself)
+- [ ] Client SDKs: generate typed API clients from OpenAPI specs
 
 ---
 
 ## Priority Summary
 
-| Phase | Focus | Timeline | Business Impact |
+| Phase | Focus | Status | Business Impact |
 |---|---|---|---|
-| **Phase 1** | Troubleshooting & Observability | 4-6 weeks | Eliminates #1 competitive gap |
-| **Phase 2** | Custom Plugins (Callout, Masking, Threat) | 3-4 weeks | Enables enterprise patterns |
-| **Phase 3** | Analytics & Monitoring | 3-4 weeks | Self-contained, no Grafana needed |
-| **Phase 4** | Multi-Environment & Governance | 4-5 weeks | Enterprise deployment workflows |
-| **Phase 5** | Developer Portal | 6-8 weeks | Required for external API programs |
-| **Phase 6** | Advanced Features | Ongoing | Differentiation & polish |
-| **Phase 7** | AI Gateway | Future | Next-gen positioning |
-
----
-
-## Technical Dependencies
-
-### Infrastructure Required
-- PostgreSQL (already in place) -- add `debug_logs` table
-- APISIX Control API access (port 9090) -- expose in docker-compose
-- APISIX Prometheus endpoint (port 9091) -- already configured
-- APISIX `http-logger` plugin -- configure to send to our backend
-- APISIX `debug.yaml` -- enable dynamic debug headers
-
-### Backend Changes (Go)
-- New handler: `debug_log.go` (receive/store/stream debug logs)
-- New handler: `metrics.go` (scrape/parse/serve Prometheus metrics)
-- New handler: `health.go` (proxy APISIX Control API health checks)
-- New service: `plugin_manager.go` (hot-reload, custom plugin management)
-- New migration: `000008_debug_logs.up.sql`
-
-### Frontend Changes (Next.js)
-- New page: `troubleshooting/page.tsx` (or replace monitoring Coming Soon)
-- New components: `TrafficFeed`, `RequestDetail`, `TimingWaterfall`, `MetricsCharts`
-- New stores: `debug-store.ts` (Zustand for live traffic state)
-- Chart library: add `recharts` or `@tremor/react` for analytics
+| **Phase 0** | Foundation | ✅ Complete | Core platform |
+| **Phase 1** | Troubleshooting & Observability | ✅ Complete | Eliminates #1 competitive gap |
+| **Phase 2** | Custom Plugins (Callout, Masking, Threat) | ✅ Complete | Enables enterprise patterns |
+| **Phase 3** | Analytics & Monitoring | ✅ Complete | Self-contained, no Grafana needed |
+| **Phase 4** | Multi-Environment & Governance | ✅ Complete | Enterprise deployment workflows |
+| **Phase 5** | Developer Portal | ✅ Complete | Required for external API programs |
+| **Phase 6** | Advanced Features | ✅ Complete | Differentiation & polish |
+| **Phase 7** | AI Gateway | ✅ Complete | Next-gen AI/LLM capabilities |
+| **Phase 8** | GraphQL Gateway | Pending | GraphQL-native API management |
+| **Phase 9** | Event-Native APIs (Kafka) | Pending | Async/event-driven API products |
+| **Phase 10** | API Monetization | Pending | API-as-a-product business model |
+| **Phase 11** | API Testing & Quality | Pending | Automated quality assurance |
+| **Phase 12** | Service Mesh Integration | Pending | East-west traffic management |
+| **Phase 13** | Marketplace & Extensibility | Pending | Community ecosystem |

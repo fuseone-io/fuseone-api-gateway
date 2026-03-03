@@ -71,11 +71,41 @@
       "Bash(go test ./internal/service/ -v -count=1)",
       "Bash(pnpm dlx shadcn@latest add popover --overwrite --yes)",
       "Bash(go test ./internal/handler/ -run TestReload -v)",
-      "Bash(go test ./internal/handler/ -run \"TestReload|TestList\" -v)"
+      "Bash(go test ./internal/handler/ -run \"TestReload|TestList\" -v)",
+      "Bash(go vet ./internal/handler/)",
+      "Bash(go test ./internal/handler/ -run TestPlugin -v -count=1)",
+      "Bash(go test ./internal/handler/ -run TestReload -v -count=1)",
+      "Bash(head -50 frontend/src/app/\\\\\\(dashboard\\\\\\)/dashboard/page.tsx)",
+      "Bash(head -50 frontend/src/app/\\\\\\(dashboard\\\\\\)/apis/page.tsx)",
+      "Bash(pnpm dlx shadcn@latest add tooltip -y)",
+      "Bash(pnpm tsc --noEmit --project /home/kleber/Dados/fuseone-api-gateway/frontend/tsconfig.json)",
+      "Bash(go get golang.org/x/oauth2)",
+      "Bash(pnpm dlx shadcn@latest add button card badge input label separator sheet avatar dropdown-menu dialog tabs --yes)",
+      "Bash(pnpm exec next build)",
+      "Bash(docker compose -f /home/kleber/Dados/fuseone-api-gateway/docker-compose.yml exec -T postgres psql -U gateway -d fuseone_gateway -c \"SELECT name FROM roles WHERE name=''developer'';\")",
+      "Bash(docker compose -f /home/kleber/Dados/fuseone-api-gateway/docker-compose.yml exec -T postgres psql -U gateway -d fuseone_gateway -c \"SELECT column_name FROM information_schema.columns WHERE table_name=''api_definitions'' AND column_name IN \\(''portal_visible'',''portal_categories'',''openapi_spec''\\);\")",
+      "Bash(pgrep -f \"air|gateway-api\")",
+      "Bash(ps -p 3435714,3446063 -o pid,comm,args)",
+      "Bash(pgrep -af \"tmp/main\\\\|gateway-api\")",
+      "Bash(pgrep -af \"main|gateway\")",
+      "Bash(lsof -i :8080 -P)",
+      "Bash(docker compose -f /home/kleber/Dados/fuseone-api-gateway/docker-compose.yml exec -T postgres psql -U gateway -d fuseone_gateway -c \"DELETE FROM users WHERE username=''testdev2'';\")",
+      "Bash(pnpm add @codemirror/view @codemirror/state @codemirror/language @codemirror/autocomplete @codemirror/commands @codemirror/search @codemirror/lint codemirror @replit/codemirror-lang-lua)",
+      "Bash(pnpm add @codemirror/view @codemirror/state @codemirror/language @codemirror/autocomplete @codemirror/commands @codemirror/search @codemirror/lint codemirror @codemirror/legacy-modes)",
+      "Bash(pnpm add @codemirror/lang-javascript)",
+      "Bash(pnpm dlx shadcn@latest add slider --yes)",
+      "WebFetch(domain:api7.ai)",
+      "WebFetch(domain:docs.api7.ai)",
+      "Read(//home/kleber/Dados/fuseone-api-gateway/**)",
+      "Bash(pnpm add @xyflow/react)",
+      "Bash(git rm -r --cached developer-portal/node_modules developer-portal/.next)",
+      "Bash(git rm -r --cached frontend/node_modules frontend/.next)"
     ],
     "additionalDirectories": [
       "/home/kleber/Dados/fuseone-api-gateway/frontend/src/app/(dashboard)/apis/[id]",
-      "/home/kleber/Dados/fuseone-api-gateway/custom-plugins/apisix/plugins"
+      "/home/kleber/Dados/fuseone-api-gateway/custom-plugins/apisix/plugins",
+      "/home/kleber/Dados/fuseone-api-gateway/frontend/src/app/(dashboard)/applications/[id]",
+      "/home/kleber/Dados/fuseone-api-gateway/frontend/src/app/(dashboard)/docs"
     ]
   }
 }

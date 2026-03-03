@@ -33,6 +33,7 @@ export type PluginCategory =
   | "transformation"
   | "observability"
   | "ai"
+  | "graphql"
 
 export const PLUGIN_CATEGORIES: { value: PluginCategory; label: string; color: string }[] = [
   { value: "authentication", label: "Authentication", color: "bg-blue-500" },
@@ -41,6 +42,7 @@ export const PLUGIN_CATEGORIES: { value: PluginCategory; label: string; color: s
   { value: "transformation", label: "Transformation", color: "bg-purple-500" },
   { value: "observability", label: "Observability", color: "bg-green-500" },
   { value: "ai", label: "AI Gateway", color: "bg-cyan-500" },
+  { value: "graphql", label: "GraphQL", color: "bg-pink-500" },
 ]
 
 export const PLUGINS: PluginDefinition[] = [
@@ -100,6 +102,7 @@ export const PLUGINS: PluginDefinition[] = [
   { name: "gzip", label: "Gzip", description: "Compress response body with gzip", category: "transformation", phase: "response", icon: "FileArchive" },
   { name: "grpc-web", label: "gRPC-Web", description: "Enable gRPC-Web protocol for browser clients", category: "transformation", phase: "request", icon: "ArrowLeftRight" },
   { name: "http-callout", label: "HTTP Callout", description: "Call external services during request processing for enrichment or validation", category: "transformation", phase: "request", icon: "Globe" },
+  { name: "api-composition", label: "API Composition", description: "Orchestrate multiple backend calls into a single aggregated response", category: "transformation", phase: "request", icon: "GitMerge" },
 
   // Observability (log phase)
   { name: "prometheus", label: "Prometheus", description: "Export metrics to Prometheus", category: "observability", phase: "observability", icon: "BarChart3" },
@@ -131,6 +134,13 @@ export const PLUGINS: PluginDefinition[] = [
   { name: "ai-rate-limiting", label: "AI Rate Limit", description: "Token-based rate limiting for LLM requests", category: "ai", phase: "request", icon: "Gauge" },
   { name: "ai-rag", label: "AI RAG", description: "Retrieval-Augmented Generation with vector search", category: "ai", phase: "request", icon: "BookOpen" },
   { name: "ai-aws-content-moderation", label: "Content Moderation", description: "Moderate LLM content via AWS Comprehend", category: "ai", phase: "request", icon: "Eye" },
+
+  // GraphQL (request phase)
+  { name: "degraphql", label: "REST-to-GraphQL", description: "Convert REST API endpoints into GraphQL queries", category: "graphql", phase: "request", icon: "ArrowLeftRight" },
+  { name: "graphql-depth-limit", label: "Depth Limit", description: "Limit GraphQL query nesting depth to prevent abuse", category: "graphql", phase: "request", icon: "Layers" },
+  { name: "graphql-complexity", label: "Complexity Limit", description: "Cost-based complexity analysis with field weights", category: "graphql", phase: "request", icon: "Calculator" },
+  { name: "graphql-allowlist", label: "Query Allowlist", description: "Only allow pre-registered persisted queries", category: "graphql", phase: "request", icon: "ListChecks" },
+  { name: "graphql-introspection-guard", label: "Introspection Guard", description: "Block introspection queries in production", category: "graphql", phase: "request", icon: "EyeOff" },
 ]
 
 /**

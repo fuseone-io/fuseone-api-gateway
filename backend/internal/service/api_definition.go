@@ -17,13 +17,19 @@ import (
 
 type ApiDefinitionService struct {
 	repo           *repository.ApiDefinitionRepository
-	apisix         *APISIXClient
+	deployRepo     *repository.ApiDeploymentRepository
+	registry       *APISIXClientRegistry
 	secretResolver *SecretResolver
 	logger         *zap.Logger
 }
 
-func NewApiDefinitionService(repo *repository.ApiDefinitionRepository, apisix *APISIXClient, secretResolver *SecretResolver, logger *zap.Logger) *ApiDefinitionService {
-	return &ApiDefinitionService{repo: repo, apisix: apisix, secretResolver: secretResolver, logger: logger}
+func NewApiDefinitionService(repo *repository.ApiDefinitionRepository, deployRepo *repository.ApiDeploymentRepository, registry *APISIXClientRegistry, secretResolver *SecretResolver, logger *zap.Logger) *ApiDefinitionService {
+	return &ApiDefinitionService{repo: repo, deployRepo: deployRepo, registry: registry, secretResolver: secretResolver, logger: logger}
+}
+
+// getClient resolves the APISIX client for the given environment ID.
+func (s *ApiDefinitionService) getClient(ctx context.Context, envID uuid.UUID) (*APISIXClient, error) {
+	return s.registry.GetClient(ctx, envID)
 }
 
 func (s *ApiDefinitionService) Get(ctx context.Context, id uuid.UUID) (*model.ApiDefinition, error) {
@@ -85,20 +91,25 @@ func (s *ApiDefinitionService) Delete(ctx context.Context, id uuid.UUID) error {
 		return fmt.Errorf("not found")
 	}
 
-	// If deployed, remove from APISIX
+	// If deployed, remove from APISIX (use default environment for now)
 	if existing.APISIXServiceID != nil && *existing.APISIXServiceID != "" {
-		// Delete all routes tracked in apisix_route_ids
-		var routeIDs []string
-		if err := json.Unmarshal(existing.APISIXRouteIDs, &routeIDs); err == nil {
-			for _, rid := range routeIDs {
-				if delErr := s.apisix.Delete(ctx, "routes", rid); delErr != nil {
-					s.logger.Warn("failed to delete APISIX route", zap.String("id", rid), zap.Error(delErr))
+		client, clientErr := s.getClient(ctx, uuid.Nil)
+		if clientErr != nil {
+			s.logger.Warn("failed to get APISIX client for delete", zap.Error(clientErr))
+		} else {
+			// Delete all routes tracked in apisix_route_ids
+			var routeIDs []string
+			if err := json.Unmarshal(existing.APISIXRouteIDs, &routeIDs); err == nil {
+				for _, rid := range routeIDs {
+					if delErr := client.Delete(ctx, "routes", rid); delErr != nil {
+						s.logger.Warn("failed to delete APISIX route", zap.String("id", rid), zap.Error(delErr))
+					}
 				}
 			}
-		}
-		// Delete service
-		if delErr := s.apisix.Delete(ctx, "services", *existing.APISIXServiceID); delErr != nil {
-			s.logger.Warn("failed to delete APISIX service", zap.String("id", *existing.APISIXServiceID), zap.Error(delErr))
+			// Delete service
+			if delErr := client.Delete(ctx, "services", *existing.APISIXServiceID); delErr != nil {
+				s.logger.Warn("failed to delete APISIX service", zap.String("id", *existing.APISIXServiceID), zap.Error(delErr))
+			}
 		}
 	}
 
@@ -111,14 +122,19 @@ type flowRouteMapping struct {
 	routeIDs  map[string]string // strategy -> APISIX route ID ("path", "header", "default")
 }
 
-// Deploy pushes the API definition to APISIX.
-func (s *ApiDefinitionService) Deploy(ctx context.Context, id uuid.UUID) (*model.ApiDefinition, error) {
+// Deploy pushes the API definition to APISIX for the given environment.
+func (s *ApiDefinitionService) Deploy(ctx context.Context, id uuid.UUID, envID uuid.UUID, deployedBy *uuid.UUID) (*model.ApiDefinition, error) {
 	existing, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	if existing == nil {
 		return nil, fmt.Errorf("not found")
+	}
+
+	client, err := s.getClient(ctx, envID)
+	if err != nil {
+		return nil, fmt.Errorf("resolving APISIX client: %w", err)
 	}
 
 	// Parse the definition to extract APISIX payloads
@@ -176,11 +192,11 @@ func (s *ApiDefinitionService) Deploy(ctx context.Context, id uuid.UUID) (*model
 	var serviceID string
 	if existing.APISIXServiceID != nil && *existing.APISIXServiceID != "" {
 		serviceID = *existing.APISIXServiceID
-		if _, err := s.apisix.Update(ctx, "services", serviceID, serviceJSON); err != nil {
+		if _, err := client.Update(ctx, "services", serviceID, serviceJSON); err != nil {
 			return nil, fmt.Errorf("updating APISIX service: %w", err)
 		}
 	} else {
-		respBody, err := s.apisix.Create(ctx, "services", serviceJSON)
+		respBody, err := client.Create(ctx, "services", serviceJSON)
 		if err != nil {
 			return nil, fmt.Errorf("creating APISIX service: %w", err)
 		}
@@ -340,7 +356,7 @@ func (s *ApiDefinitionService) Deploy(ctx context.Context, id uuid.UUID) (*model
 
 			if existingID != "" {
 				// Update existing route
-				if _, err := s.apisix.Update(ctx, "routes", existingID, routeJSON); err != nil {
+				if _, err := client.Update(ctx, "routes", existingID, routeJSON); err != nil {
 					return nil, fmt.Errorf("updating APISIX route %s (%s): %w", existingID, strat.key, err)
 				}
 				newFlowRouteIDs[strat.key] = existingID
@@ -348,7 +364,7 @@ func (s *ApiDefinitionService) Deploy(ctx context.Context, id uuid.UUID) (*model
 				usedRouteIDs[existingID] = true
 			} else {
 				// Create new route
-				respBody, err := s.apisix.Create(ctx, "routes", routeJSON)
+				respBody, err := client.Create(ctx, "routes", routeJSON)
 				if err != nil {
 					return nil, fmt.Errorf("creating APISIX route (%s): %w", strat.key, err)
 				}
@@ -365,7 +381,7 @@ func (s *ApiDefinitionService) Deploy(ctx context.Context, id uuid.UUID) (*model
 		// Remove routes from strategies no longer used
 		for key, rid := range existingRouteIDs {
 			if _, stillUsed := newFlowRouteIDs[key]; !stillUsed && rid != "" {
-				if delErr := s.apisix.Delete(ctx, "routes", rid); delErr != nil {
+				if delErr := client.Delete(ctx, "routes", rid); delErr != nil {
 					s.logger.Warn("failed to delete orphaned strategy route",
 						zap.String("id", rid), zap.String("strategy", key), zap.Error(delErr))
 				}
@@ -376,14 +392,14 @@ func (s *ApiDefinitionService) Deploy(ctx context.Context, id uuid.UUID) (*model
 	}
 
 	// Auto-create/update consumers for auth plugins with credentials
-	if err := s.ensureConsumersForAuthPlugins(ctx, def.Name, def.Flows); err != nil {
+	if err := s.ensureConsumersForAuthPlugins(ctx, client, def.Name, def.Flows); err != nil {
 		s.logger.Warn("failed to auto-create consumers for auth plugins", zap.Error(err))
 	}
 
 	// Delete orphaned routes (from previous deploy)
 	for _, oldID := range oldRouteIDs {
 		if !usedRouteIDs[oldID] {
-			if delErr := s.apisix.Delete(ctx, "routes", oldID); delErr != nil {
+			if delErr := client.Delete(ctx, "routes", oldID); delErr != nil {
 				s.logger.Warn("failed to delete orphaned APISIX route", zap.String("id", oldID), zap.Error(delErr))
 			}
 		}
@@ -398,6 +414,13 @@ func (s *ApiDefinitionService) Deploy(ctx context.Context, id uuid.UUID) (*model
 	// Mark as deployed
 	if err := s.repo.SetDeployed(ctx, id, serviceID, allNewRouteIDs); err != nil {
 		return nil, fmt.Errorf("setting deployed status: %w", err)
+	}
+
+	// Record deployment in api_deployments table
+	if s.deployRepo != nil {
+		if _, err := s.deployRepo.Upsert(ctx, id, envID, serviceID, allNewRouteIDs, updatedDef, deployedBy); err != nil {
+			s.logger.Warn("failed to record deployment", zap.Error(err))
+		}
 	}
 
 	// Auto-transition lifecycle: draft -> active on deploy
@@ -531,7 +554,7 @@ func extractConsumerCredentials(pluginName string, config map[string]interface{}
 // credential fields (e.g. key-auth with a "key"). For each, it creates or
 // updates an APISIX consumer so the credentials work at runtime.
 // Consumer username: slugified "{apiName}-{flowName}" to keep them traceable.
-func (s *ApiDefinitionService) ensureConsumersForAuthPlugins(ctx context.Context, apiName string, flows []struct {
+func (s *ApiDefinitionService) ensureConsumersForAuthPlugins(ctx context.Context, client *APISIXClient, apiName string, flows []struct {
 	ID         string                `json:"id"`
 	RouteID    *string               `json:"routeId"`
 	RouteIDs   map[string]string     `json:"routeIds"`
@@ -575,7 +598,7 @@ func (s *ApiDefinitionService) ensureConsumersForAuthPlugins(ctx context.Context
 
 			payloadJSON, _ := json.Marshal(consumerPayload)
 
-			if _, err := s.apisix.CreateWithID(ctx, "consumers", username, payloadJSON); err != nil {
+			if _, err := client.CreateWithID(ctx, "consumers", username, payloadJSON); err != nil {
 				return fmt.Errorf("creating/updating consumer %q for plugin %s: %w", username, p.Name, err)
 			}
 
@@ -666,7 +689,9 @@ func (s *ApiDefinitionService) Deprecate(ctx context.Context, id uuid.UUID, req 
 
 	// Inject deprecation headers via APISIX
 	if existing.APISIXServiceID != nil && *existing.APISIXServiceID != "" {
-		s.injectDeprecationHeaders(ctx, existing, req.SunsetDate)
+		if client, err := s.getClient(ctx, uuid.Nil); err == nil {
+			s.injectDeprecationHeaders(ctx, client, existing, req.SunsetDate)
+		}
 	}
 
 	return s.repo.GetByID(ctx, id)
@@ -691,7 +716,9 @@ func (s *ApiDefinitionService) Retire(ctx context.Context, id uuid.UUID) (*model
 
 	// Configure APISIX routes to return 410 Gone
 	if existing.APISIXServiceID != nil && *existing.APISIXServiceID != "" {
-		s.retireInAPISIX(ctx, existing)
+		if client, err := s.getClient(ctx, uuid.Nil); err == nil {
+			s.retireInAPISIX(ctx, client, existing)
+		}
 	}
 
 	return s.repo.GetByID(ctx, id)
@@ -716,7 +743,9 @@ func (s *ApiDefinitionService) Undeprecate(ctx context.Context, id uuid.UUID) (*
 
 	// Remove deprecation headers from APISIX routes
 	if existing.APISIXServiceID != nil && *existing.APISIXServiceID != "" {
-		s.removeDeprecationHeaders(ctx, existing)
+		if client, err := s.getClient(ctx, uuid.Nil); err == nil {
+			s.removeDeprecationHeaders(ctx, client, existing)
+		}
 	}
 
 	return s.repo.GetByID(ctx, id)
@@ -727,9 +756,42 @@ func (s *ApiDefinitionService) GetVersions(ctx context.Context, apiGroupID uuid.
 	return s.repo.ListByGroup(ctx, apiGroupID)
 }
 
+// DiffBetweenEnvs compares the definition snapshots between two environments for an API.
+func (s *ApiDefinitionService) DiffBetweenEnvs(ctx context.Context, apiDefID, envA, envB uuid.UUID) (*model.DiffResult, error) {
+	if s.deployRepo == nil {
+		return nil, fmt.Errorf("deployment tracking not available")
+	}
+
+	deployA, err := s.deployRepo.GetByAPIAndEnv(ctx, apiDefID, envA)
+	if err != nil {
+		return nil, fmt.Errorf("getting deployment for env A: %w", err)
+	}
+	if deployA == nil {
+		return nil, fmt.Errorf("API not deployed in environment A")
+	}
+
+	deployB, err := s.deployRepo.GetByAPIAndEnv(ctx, apiDefID, envB)
+	if err != nil {
+		return nil, fmt.Errorf("getting deployment for env B: %w", err)
+	}
+	if deployB == nil {
+		return nil, fmt.Errorf("API not deployed in environment B")
+	}
+
+	return ComputeDiff(deployA.DefinitionSnapshot, deployB.DefinitionSnapshot)
+}
+
+// ListDeployments returns all per-environment deployments for an API.
+func (s *ApiDefinitionService) ListDeployments(ctx context.Context, apiDefID uuid.UUID) ([]model.ApiDeployment, error) {
+	if s.deployRepo == nil {
+		return nil, nil
+	}
+	return s.deployRepo.ListByAPI(ctx, apiDefID)
+}
+
 // --- APISIX Deprecation Helpers ---
 
-func (s *ApiDefinitionService) injectDeprecationHeaders(ctx context.Context, api *model.ApiDefinition, sunsetDate *time.Time) {
+func (s *ApiDefinitionService) injectDeprecationHeaders(ctx context.Context, client *APISIXClient, api *model.ApiDefinition, sunsetDate *time.Time) {
 	var routeIDs []string
 	if err := json.Unmarshal(api.APISIXRouteIDs, &routeIDs); err != nil {
 		return
@@ -758,11 +820,11 @@ func (s *ApiDefinitionService) injectDeprecationHeaders(ctx context.Context, api
 	}
 
 	for _, rid := range routeIDs {
-		s.patchRouteHeaders(ctx, rid, headers, nil)
+		s.patchRouteHeaders(ctx, client, rid, headers, nil)
 	}
 }
 
-func (s *ApiDefinitionService) removeDeprecationHeaders(ctx context.Context, api *model.ApiDefinition) {
+func (s *ApiDefinitionService) removeDeprecationHeaders(ctx context.Context, client *APISIXClient, api *model.ApiDefinition) {
 	var routeIDs []string
 	if err := json.Unmarshal(api.APISIXRouteIDs, &routeIDs); err != nil {
 		return
@@ -776,14 +838,14 @@ func (s *ApiDefinitionService) removeDeprecationHeaders(ctx context.Context, api
 			},
 		}
 		patchJSON, _ := json.Marshal(patch)
-		if _, err := s.apisix.Patch(ctx, "routes", rid, patchJSON); err != nil {
+		if _, err := client.Patch(ctx, "routes", rid, patchJSON); err != nil {
 			s.logger.Warn("failed to remove deprecation headers",
 				zap.String("route_id", rid), zap.Error(err))
 		}
 	}
 }
 
-func (s *ApiDefinitionService) retireInAPISIX(ctx context.Context, api *model.ApiDefinition) {
+func (s *ApiDefinitionService) retireInAPISIX(ctx context.Context, client *APISIXClient, api *model.ApiDefinition) {
 	var routeIDs []string
 	if err := json.Unmarshal(api.APISIXRouteIDs, &routeIDs); err != nil {
 		return
@@ -804,14 +866,14 @@ func (s *ApiDefinitionService) retireInAPISIX(ctx context.Context, api *model.Ap
 			},
 		}
 		patchJSON, _ := json.Marshal(patch)
-		if _, err := s.apisix.Patch(ctx, "routes", rid, patchJSON); err != nil {
+		if _, err := client.Patch(ctx, "routes", rid, patchJSON); err != nil {
 			s.logger.Warn("failed to retire route in APISIX",
 				zap.String("route_id", rid), zap.Error(err))
 		}
 	}
 }
 
-func (s *ApiDefinitionService) patchRouteHeaders(ctx context.Context, routeID string, setHeaders map[string]string, removeHeaders []string) {
+func (s *ApiDefinitionService) patchRouteHeaders(ctx context.Context, client *APISIXClient, routeID string, setHeaders map[string]string, removeHeaders []string) {
 	plugin := map[string]interface{}{
 		"headers": map[string]interface{}{},
 	}
@@ -830,7 +892,7 @@ func (s *ApiDefinitionService) patchRouteHeaders(ctx context.Context, routeID st
 	}
 	patchJSON, _ := json.Marshal(patch)
 
-	if _, err := s.apisix.Patch(ctx, "routes", routeID, patchJSON); err != nil {
+	if _, err := client.Patch(ctx, "routes", routeID, patchJSON); err != nil {
 		s.logger.Warn("failed to patch route headers",
 			zap.String("route_id", routeID), zap.Error(err))
 	}

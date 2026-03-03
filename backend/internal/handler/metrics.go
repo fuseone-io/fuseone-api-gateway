@@ -21,7 +21,7 @@ func NewMetricsHandler(repo repository.MetricsQuerier) *MetricsHandler {
 }
 
 var validRanges = map[string]bool{
-	"1h": true, "6h": true, "24h": true, "7d": true,
+	"1h": true, "6h": true, "24h": true, "7d": true, "30d": true,
 }
 
 // parseRouteIDs reads route_ids (comma-separated) with fallback to single route_id for backward compat.
@@ -43,12 +43,29 @@ func parseRouteIDs(c *gin.Context) []string {
 	return nil
 }
 
+// parseConsumerNames reads consumer_names (comma-separated) from query params.
+func parseConsumerNames(c *gin.Context) []string {
+	if names := c.Query("consumer_names"); names != "" {
+		parts := strings.Split(names, ",")
+		var result []string
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				result = append(result, p)
+			}
+		}
+		return result
+	}
+	return nil
+}
+
 const maxCustomSpan = 90 * 24 * time.Hour // 90 days
 
 // parseMetricsFilter builds a MetricsFilter from query parameters.
 // Supports preset "range" or custom "from"/"to" (RFC3339).
 func parseMetricsFilter(c *gin.Context) (*repository.MetricsFilter, error) {
 	routeIDs := parseRouteIDs(c)
+	consumerNames := parseConsumerNames(c)
 	fromStr := c.Query("from")
 
 	if fromStr != "" {
@@ -69,14 +86,14 @@ func parseMetricsFilter(c *gin.Context) (*repository.MetricsFilter, error) {
 		if to.Sub(from) > maxCustomSpan {
 			return nil, &filterError{code: "RANGE_TOO_LARGE", msg: "custom range cannot exceed 90 days"}
 		}
-		return &repository.MetricsFilter{RouteIDs: routeIDs, From: from, To: to}, nil
+		return &repository.MetricsFilter{RouteIDs: routeIDs, ConsumerNames: consumerNames, From: from, To: to}, nil
 	}
 
 	rangeStr := c.DefaultQuery("range", "1h")
 	if !validRanges[rangeStr] {
-		return nil, &filterError{code: "INVALID_RANGE", msg: "range must be 1h, 6h, 24h, or 7d"}
+		return nil, &filterError{code: "INVALID_RANGE", msg: "range must be 1h, 6h, 24h, 7d, or 30d"}
 	}
-	return &repository.MetricsFilter{RouteIDs: routeIDs, RangeStr: rangeStr}, nil
+	return &repository.MetricsFilter{RouteIDs: routeIDs, ConsumerNames: consumerNames, RangeStr: rangeStr}, nil
 }
 
 type filterError struct {
@@ -163,4 +180,38 @@ func (h *MetricsHandler) TopRoutes(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, model.NewDataResponse(routes))
+}
+
+func (h *MetricsHandler) TopConsumers(c *gin.Context) {
+	// Default range for top consumers is 24h
+	if c.Query("range") == "" && c.Query("from") == "" {
+		c.Request.URL.RawQuery += "&range=24h"
+	}
+
+	filter, err := parseMetricsFilter(c)
+	if err != nil {
+		if fe, ok := err.(*filterError); ok {
+			c.JSON(http.StatusBadRequest, model.NewErrorResponse(fe.code, fe.msg))
+			return
+		}
+		c.JSON(http.StatusBadRequest, model.NewErrorResponse("INVALID_FILTER", err.Error()))
+		return
+	}
+
+	limitStr := c.DefaultQuery("limit", "10")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+
+	consumers, err := h.repo.TopConsumers(c.Request.Context(), *filter, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.NewErrorResponse("METRICS_ERROR", err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, model.NewDataResponse(consumers))
 }

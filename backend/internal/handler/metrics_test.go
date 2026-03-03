@@ -16,11 +16,12 @@ import (
 
 // mockMetricsQuerier implements repository.MetricsQuerier for testing.
 type mockMetricsQuerier struct {
-	timeSeriesResult []model.TimeSeriesPoint
-	summaryResult    *model.MetricsSummary
-	topRoutesResult  []model.TopRoute
-	lastFilter       repository.MetricsFilter
-	lastLimit        int
+	timeSeriesResult   []model.TimeSeriesPoint
+	summaryResult      *model.MetricsSummary
+	topRoutesResult    []model.TopRoute
+	topConsumersResult []model.TopConsumer
+	lastFilter         repository.MetricsFilter
+	lastLimit          int
 }
 
 func (m *mockMetricsQuerier) BatchUpsertMinute(_ context.Context, _ []model.MetricsRow) error {
@@ -38,6 +39,11 @@ func (m *mockMetricsQuerier) TopRoutes(_ context.Context, filter repository.Metr
 	m.lastFilter = filter
 	m.lastLimit = limit
 	return m.topRoutesResult, nil
+}
+func (m *mockMetricsQuerier) TopConsumers(_ context.Context, filter repository.MetricsFilter, limit int) ([]model.TopConsumer, error) {
+	m.lastFilter = filter
+	m.lastLimit = limit
+	return m.topConsumersResult, nil
 }
 func (m *mockMetricsQuerier) RollupToHour(_ context.Context) (int64, error) { return 0, nil }
 func (m *mockMetricsQuerier) RollupToDay(_ context.Context) (int64, error)  { return 0, nil }

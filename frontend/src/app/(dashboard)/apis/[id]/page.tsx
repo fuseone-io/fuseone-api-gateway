@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowLeft, BarChart3, Bug, Eye, Heart, Save, Rocket, Clock, Download, Copy, AlertTriangle, Ban, Globe, Route, X, PenLine } from "lucide-react"
+import { ArrowRightLeft, BarChart3, Bug, Eye, Heart, Save, Rocket, Clock, Download, Copy, AlertTriangle, Ban, Globe, Route, X, PenLine, Users, Store } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -49,8 +49,15 @@ import {
 } from "@/components/ui/select"
 import { ApiFlowEditor } from "@/components/flow/api-flow-editor"
 import { exportAsFuseOneJson, exportAsOpenAPIYaml } from "@/lib/openapi-converter"
-import type { ApiDefinition, ApiDefRecord, LifecycleStatus, RoutingMode } from "@/types/api"
+import type { ApiDefinition, ApiDefRecord, ApiDeployment, LifecycleStatus, RoutingMode } from "@/types/api"
 import { api } from "@/lib/api-client"
+import { useEnvironmentStore } from "@/stores/environment-store"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 const LIFECYCLE_BADGE: Record<LifecycleStatus, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-slate-500/15 text-slate-600 border-slate-500/30" },
@@ -74,11 +81,31 @@ export default function ApiDetailPage() {
   const [showRetireDialog, setShowRetireDialog] = useState(false)
   const [sunsetDate, setSunsetDate] = useState("")
   const [showRoutingConfig, setShowRoutingConfig] = useState(false)
+  const [deployments, setDeployments] = useState<ApiDeployment[]>([])
+  const [showPortalDialog, setShowPortalDialog] = useState(false)
+  const [portalVisible, setPortalVisible] = useState(false)
+  const [portalCategories, setPortalCategories] = useState<string[]>([])
+  const [openapiSpec, setOpenapiSpec] = useState("")
+  const [savingPortal, setSavingPortal] = useState(false)
   const savedSnapshot = useRef<string>("")
+  const { environments, fetchEnvironments } = useEnvironmentStore()
+
+  useEffect(() => {
+    fetchEnvironments()
+  }, [fetchEnvironments])
 
   useEffect(() => {
     loadApi()
   }, [id])
+
+  const loadDeployments = async () => {
+    try {
+      const deps = await api.listApiDeployments(id)
+      setDeployments(deps || [])
+    } catch {
+      // deployments endpoint may not be available yet
+    }
+  }
 
   const loadApi = async () => {
     try {
@@ -94,6 +121,8 @@ export default function ApiDetailPage() {
       } catch {
         // versions endpoint may not be available yet
       }
+      // Load deployments
+      loadDeployments()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load API")
     } finally {
@@ -151,6 +180,8 @@ export default function ApiDetailPage() {
         const vers = await api.getApiVersions(record.id)
         setVersions(vers || [])
       } catch {}
+      // Reload deployments
+      loadDeployments()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to deploy API")
     } finally {
@@ -217,6 +248,67 @@ export default function ApiDetailPage() {
     }
   }
 
+  const handlePromote = async (targetEnvId: string) => {
+    if (!record) return
+    const activeEnvId = useEnvironmentStore.getState().activeEnvironmentId
+    const sourceEnvId = activeEnvId || environments.find((e) => e.is_default)?.id
+    if (!sourceEnvId) {
+      toast.error("No source environment selected")
+      return
+    }
+    try {
+      await api.createPromotion({
+        api_definition_id: record.id,
+        source_env_id: sourceEnvId,
+        target_env_id: targetEnvId,
+      })
+      toast.success("Promotion request created")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create promotion")
+    }
+  }
+
+  const openPortalDialog = async () => {
+    setShowPortalDialog(true)
+    try {
+      const settings = await api.getPortalSettings(id)
+      setPortalVisible(settings.portal_visible)
+      setPortalCategories(settings.portal_categories || [])
+      setOpenapiSpec(settings.openapi_spec || "")
+    } catch {
+      // Fields may not exist yet, use defaults
+    }
+  }
+
+  const handleSavePortal = async () => {
+    setSavingPortal(true)
+    try {
+      await api.updatePortalSettings(id, {
+        portal_visible: portalVisible,
+        portal_categories: portalCategories,
+        openapi_spec: openapiSpec,
+      })
+      toast.success("Portal settings updated")
+      setShowPortalDialog(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update portal settings")
+    } finally {
+      setSavingPortal(false)
+    }
+  }
+
+  const handleSpecFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string
+      setOpenapiSpec(text)
+      toast.success(`Loaded ${file.name}`)
+    }
+    reader.readAsText(file)
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col gap-4 p-6">
@@ -266,10 +358,6 @@ export default function ApiDetailPage() {
 
       {/* Top bar */}
       <div className="flex items-center gap-3 px-4 py-2 border-b bg-card shrink-0">
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => router.push("/apis")}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-
         <div className="flex-1 min-w-0 flex items-center gap-2">
           <span className="text-sm font-semibold truncate max-w-xs">
             {apiDef.name || <span className="text-muted-foreground">Untitled API</span>}
@@ -381,6 +469,36 @@ export default function ApiDetailPage() {
             </span>
           )}
 
+          {/* Per-environment deployment badges */}
+          {deployments.length > 0 && environments.length > 1 && (
+            <TooltipProvider delayDuration={200}>
+              <div className="flex items-center gap-1">
+                {deployments.map((dep) => {
+                  const env = environments.find((e) => e.id === dep.environment_id)
+                  if (!env) return null
+                  return (
+                    <Tooltip key={dep.id}>
+                      <TooltipTrigger asChild>
+                        <span
+                          className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-border"
+                          style={{ backgroundColor: env.color }}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-xs">
+                        <p className="font-medium">{env.name}</p>
+                        {dep.deployed_at && (
+                          <p className="text-muted-foreground">
+                            {new Date(dep.deployed_at).toLocaleString()}
+                          </p>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  )
+                })}
+              </div>
+            </TooltipProvider>
+          )}
+
           {/* Status toggle */}
           {!isRetired && (
             <div className="flex items-center gap-1.5">
@@ -401,6 +519,14 @@ export default function ApiDetailPage() {
             <Badge variant="outline" className="text-[10px]">
               {apiDef.flows.length} flows
             </Badge>
+          )}
+
+          {/* Portal settings */}
+          {!isRetired && (
+            <Button variant="outline" size="sm" className="h-8" onClick={openPortalDialog}>
+              <Store className="mr-1.5 h-3.5 w-3.5" />
+              Portal
+            </Button>
           )}
 
           {/* Observe */}
@@ -425,8 +551,42 @@ export default function ApiDetailPage() {
                 <Bug className="mr-2 h-4 w-4" />
                 Debug Logs
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push(`/apis/${id}/subscriptions`)}>
+                <Users className="mr-2 h-4 w-4" />
+                Subscribers
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Promote to... */}
+          {environments.length > 1 && hasBeenDeployed && !isRetired && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8">
+                  <ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" />
+                  Promote
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {environments
+                  .filter((env) => {
+                    const activeId = useEnvironmentStore.getState().activeEnvironmentId
+                    const sourceId = activeId || environments.find((e) => e.is_default)?.id
+                    return env.id !== sourceId
+                  })
+                  .map((env) => (
+                    <DropdownMenuItem key={env.id} onClick={() => handlePromote(env.id)}>
+                      <span
+                        className="h-2.5 w-2.5 rounded-full shrink-0 mr-2"
+                        style={{ backgroundColor: env.color }}
+                      />
+                      Promote to {env.name}
+                    </DropdownMenuItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {/* More actions */}
           <DropdownMenu>
@@ -663,6 +823,92 @@ export default function ApiDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Portal settings dialog */}
+      <Dialog open={showPortalDialog} onOpenChange={setShowPortalDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Developer Portal Settings</DialogTitle>
+            <DialogDescription>
+              Control how this API appears in the Developer Portal.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5 py-2">
+            {/* Visibility toggle */}
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <Label>Visible on Developer Portal</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Make this API discoverable by developers
+                </p>
+              </div>
+              <Switch checked={portalVisible} onCheckedChange={setPortalVisible} />
+            </div>
+
+            {/* Categories */}
+            <div className="space-y-2">
+              <Label>Categories</Label>
+              <div className="flex flex-wrap gap-1.5 items-center">
+                {portalCategories.map((cat, i) => (
+                  <Badge key={i} variant="secondary" className="text-xs gap-1 pl-2 pr-1">
+                    {cat}
+                    <button
+                      className="ml-0.5 hover:text-destructive transition-colors"
+                      onClick={() => setPortalCategories(portalCategories.filter((_, idx) => idx !== i))}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+                <Input
+                  placeholder="Add category..."
+                  className="h-8 w-40 text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      const val = (e.target as HTMLInputElement).value.trim()
+                      if (val && !portalCategories.includes(val)) {
+                        setPortalCategories([...portalCategories, val])
+                        ;(e.target as HTMLInputElement).value = ""
+                      }
+                    }
+                  }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Press Enter to add. Categories help developers filter APIs.
+              </p>
+            </div>
+
+            {/* OpenAPI Spec */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>OpenAPI Specification</Label>
+                <label className="cursor-pointer text-xs text-primary hover:underline">
+                  Upload file
+                  <input type="file" accept=".json,.yaml,.yml" className="hidden" onChange={handleSpecFileUpload} />
+                </label>
+              </div>
+              <textarea
+                value={openapiSpec}
+                onChange={(e) => setOpenapiSpec(e.target.value)}
+                rows={8}
+                className="w-full rounded-md border bg-muted p-3 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder='Paste OpenAPI 3.0 JSON spec here, or upload a file...'
+              />
+              <p className="text-xs text-muted-foreground">
+                This powers the interactive documentation page in the Developer Portal.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPortalDialog(false)}>Cancel</Button>
+            <Button onClick={handleSavePortal} disabled={savingPortal}>
+              {savingPortal ? "Saving..." : "Save Portal Settings"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

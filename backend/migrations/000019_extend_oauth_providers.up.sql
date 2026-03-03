@@ -1,0 +1,9 @@
+BEGIN;
+
+ALTER TABLE oauth_providers
+    ADD COLUMN IF NOT EXISTS display_name VARCHAR(100) NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS extra_config JSONB NOT NULL DEFAULT '{}',
+    ADD COLUMN IF NOT EXISTS auto_create_users BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS default_role_id UUID REFERENCES roles(id);
+
+COMMIT;

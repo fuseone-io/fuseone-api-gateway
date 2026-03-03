@@ -20,6 +20,7 @@ import {
   Users,
   Hash,
   GitBranch,
+  GitMerge,
   Database,
   Replace,
   FileOutput,
@@ -36,6 +37,30 @@ import {
   CircleDot,
   Loader2,
   Puzzle,
+  CheckSquare,
+  Monitor,
+  Link,
+  Copy,
+  Zap,
+  SlidersHorizontal,
+  MapPin,
+  Workflow,
+  Code,
+  Wand2,
+  FlaskConical,
+  Cloud,
+  FileArchive,
+  Cable,
+  Satellite,
+  Bot,
+  Layers,
+  Sparkles,
+  BookOpen,
+  Eye,
+  EyeOff,
+  Server,
+  Scale,
+  LogIn,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -74,8 +99,12 @@ import {
 const ICON_MAP: Record<string, LucideIcon> = {
   Key, Lock, ShieldCheck, Fingerprint, KeyRound, ArrowRightLeft,
   Shield, Ban, Globe, ShieldAlert, UserX, Gauge, Users, Hash,
-  GitBranch, Database, Replace, FileOutput, ArrowLeftRight, Bug,
+  GitBranch, GitMerge, Database, Replace, FileOutput, ArrowLeftRight, Bug,
   ExternalLink, BarChart3, Send, Radio, FileText, Network, Activity,
+  CheckSquare, Monitor, Link, Copy, Zap, SlidersHorizontal, MapPin,
+  Workflow, Code, Wand2, FlaskConical, Cloud, FileArchive,
+  Cable, Satellite, Bot, Layers, Sparkles, BookOpen, Eye, EyeOff,
+  Server, Scale, LogIn,
 }
 
 function getIconComponent(iconName?: string): LucideIcon {

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Save, Rocket, FileText, Upload, PenLine, ArrowRight, ArrowLeft, Globe, Route, X, RotateCcw } from "lucide-react"
+import { Save, Rocket, FileText, Upload, PenLine, ArrowRight, Globe, Route, X, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -489,10 +489,6 @@ export default function NewApiPage() {
         </div>
 
         <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setMode("choose")}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
           <Button onClick={handleConfigureDone}>
             Continue to Editor
             <ArrowRight className="ml-2 h-4 w-4" />
@@ -578,9 +574,6 @@ export default function NewApiPage() {
               {apiDef.status}
             </Badge>
           </div>
-          <Button variant="outline" onClick={() => setMode("configure")}>
-            Back
-          </Button>
           <Button onClick={() => setShowConfirm(true)} disabled={saving || !canSave}>
             <Save className="mr-2 h-4 w-4" />
             {saving ? "Creating..." : "Create API"}

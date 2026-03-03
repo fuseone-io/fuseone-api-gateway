@@ -81,10 +81,17 @@ plugins:
   - ext-plugin-post-req
   - ext-plugin-post-resp
   - serverless-post-function
+  # GraphQL security plugins
+  - degraphql
+  - graphql-depth-limit
+  - graphql-complexity
+  - graphql-allowlist
+  - graphql-introspection-guard
   # FuseOne custom plugins
   - http-callout
   - data-masking
   - threat-protection
+  - api-composition
 
 deployment:
   admin:

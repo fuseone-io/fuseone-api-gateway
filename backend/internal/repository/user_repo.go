@@ -61,6 +61,18 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*m
 	return user, nil
 }
 
+func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*model.User, error) {
+	query := fmt.Sprintf(`SELECT %s FROM users u JOIN roles r ON r.id = u.role_id WHERE u.email = $1`, userSelectColumns)
+	user, err := scanUser(r.pool.QueryRow(ctx, query, email))
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("getting user by email: %w", err)
+	}
+	return user, nil
+}
+
 func (r *UserRepository) List(ctx context.Context, page, pageSize int) ([]model.User, int, error) {
 	if page < 1 {
 		page = 1
@@ -135,6 +147,63 @@ func (r *UserRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+func (r *UserRepository) ListWithSearch(ctx context.Context, search string, page, pageSize int) ([]model.User, int, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	var total int
+	var args []interface{}
+	countQuery := "SELECT COUNT(*) FROM users"
+	listQuery := fmt.Sprintf(`SELECT %s FROM users u JOIN roles r ON r.id = u.role_id`, userSelectColumns)
+
+	if search != "" {
+		filter := " WHERE (u.username ILIKE $1 OR u.email ILIKE $1 OR u.display_name ILIKE $1)"
+		pattern := "%" + search + "%"
+		args = append(args, pattern)
+		countQuery = "SELECT COUNT(*) FROM users u" + filter
+		listQuery += filter
+		listQuery += " ORDER BY u.created_at DESC LIMIT $2 OFFSET $3"
+		args = append(args, pageSize, offset)
+	} else {
+		listQuery += " ORDER BY u.created_at DESC LIMIT $1 OFFSET $2"
+		args = append(args, pageSize, offset)
+	}
+
+	if search != "" {
+		err := r.pool.QueryRow(ctx, countQuery, "%"+search+"%").Scan(&total)
+		if err != nil {
+			return nil, 0, fmt.Errorf("counting users: %w", err)
+		}
+	} else {
+		err := r.pool.QueryRow(ctx, countQuery).Scan(&total)
+		if err != nil {
+			return nil, 0, fmt.Errorf("counting users: %w", err)
+		}
+	}
+
+	rows, err := r.pool.Query(ctx, listQuery, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("listing users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []model.User
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			return nil, 0, fmt.Errorf("scanning user: %w", err)
+		}
+		users = append(users, *u)
+	}
+
+	return users, total, nil
+}
+
 // Roles
 
 func (r *UserRepository) GetRoleByID(ctx context.Context, id uuid.UUID) (*model.Role, error) {
@@ -188,6 +257,39 @@ func (r *UserRepository) ListRoles(ctx context.Context) ([]model.Role, error) {
 		roles = append(roles, role)
 	}
 	return roles, nil
+}
+
+func (r *UserRepository) CreateRole(ctx context.Context, role *model.Role) error {
+	permJSON, err := json.Marshal(role.Permissions)
+	if err != nil {
+		return fmt.Errorf("marshaling permissions: %w", err)
+	}
+	query := `INSERT INTO roles (name, description, permissions)
+		VALUES ($1, $2, $3) RETURNING id, created_at, updated_at`
+	return r.pool.QueryRow(ctx, query, role.Name, role.Description, permJSON).
+		Scan(&role.ID, &role.CreatedAt, &role.UpdatedAt)
+}
+
+func (r *UserRepository) UpdateRole(ctx context.Context, role *model.Role) error {
+	permJSON, err := json.Marshal(role.Permissions)
+	if err != nil {
+		return fmt.Errorf("marshaling permissions: %w", err)
+	}
+	_, err = r.pool.Exec(ctx,
+		`UPDATE roles SET name = $2, description = $3, permissions = $4, updated_at = NOW() WHERE id = $1`,
+		role.ID, role.Name, role.Description, permJSON)
+	return err
+}
+
+func (r *UserRepository) DeleteRole(ctx context.Context, id uuid.UUID) error {
+	_, err := r.pool.Exec(ctx, "DELETE FROM roles WHERE id = $1", id)
+	return err
+}
+
+func (r *UserRepository) CountUsersWithRole(ctx context.Context, roleID uuid.UUID) (int, error) {
+	var count int
+	err := r.pool.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE role_id = $1", roleID).Scan(&count)
+	return count, err
 }
 
 // Refresh Tokens

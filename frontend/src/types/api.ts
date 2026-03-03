@@ -38,6 +38,12 @@ export interface ApiFlow {
     uri: string
     hosts: string[]
     methods: string[]
+    // GraphQL-specific matching (maps to APISIX vars: graphql_operation, graphql_name, graphql_root_fields)
+    graphql?: {
+      operation?: "query" | "mutation" | "subscription"
+      name?: string
+      root_fields?: string[]
+    }
   }
 
   // Policies (per-flow, organized by phase)
@@ -161,6 +167,19 @@ export interface ApiDefRecord {
   sunset_date?: string
 }
 
+export interface ApiDeployment {
+  id: string
+  api_definition_id: string
+  environment_id: string
+  apisix_service_id?: string
+  apisix_route_ids?: string[]
+  sync_status: "pending" | "synced" | "out_of_sync" | "failed"
+  deployed_at?: string
+  deployed_by?: string
+  created_at: string
+  updated_at: string
+}
+
 export interface CloneApiRequest {
   version?: string
 }
@@ -266,6 +285,46 @@ function parseEndpoint(upstream: Record<string, unknown>): ApiDefinition["endpoi
   }
 }
 
+// --- GraphQL vars helpers ---
+
+type GraphQLMatch = NonNullable<ApiFlow["entrypoint"]["graphql"]>
+
+function buildGraphQLVars(graphql?: GraphQLMatch): unknown[][] {
+  if (!graphql) return []
+  const vars: unknown[][] = []
+  if (graphql.operation) {
+    vars.push(["graphql_operation", "==", graphql.operation])
+  }
+  if (graphql.name) {
+    vars.push(["graphql_name", "==", graphql.name])
+  }
+  if (graphql.root_fields && graphql.root_fields.length > 0) {
+    vars.push(["graphql_root_fields", "has", graphql.root_fields[0]])
+  }
+  return vars
+}
+
+function parseGraphQLVars(vars?: unknown[][]): GraphQLMatch | undefined {
+  if (!vars || !Array.isArray(vars)) return undefined
+  const graphql: GraphQLMatch = {}
+  for (const v of vars) {
+    if (!Array.isArray(v) || v.length < 3) continue
+    const [field, op, value] = v as [string, string, string]
+    if (field === "graphql_operation" && op === "==") {
+      graphql.operation = value as "query" | "mutation" | "subscription"
+    } else if (field === "graphql_name" && op === "==") {
+      graphql.name = value
+    } else if (field === "graphql_root_fields" && op === "has") {
+      graphql.root_fields = graphql.root_fields || []
+      graphql.root_fields.push(value)
+    }
+  }
+  if (graphql.operation || graphql.name || (graphql.root_fields && graphql.root_fields.length > 0)) {
+    return graphql
+  }
+  return undefined
+}
+
 // Convert ApiDefinition to APISIX Service + N Routes
 export function apiToAPISIX(api: ApiDefinition) {
   const ep = api.endpoint
@@ -296,22 +355,28 @@ export function apiToAPISIX(api: ApiDefinition) {
     upstream,
   }
 
-  const routes = api.flows.map((flow) => ({
-    flowId: flow.id,
-    routeId: flow.routeId,
-    data: {
-      name: api.flows.length > 1 ? `${api.name} - ${flow.name}` : api.name,
-      desc: api.description,
-      uri: flow.entrypoint.uri,
-      hosts: flow.entrypoint.hosts.length > 0 ? flow.entrypoint.hosts : (api.hosts && api.hosts.length > 0 ? api.hosts : undefined),
-      methods: flow.entrypoint.methods.length > 0 ? flow.entrypoint.methods : undefined,
-      status: api.status === "enabled" ? 1 : 0,
-      plugins: buildPlugins(flow.policies),
-      plugin_config_id: flow.policyTemplateId || undefined,
-      service_id: api.serviceId as string | undefined,
-      labels: { ...api.labels, _fuseone_api: api.serviceId || "" } as Record<string, string>,
-    },
-  }))
+  const routes = api.flows.map((flow) => {
+    // Build APISIX vars for GraphQL matching
+    const vars = buildGraphQLVars(flow.entrypoint.graphql)
+
+    return {
+      flowId: flow.id,
+      routeId: flow.routeId,
+      data: {
+        name: api.flows.length > 1 ? `${api.name} - ${flow.name}` : api.name,
+        desc: api.description,
+        uri: flow.entrypoint.uri,
+        hosts: flow.entrypoint.hosts.length > 0 ? flow.entrypoint.hosts : (api.hosts && api.hosts.length > 0 ? api.hosts : undefined),
+        methods: flow.entrypoint.methods.length > 0 ? flow.entrypoint.methods : undefined,
+        status: api.status === "enabled" ? 1 : 0,
+        plugins: buildPlugins(flow.policies),
+        plugin_config_id: flow.policyTemplateId || undefined,
+        service_id: api.serviceId as string | undefined,
+        labels: { ...api.labels, _fuseone_api: api.serviceId || "" } as Record<string, string>,
+        ...(vars.length > 0 ? { vars } : {}),
+      },
+    }
+  })
 
   return { service, routes }
 }
@@ -337,6 +402,7 @@ export function apisixToApi(route: Record<string, unknown>): ApiDefinition {
           uri: (route.uri as string) || "",
           hosts: (route.hosts as string[]) || (route.host ? [route.host as string] : []),
           methods: (route.methods as string[]) || [],
+          graphql: parseGraphQLVars(route.vars as unknown[][] | undefined),
         },
         policies: parsePlugins(plugins),
         policyTemplateId: route.plugin_config_id as string | undefined,
@@ -366,6 +432,7 @@ export function apisixServiceToApi(
         uri: (route.uri as string) || "",
         hosts: (route.hosts as string[]) || (route.host ? [route.host as string] : []),
         methods: (route.methods as string[]) || [],
+        graphql: parseGraphQLVars(route.vars as unknown[][] | undefined),
       },
       policies: parsePlugins(plugins),
       policyTemplateId: route.plugin_config_id as string | undefined,

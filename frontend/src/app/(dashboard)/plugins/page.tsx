@@ -139,6 +139,7 @@ const CATEGORY_BADGE_STYLES: Record<PluginCategory, { bg: string; text: string; 
   transformation: { bg: "bg-purple-500/10", text: "text-purple-600 dark:text-purple-400", border: "border-purple-500/20" },
   observability: { bg: "bg-green-500/10", text: "text-green-600 dark:text-green-400", border: "border-green-500/20" },
   ai: { bg: "bg-cyan-500/10", text: "text-cyan-600 dark:text-cyan-400", border: "border-cyan-500/20" },
+  graphql: { bg: "bg-pink-500/10", text: "text-pink-600 dark:text-pink-400", border: "border-pink-500/20" },
 }
 
 const PHASE_BADGE_STYLES: Record<string, { bg: string; text: string }> = {

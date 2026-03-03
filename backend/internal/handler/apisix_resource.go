@@ -14,21 +14,27 @@ import (
 
 // APISIXResourceHandler provides generic CRUD for any APISIX resource type
 type APISIXResourceHandler struct {
-	apisix       *service.APISIXClient
+	registry     *service.APISIXClientRegistry
 	audit        *middleware.AuditLogger
 	resourceName string // e.g., "routes", "services", "upstreams"
 }
 
-func NewAPISIXResourceHandler(apisix *service.APISIXClient, audit *middleware.AuditLogger, resourceName string) *APISIXResourceHandler {
+func NewAPISIXResourceHandler(registry *service.APISIXClientRegistry, audit *middleware.AuditLogger, resourceName string) *APISIXResourceHandler {
 	return &APISIXResourceHandler{
-		apisix:       apisix,
+		registry:     registry,
 		audit:        audit,
 		resourceName: resourceName,
 	}
 }
 
 func (h *APISIXResourceHandler) List(c *gin.Context) {
-	result, err := h.apisix.List(c.Request.Context(), h.resourceName)
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
+	result, err := client.List(c.Request.Context(), h.resourceName)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, model.NewErrorResponse("APISIX_ERROR", err.Error()))
 		return
@@ -38,9 +44,15 @@ func (h *APISIXResourceHandler) List(c *gin.Context) {
 }
 
 func (h *APISIXResourceHandler) Get(c *gin.Context) {
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
 	id := c.Param("id")
 
-	result, err := h.apisix.Get(c.Request.Context(), h.resourceName, id)
+	result, err := client.Get(c.Request.Context(), h.resourceName, id)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, model.NewErrorResponse("APISIX_ERROR", err.Error()))
 		return
@@ -50,13 +62,19 @@ func (h *APISIXResourceHandler) Get(c *gin.Context) {
 }
 
 func (h *APISIXResourceHandler) Create(c *gin.Context) {
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, model.NewErrorResponse("BAD_REQUEST", "Invalid request body"))
 		return
 	}
 
-	result, err := h.apisix.Create(c.Request.Context(), h.resourceName, body)
+	result, err := client.Create(c.Request.Context(), h.resourceName, body)
 	if err != nil {
 		h.audit.LogError(c, "CREATE", h.resourceName, nil, string(body), err.Error())
 		c.JSON(http.StatusBadGateway, model.NewErrorResponse("APISIX_ERROR", err.Error()))
@@ -68,6 +86,12 @@ func (h *APISIXResourceHandler) Create(c *gin.Context) {
 }
 
 func (h *APISIXResourceHandler) Update(c *gin.Context) {
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
 	id := c.Param("id")
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
@@ -75,7 +99,7 @@ func (h *APISIXResourceHandler) Update(c *gin.Context) {
 		return
 	}
 
-	result, err := h.apisix.Update(c.Request.Context(), h.resourceName, id, body)
+	result, err := client.Update(c.Request.Context(), h.resourceName, id, body)
 	if err != nil {
 		h.audit.LogError(c, "UPDATE", h.resourceName, &id, string(body), err.Error())
 		c.JSON(http.StatusBadGateway, model.NewErrorResponse("APISIX_ERROR", err.Error()))
@@ -87,6 +111,12 @@ func (h *APISIXResourceHandler) Update(c *gin.Context) {
 }
 
 func (h *APISIXResourceHandler) Patch(c *gin.Context) {
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
 	id := c.Param("id")
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
@@ -94,7 +124,7 @@ func (h *APISIXResourceHandler) Patch(c *gin.Context) {
 		return
 	}
 
-	result, err := h.apisix.Patch(c.Request.Context(), h.resourceName, id, body)
+	result, err := client.Patch(c.Request.Context(), h.resourceName, id, body)
 	if err != nil {
 		h.audit.LogError(c, "UPDATE", h.resourceName, &id, string(body), err.Error())
 		c.JSON(http.StatusBadGateway, model.NewErrorResponse("APISIX_ERROR", err.Error()))
@@ -106,9 +136,15 @@ func (h *APISIXResourceHandler) Patch(c *gin.Context) {
 }
 
 func (h *APISIXResourceHandler) Delete(c *gin.Context) {
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
 	id := c.Param("id")
 
-	if err := h.apisix.Delete(c.Request.Context(), h.resourceName, id); err != nil {
+	if err := client.Delete(c.Request.Context(), h.resourceName, id); err != nil {
 		h.audit.LogError(c, "DELETE", h.resourceName, &id, "", err.Error())
 		c.JSON(http.StatusBadGateway, model.NewErrorResponse("APISIX_ERROR", err.Error()))
 		return

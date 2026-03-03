@@ -1,44 +1,424 @@
 "use client"
 
-import { ShieldCheck } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
 import {
-  Card,
-  CardContent,
+  Pencil,
+  Plus,
+  ShieldCheck,
+  Trash2,
+} from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
   CardDescription,
-  CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { PageHeader } from "@/components/page-header"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Separator } from "@/components/ui/separator"
+import { api } from "@/lib/api-client"
+import { PERMISSION_GROUPS } from "@/lib/permissions"
+import type { Role } from "@/types/auth"
+import { toast } from "sonner"
 
-export default function RolesSettingsPage() {
+export default function RolesContent() {
+  const [roles, setRoles] = useState<Role[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showDialog, setShowDialog] = useState(false)
+  const [editingRole, setEditingRole] = useState<Role | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleteRoleId, setDeleteRoleId] = useState<string | null>(null)
+
+  const fetchData = useCallback(async () => {
+    try {
+      const data = await api.listRoles()
+      setRoles(data)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load roles")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  const handleEdit = (role: Role) => {
+    setEditingRole(role)
+    setShowDialog(true)
+  }
+
+  const handleDialogClose = () => {
+    setShowDialog(false)
+    setEditingRole(null)
+  }
+
+  const handleSaved = () => {
+    handleDialogClose()
+    fetchData()
+  }
+
+  const handleDelete = async () => {
+    if (!deleteRoleId) return
+    try {
+      await api.deleteRole(deleteRoleId)
+      toast.success("Role deleted")
+      setShowDeleteDialog(false)
+      setDeleteRoleId(null)
+      fetchData()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete role")
+    }
+  }
+
+  const formatPermissions = (perms: string[]) => {
+    if (perms.length === 1 && perms[0] === "*") return "Full Access"
+    return `${perms.length} permission${perms.length !== 1 ? "s" : ""}`
+  }
+
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Role Management"
-        description="Configure roles and permissions for RBAC"
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">Roles & Permissions</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Configure roles and granular RBAC permissions
+          </p>
+        </div>
+        <Button size="sm" onClick={() => setShowDialog(true)}>
+          <Plus className="h-3.5 w-3.5 mr-1.5" />
+          Add Role
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-3/4" />
+        </div>
+      ) : roles.length === 0 ? (
+        <div className="py-12 text-center rounded-lg border border-dashed bg-muted/30">
+          <ShieldCheck className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm font-medium">No roles configured</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Create custom roles to control access to API Gateway resources.
+          </p>
+        </div>
+      ) : (
+        <div>
+          <div className="mb-3">
+            <CardTitle className="text-base">Roles</CardTitle>
+            <CardDescription>{roles.length} role{roles.length !== 1 ? "s" : ""} configured</CardDescription>
+          </div>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Permissions</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {roles.map((role) => (
+                  <TableRow key={role.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="font-medium text-sm">{role.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">
+                      {role.description || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs">
+                        {formatPermissions(role.permissions)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {role.is_system ? (
+                        <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 border-blue-200">
+                          System
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          Custom
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          disabled={role.is_system}
+                          onClick={() => handleEdit(role)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          disabled={role.is_system}
+                          onClick={() => {
+                            setDeleteRoleId(role.id)
+                            setShowDeleteDialog(true)
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+
+      <RoleDialog
+        open={showDialog}
+        onOpenChange={(open) => { if (!open) handleDialogClose() }}
+        onSaved={handleSaved}
+        editingRole={editingRole}
       />
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-primary" />
-              Roles & Permissions
-            </CardTitle>
-            <Badge variant="secondary">Coming Soon</Badge>
-          </div>
-          <CardDescription>
-            This feature will allow you to configure granular role-based access control
-            with custom permissions for routes, services, plugins, and other resources.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-12 rounded-lg bg-muted/50 border border-dashed">
-            <ShieldCheck className="h-16 w-16 text-muted-foreground/20" />
-          </div>
-        </CardContent>
-      </Card>
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Role</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this role? Users assigned to this role will need to be reassigned first.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  )
+}
+
+function RoleDialog({
+  open,
+  onOpenChange,
+  onSaved,
+  editingRole,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSaved: () => void
+  editingRole: Role | null
+}) {
+  const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
+  const [permissions, setPermissions] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (editingRole) {
+      setName(editingRole.name)
+      setDescription(editingRole.description)
+      setPermissions([...editingRole.permissions])
+    } else {
+      setName("")
+      setDescription("")
+      setPermissions([])
+    }
+  }, [editingRole, open])
+
+  const togglePermission = (perm: string) => {
+    setPermissions((prev) =>
+      prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]
+    )
+  }
+
+  const toggleGroup = (groupPerms: readonly string[]) => {
+    const allSelected = groupPerms.every((p) => permissions.includes(p))
+    if (allSelected) {
+      setPermissions((prev) => prev.filter((p) => !groupPerms.includes(p)))
+    } else {
+      setPermissions((prev) => {
+        const newPerms = [...prev]
+        for (const p of groupPerms) {
+          if (!newPerms.includes(p)) newPerms.push(p)
+        }
+        return newPerms
+      })
+    }
+  }
+
+  const selectAll = () => {
+    const all = PERMISSION_GROUPS.flatMap((g) => g.permissions)
+    setPermissions([...all])
+  }
+
+  const clearAll = () => {
+    setPermissions([])
+  }
+
+  const handleSubmit = async () => {
+    if (!name.trim()) {
+      toast.error("Role name is required")
+      return
+    }
+    if (permissions.length === 0) {
+      toast.error("Select at least one permission")
+      return
+    }
+
+    setSaving(true)
+    try {
+      if (editingRole) {
+        await api.updateRole(editingRole.id, {
+          name: name.trim(),
+          description: description.trim(),
+          permissions,
+        })
+        toast.success("Role updated")
+      } else {
+        await api.createRole({
+          name: name.trim(),
+          description: description.trim(),
+          permissions,
+        })
+        toast.success("Role created")
+      }
+      onSaved()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save role")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" />
+            {editingRole ? "Edit Role" : "New Role"}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>Name</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g., api-manager"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What this role can do..."
+            />
+          </div>
+
+          <Separator />
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Permissions</Label>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={selectAll}>
+                  Select All
+                </Button>
+                <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={clearAll}>
+                  Clear
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+              {PERMISSION_GROUPS.map((group) => {
+                const allSelected = group.permissions.every((p) => permissions.includes(p))
+                const someSelected = group.permissions.some((p) => permissions.includes(p))
+                return (
+                  <div key={group.group} className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                        onCheckedChange={() => toggleGroup(group.permissions)}
+                        id={`group-${group.group}`}
+                      />
+                      <label
+                        htmlFor={`group-${group.group}`}
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        {group.group}
+                      </label>
+                    </div>
+                    <div className="ml-6 flex flex-wrap gap-x-4 gap-y-1">
+                      {group.permissions.map((perm) => (
+                        <div key={perm} className="flex items-center gap-1.5">
+                          <Checkbox
+                            checked={permissions.includes(perm)}
+                            onCheckedChange={() => togglePermission(perm)}
+                            id={`perm-${perm}`}
+                          />
+                          <label
+                            htmlFor={`perm-${perm}`}
+                            className="text-xs text-muted-foreground cursor-pointer"
+                          >
+                            {perm.split(":")[1]}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {permissions.length} permission{permissions.length !== 1 ? "s" : ""} selected
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={saving}>
+            {saving ? "Saving..." : editingRole ? "Save Changes" : "Create Role"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

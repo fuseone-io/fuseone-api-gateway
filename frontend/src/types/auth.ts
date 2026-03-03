@@ -30,6 +30,39 @@ export interface Role {
   updated_at: string
 }
 
+export interface CreateUserRequest {
+  username: string
+  email?: string
+  display_name: string
+  password: string
+  role_id: string
+  is_active: boolean
+}
+
+export interface UpdateUserRequest {
+  username: string
+  email?: string
+  display_name: string
+  role_id: string
+  is_active: boolean
+}
+
+export interface ResetPasswordRequest {
+  new_password: string
+}
+
+export interface CreateRoleRequest {
+  name: string
+  description: string
+  permissions: string[]
+}
+
+export interface UpdateRoleRequest {
+  name: string
+  description: string
+  permissions: string[]
+}
+
 export interface AuditLog {
   id: string
   user_id: string

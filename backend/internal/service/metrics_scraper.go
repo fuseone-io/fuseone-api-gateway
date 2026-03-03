@@ -22,9 +22,10 @@ import (
 	"github.com/fuseone/api-gateway/internal/repository"
 )
 
-// routeAccumulator holds running counters for a single route within one minute window.
+// routeAccumulator holds running counters for a single route+consumer within one minute window.
 type routeAccumulator struct {
 	routeName      string
+	consumerName   string
 	statusCounts   map[int]int       // status_code -> delta count
 	latencyBuckets map[float64]int   // le_boundary -> delta cumulative count
 	latencySum     float64
@@ -209,11 +210,12 @@ func (s *MetricsScraper) processMetrics(families map[string]*dto.MetricFamily) {
 			route := getLabelValue(m.Label, "route")
 			code := getLabelValue(m.Label, "code")
 			node := getLabelValue(m.Label, "node")
+			consumer := getLabelValue(m.Label, "consumer")
 			if route == "" || m.Counter == nil {
 				continue
 			}
 
-			key := fmt.Sprintf("http_status|%s|%s|%s", route, code, node)
+			key := fmt.Sprintf("http_status|%s|%s|%s|%s", route, code, node, consumer)
 			val := m.Counter.GetValue()
 			newCounters[key] = val
 
@@ -226,7 +228,7 @@ func (s *MetricsScraper) processMetrics(families map[string]*dto.MetricFamily) {
 				continue
 			}
 
-			acc := s.getOrCreateAccumulator(route)
+			acc := s.getOrCreateAccumulator(route, consumer)
 			codeInt, _ := strconv.Atoi(code)
 			acc.statusCounts[codeInt] += int(delta)
 		}
@@ -238,11 +240,12 @@ func (s *MetricsScraper) processMetrics(families map[string]*dto.MetricFamily) {
 			route := getLabelValue(m.Label, "route")
 			bwType := getLabelValue(m.Label, "type")
 			node := getLabelValue(m.Label, "node")
+			consumer := getLabelValue(m.Label, "consumer")
 			if route == "" || m.Counter == nil {
 				continue
 			}
 
-			key := fmt.Sprintf("bandwidth|%s|%s|%s", route, bwType, node)
+			key := fmt.Sprintf("bandwidth|%s|%s|%s|%s", route, bwType, node, consumer)
 			val := m.Counter.GetValue()
 			newCounters[key] = val
 
@@ -255,7 +258,7 @@ func (s *MetricsScraper) processMetrics(families map[string]*dto.MetricFamily) {
 				continue
 			}
 
-			acc := s.getOrCreateAccumulator(route)
+			acc := s.getOrCreateAccumulator(route, consumer)
 			switch bwType {
 			case "ingress":
 				acc.bandwidthIn += int64(delta)
@@ -275,12 +278,13 @@ func (s *MetricsScraper) processMetrics(families map[string]*dto.MetricFamily) {
 			}
 
 			node := getLabelValue(m.Label, "node")
+			consumer := getLabelValue(m.Label, "consumer")
 
 			// Process buckets
 			for _, b := range m.Histogram.Bucket {
 				le := b.GetUpperBound()
 				count := float64(b.GetCumulativeCount())
-				key := fmt.Sprintf("latency_bucket|%s|%s|%v", route, node, le)
+				key := fmt.Sprintf("latency_bucket|%s|%s|%s|%v", route, node, consumer, le)
 				newCounters[key] = count
 
 				if s.firstScrape {
@@ -292,7 +296,7 @@ func (s *MetricsScraper) processMetrics(families map[string]*dto.MetricFamily) {
 					continue
 				}
 
-				acc := s.getOrCreateAccumulator(route)
+				acc := s.getOrCreateAccumulator(route, consumer)
 				if acc.latencyBuckets == nil {
 					acc.latencyBuckets = make(map[float64]int)
 				}
@@ -303,8 +307,8 @@ func (s *MetricsScraper) processMetrics(families map[string]*dto.MetricFamily) {
 			sumVal := m.Histogram.GetSampleSum()
 			countVal := float64(m.Histogram.GetSampleCount())
 
-			sumKey := fmt.Sprintf("latency_sum|%s|%s", route, node)
-			countKey := fmt.Sprintf("latency_count|%s|%s", route, node)
+			sumKey := fmt.Sprintf("latency_sum|%s|%s|%s", route, node, consumer)
+			countKey := fmt.Sprintf("latency_count|%s|%s|%s", route, node, consumer)
 			newCounters[sumKey] = sumVal
 			newCounters[countKey] = countVal
 
@@ -312,7 +316,7 @@ func (s *MetricsScraper) processMetrics(families map[string]*dto.MetricFamily) {
 				sumDelta := s.computeDelta(sumKey, sumVal)
 				countDelta := s.computeDelta(countKey, countVal)
 				if sumDelta > 0 && countDelta > 0 {
-					acc := s.getOrCreateAccumulator(route)
+					acc := s.getOrCreateAccumulator(route, consumer)
 					acc.latencySum += sumDelta
 					acc.latencyCount += int(countDelta)
 				}
@@ -344,14 +348,22 @@ func (s *MetricsScraper) computeDelta(key string, currentVal float64) float64 {
 	return delta
 }
 
-func (s *MetricsScraper) getOrCreateAccumulator(routeID string) *routeAccumulator {
-	acc, ok := s.accumulators[routeID]
+// accumulatorKey builds the map key for route+consumer combination.
+func accumulatorKey(route, consumer string) string {
+	return route + "|" + consumer
+}
+
+func (s *MetricsScraper) getOrCreateAccumulator(route, consumer string) *routeAccumulator {
+	key := accumulatorKey(route, consumer)
+	acc, ok := s.accumulators[key]
 	if !ok {
 		acc = &routeAccumulator{
+			routeName:      route,
+			consumerName:   consumer,
 			statusCounts:   make(map[int]int),
 			latencyBuckets: make(map[float64]int),
 		}
-		s.accumulators[routeID] = acc
+		s.accumulators[key] = acc
 	}
 	return acc
 }
@@ -379,7 +391,7 @@ func (s *MetricsScraper) buildRows() []model.MetricsRow {
 	now := time.Now().Truncate(time.Minute)
 	rows := make([]model.MetricsRow, 0, len(s.accumulators))
 
-	for routeName, acc := range s.accumulators {
+	for _, acc := range s.accumulators {
 		var s2xx, s3xx, s4xx, s5xx, total int
 		for code, count := range acc.statusCounts {
 			total += count
@@ -402,12 +414,13 @@ func (s *MetricsScraper) buildRows() []model.MetricsRow {
 		// Resolve Prometheus route name to APISIX route object ID.
 		// APISIX exports the route *name* in Prometheus labels, but
 		// api_definitions stores the route *object ID* in apisix_route_ids.
-		resolvedID := s.routeResolver.Resolve(routeName)
+		resolvedID := s.routeResolver.Resolve(acc.routeName)
 
 		rows = append(rows, model.MetricsRow{
 			Ts:               now,
 			RouteID:          resolvedID,
-			RouteName:        routeName,
+			RouteName:        acc.routeName,
+			ConsumerName:     acc.consumerName,
 			RequestsTotal:    total,
 			Status2xx:        s2xx,
 			Status3xx:        s3xx,

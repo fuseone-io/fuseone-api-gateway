@@ -9,21 +9,28 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/fuseone/api-gateway/internal/middleware"
 	"github.com/fuseone/api-gateway/internal/model"
 	"github.com/fuseone/api-gateway/internal/service"
 )
 
 type UpstreamHealthHandler struct {
-	apisix  *service.APISIXClient
-	apiDefs ApiDefReader
+	registry *service.APISIXClientRegistry
+	apiDefs  ApiDefReader
 }
 
-func NewUpstreamHealthHandler(apisix *service.APISIXClient, apiDefs ApiDefReader) *UpstreamHealthHandler {
-	return &UpstreamHealthHandler{apisix: apisix, apiDefs: apiDefs}
+func NewUpstreamHealthHandler(registry *service.APISIXClientRegistry, apiDefs ApiDefReader) *UpstreamHealthHandler {
+	return &UpstreamHealthHandler{registry: registry, apiDefs: apiDefs}
 }
 
 func (h *UpstreamHealthHandler) GetHealth(c *gin.Context) {
-	body, err := h.apisix.GetUpstreamHealth(c.Request.Context())
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
+	body, err := client.GetUpstreamHealth(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusBadGateway, model.NewErrorResponse("CONTROL_API_ERROR", err.Error()))
 		return
@@ -78,7 +85,13 @@ func (h *UpstreamHealthHandler) GetHealthForAPI(c *gin.Context) {
 		return
 	}
 
-	body, err := h.apisix.GetUpstreamHealth(c.Request.Context())
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
+	body, err := client.GetUpstreamHealth(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusBadGateway, model.NewErrorResponse("CONTROL_API_ERROR", err.Error()))
 		return

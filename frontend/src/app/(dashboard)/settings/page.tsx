@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import {
   Sliders,
   Users,
@@ -12,18 +12,19 @@ import {
   Database,
   Clock,
   Construction,
+  Layers,
 } from "lucide-react"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
-import { cn } from "@/lib/utils"
+import NotificationsContent from "./notifications/page"
+import EnvironmentsContent from "./environments/page"
+import UsersContent from "./users/page"
+import RolesContent from "./roles/page"
+import GeneralContent from "./general/page"
+import ConnectionContent from "./connection/page"
+import OAuthContent from "./oauth/page"
 
 interface SettingsSection {
   id: string
@@ -31,51 +32,57 @@ interface SettingsSection {
   description: string
   icon: React.ComponentType<{ className?: string }>
   ready: boolean
-  content?: React.ReactNode
 }
 
 const settingsSections: SettingsSection[] = [
+  {
+    id: "environments",
+    title: "Environments",
+    description: "Manage multiple API Gateway environments",
+    icon: Layers,
+    ready: true,
+  },
   {
     id: "general",
     title: "General",
     description: "Gateway name, environment, and system preferences",
     icon: Sliders,
-    ready: false,
+    ready: true,
   },
   {
     id: "connection",
     title: "Gateway Connection",
-    description: "APISIX Admin API endpoint, keys, and health check",
+    description: "API Gateway endpoint, health check, and latency",
     icon: KeyRound,
-    ready: false,
+    ready: true,
   },
   {
     id: "users",
     title: "Users",
     description: "Manage user accounts, invitations, and access",
     icon: Users,
-    ready: false,
+    ready: true,
   },
   {
     id: "roles",
     title: "Roles & Permissions",
     description: "Configure roles and RBAC permissions",
     icon: ShieldCheck,
-    ready: false,
+    ready: true,
   },
   {
     id: "oauth",
     title: "Authentication Providers",
-    description: "Google, GitHub, SAML, and OAuth2 SSO providers",
+    description: "Google, GitHub, Microsoft, Okta, and OIDC providers",
     icon: Globe,
-    ready: false,
+    ready: true,
   },
   {
     id: "notifications",
     title: "Notifications",
-    description: "Alerts, webhooks, and notification channels",
+    description: "Slack, Teams, webhook, and email notification channels",
     icon: Bell,
-    ready: false,
+    ready: true,
   },
   {
     id: "appearance",
@@ -93,67 +100,25 @@ const settingsSections: SettingsSection[] = [
   },
 ]
 
-function PlannedContent({ section }: { section: SettingsSection }) {
-  const features: Record<string, string[]> = {
-    general: [
-      "Gateway display name and description",
-      "Default environment selection",
-      "Time zone and locale preferences",
-      "Session timeout configuration",
-      "API pagination defaults",
-    ],
-    connection: [
-      "APISIX Admin API URL and API key",
-      "Connection health check and latency",
-      "Control API (port 9090) configuration",
-      "Prometheus endpoint configuration",
-      "etcd connection status",
-    ],
-    users: [
-      "User listing with search and filters",
-      "Invite users via email",
-      "Activate / deactivate accounts",
-      "Reset passwords and manage 2FA",
-      "User activity history",
-    ],
-    roles: [
-      "Built-in roles: Admin, Editor, Viewer",
-      "Custom role creation",
-      "Granular permissions per resource",
-      "Role assignment to users",
-      "Permission audit log",
-    ],
-    oauth: [
-      "Google OAuth2 integration",
-      "GitHub OAuth2 integration",
-      "SAML 2.0 SSO provider",
-      "Generic OAuth2 / OIDC provider",
-      "Auto-provisioning rules for SSO users",
-    ],
-    notifications: [
-      "Email notification settings (SMTP)",
-      "Webhook channels (Slack, Discord, Teams)",
-      "Alert rules (error rate, latency, downtime)",
-      "Notification history and delivery status",
-      "Per-user notification preferences",
-    ],
-    appearance: [
-      "Light / dark theme toggle",
-      "Custom logo and favicon upload",
-      "Primary and accent color overrides",
-      "Developer portal branding",
-      "Custom CSS injection",
-    ],
-    backup: [
-      "Export all API definitions as JSON/YAML",
-      "Export APISIX configuration snapshot",
-      "Scheduled automatic backups",
-      "Import and restore from backup",
-      "Configuration diff before restore",
-    ],
-  }
+const plannedFeatures: Record<string, string[]> = {
+  appearance: [
+    "Light / dark theme toggle",
+    "Custom logo and favicon upload",
+    "Primary and accent color overrides",
+    "Developer portal branding",
+    "Custom CSS injection",
+  ],
+  backup: [
+    "Export all API definitions as JSON/YAML",
+    "Export APISIX configuration snapshot",
+    "Scheduled automatic backups",
+    "Import and restore from backup",
+    "Configuration diff before restore",
+  ],
+}
 
-  const items = features[section.id] || []
+function PlannedContent({ section }: { section: SettingsSection }) {
+  const items = plannedFeatures[section.id] || []
 
   return (
     <div className="space-y-6">
@@ -189,9 +154,26 @@ function PlannedContent({ section }: { section: SettingsSection }) {
   )
 }
 
+const DEFAULT_TAB = "environments"
+const validTabs = new Set(settingsSections.map((s) => s.id))
+
 export default function SettingsPage() {
-  const [activeSection, setActiveSection] = useState("general")
-  const active = settingsSections.find((s) => s.id === activeSection) || settingsSections[0]
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  const tabParam = searchParams.get("tab")
+  const activeTab = tabParam && validTabs.has(tabParam) ? tabParam : DEFAULT_TAB
+
+  const handleTabChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value === DEFAULT_TAB) {
+      params.delete("tab")
+    } else {
+      params.set("tab", value)
+    }
+    const qs = params.toString()
+    router.replace(`/settings${qs ? `?${qs}` : ""}`, { scroll: false })
+  }
 
   return (
     <div className="space-y-6">
@@ -200,44 +182,65 @@ export default function SettingsPage() {
         description="Manage your API Gateway configuration and access control"
       />
 
-      <div className="flex gap-6 min-h-[600px]">
-        {/* Vertical nav */}
-        <nav className="w-64 shrink-0 space-y-1">
+      <Tabs value={activeTab} onValueChange={handleTabChange} orientation="vertical" className="min-h-[600px] gap-6">
+        <TabsList variant="line" className="w-56 shrink-0 items-start">
           {settingsSections.map((section) => (
-            <button
+            <TabsTrigger
               key={section.id}
-              onClick={() => setActiveSection(section.id)}
-              className={cn(
-                "flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
-                activeSection === section.id
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
+              value={section.id}
+              className="w-full justify-start gap-2.5 px-3 py-2"
             >
               <section.icon className="h-4 w-4 shrink-0" />
-              <span className="flex-1 truncate">{section.title}</span>
-              {!section.ready && (
+              <span className="flex-1 truncate text-left">{section.title}</span>
+              {section.ready ? (
+                <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600">
+                  Ready
+                </Badge>
+              ) : (
                 <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
                   Planned
                 </Badge>
               )}
-            </button>
+            </TabsTrigger>
           ))}
-        </nav>
+        </TabsList>
 
-        {/* Content area */}
-        <div className="flex-1 min-w-0">
-          <Card className="h-full">
-            <CardContent className="p-6">
-              {active.ready && active.content ? (
-                active.content
-              ) : (
-                <PlannedContent section={active} />
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        <TabsContent value="environments">
+          <EnvironmentsContent />
+        </TabsContent>
+
+        <TabsContent value="general">
+          <GeneralContent />
+        </TabsContent>
+
+        <TabsContent value="connection">
+          <ConnectionContent />
+        </TabsContent>
+
+        <TabsContent value="users">
+          <UsersContent />
+        </TabsContent>
+
+        <TabsContent value="roles">
+          <RolesContent />
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <NotificationsContent />
+        </TabsContent>
+
+        <TabsContent value="oauth">
+          <OAuthContent />
+        </TabsContent>
+
+        {settingsSections
+          .filter((s) => !s.ready)
+          .map((section) => (
+            <TabsContent key={section.id} value={section.id}>
+              <PlannedContent section={section} />
+            </TabsContent>
+          ))}
+      </Tabs>
     </div>
   )
 }

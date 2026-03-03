@@ -171,6 +171,7 @@ export interface DashboardSummary {
   global_rules: number
   plugins: number
   stream_routes: number
+  firing_alerts: number
   apisix_status: "healthy" | "degraded" | "unhealthy"
 }
 

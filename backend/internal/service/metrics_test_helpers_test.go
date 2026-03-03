@@ -22,6 +22,9 @@ func (n *noopMetricsQuerier) Summary(_ context.Context, _ repository.MetricsFilt
 func (n *noopMetricsQuerier) TopRoutes(_ context.Context, _ repository.MetricsFilter, _ int) ([]model.TopRoute, error) {
 	return nil, nil
 }
+func (n *noopMetricsQuerier) TopConsumers(_ context.Context, _ repository.MetricsFilter, _ int) ([]model.TopConsumer, error) {
+	return nil, nil
+}
 func (n *noopMetricsQuerier) RollupToHour(_ context.Context) (int64, error)         { return 0, nil }
 func (n *noopMetricsQuerier) RollupToDay(_ context.Context) (int64, error)          { return 0, nil }
 func (n *noopMetricsQuerier) CleanupExpired(_ context.Context, _, _ int) (int64, error) { return 0, nil }

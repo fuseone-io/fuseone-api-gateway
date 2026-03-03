@@ -5,6 +5,11 @@ import { useParams } from "next/navigation"
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -17,6 +22,7 @@ import {
   Activity,
   ArrowDownRight,
   ArrowUpRight,
+  Bell,
   Clock,
   RefreshCw,
   TrendingUp,
@@ -55,6 +61,7 @@ import {
 } from "@/lib/metrics-utils"
 import type { TimeSeriesPoint, MetricsSummary, TopRoute, DateRangeValue } from "@/types/metrics"
 import type { ApiDefRecord } from "@/types/api"
+import type { AlertRule } from "@/types/alert"
 import { toast } from "sonner"
 
 const AUTO_REFRESH_INTERVAL = 30_000
@@ -78,6 +85,9 @@ export default function ApiAnalyticsPage() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Active alerts for this API's routes
+  const [activeAlerts, setActiveAlerts] = useState<AlertRule[]>([])
+
   // Drag-to-zoom state (index into chartData)
   const [dragStartIdx, setDragStartIdx] = useState<number | null>(null)
   const [dragEndIdx, setDragEndIdx] = useState<number | null>(null)
@@ -99,6 +109,20 @@ export default function ApiAnalyticsPage() {
   }, [apiId])
 
   const routeIds = record?.apisix_route_ids
+
+  // Load alert rules that target this API's routes
+  useEffect(() => {
+    if (!routeIds?.length) return
+    api.listAlertRules().then((rules) => {
+      const relevant = rules.filter(
+        (r) =>
+          r.scope_type === "route" &&
+          r.scope_ids.some((sid) => routeIds.includes(sid)) &&
+          (r.state === "firing" || r.state === "acknowledged")
+      )
+      setActiveAlerts(relevant)
+    }).catch(() => {})
+  }, [routeIds])
 
   const fetchData = useCallback(async () => {
     if (!routeIds?.length) {
@@ -301,6 +325,37 @@ export default function ApiAnalyticsPage() {
         </div>
       )}
 
+      {/* Active Alerts for this API */}
+      {activeAlerts.length > 0 && (
+        <Card className="border-red-500/30 bg-red-500/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Bell className="h-5 w-5 text-red-500" />
+              Active Alerts ({activeAlerts.length})
+            </CardTitle>
+            <CardDescription>Alert rules firing or acknowledged for this API&apos;s routes</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {activeAlerts.map((alert) => (
+                <div key={alert.id} className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <p className="text-sm font-medium">{alert.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {alert.rule_type.replace("_", " ")} &gt; {alert.threshold}
+                      {alert.rule_type === "error_rate" ? "%" : alert.rule_type === "latency_p99" ? "ms" : "%"}
+                    </p>
+                  </div>
+                  <Badge variant={alert.state === "firing" ? "destructive" : "outline"}>
+                    {alert.state}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Content */}
       {loading && timeSeries.length === 0 ? (
         <Card>
@@ -406,6 +461,86 @@ export default function ApiAnalyticsPage() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+
+          {/* Charts Row: Per-Flow Bar + Status Pie */}
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+            {/* Per-Flow Bar Chart */}
+            {topRoutes.length > 1 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Traffic by Flow</CardTitle>
+                  <CardDescription>Request distribution across flows</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={Math.max(200, topRoutes.length * 36)}>
+                    <BarChart data={topRoutes.slice(0, 10)} layout="vertical" margin={{ left: 8, right: 16 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        type="category"
+                        dataKey="route_name"
+                        width={120}
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(v: string, i: number) => v || topRoutes[i]?.route_id || ""}
+                      />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
+                        labelStyle={{ color: "var(--foreground)" }}
+                        formatter={(value) => [formatNumber(Number(value ?? 0)), "Requests"]}
+                      />
+                      <Bar dataKey="requests_total" fill="var(--primary)" radius={[0, 4, 4, 0]} name="Requests" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Status Distribution Pie Chart */}
+            {summary && summary.total_requests > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Status Distribution</CardTitle>
+                  <CardDescription>HTTP response status breakdown</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: "2xx", value: summary.status_2xx, fill: "#22c55e" },
+                          { name: "3xx", value: summary.status_3xx, fill: "#3b82f6" },
+                          { name: "4xx", value: summary.status_4xx, fill: "#f59e0b" },
+                          { name: "5xx", value: summary.status_5xx, fill: "#ef4444" },
+                        ].filter((d) => d.value > 0)}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                      >
+                        {[
+                          { name: "2xx", value: summary.status_2xx, fill: "#22c55e" },
+                          { name: "3xx", value: summary.status_3xx, fill: "#3b82f6" },
+                          { name: "4xx", value: summary.status_4xx, fill: "#f59e0b" },
+                          { name: "5xx", value: summary.status_5xx, fill: "#ef4444" },
+                        ].filter((d) => d.value > 0).map((entry) => (
+                          <Cell key={entry.name} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
+                        labelStyle={{ color: "var(--foreground)" }}
+                        formatter={(value) => [formatNumber(Number(value ?? 0)), "Responses"]}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
           {/* Per-Flow Breakdown */}
           {topRoutes.length > 0 && (

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, lazy, Suspense } from "react"
 import {
   X,
   CircleDot,
@@ -20,6 +20,7 @@ import {
   Users,
   Hash,
   GitBranch,
+  GitMerge,
   Database,
   Replace,
   FileOutput,
@@ -32,6 +33,31 @@ import {
   FileText,
   Network,
   Activity,
+  CheckSquare,
+  Monitor,
+  Link,
+  Copy,
+  Zap,
+  SlidersHorizontal,
+  MapPin,
+  Workflow,
+  Code,
+  Wand2,
+  FlaskConical,
+  Cloud,
+  FileArchive,
+  Search,
+  Cable,
+  Satellite,
+  Bot,
+  Layers,
+  Sparkles,
+  BookOpen,
+  Eye,
+  EyeOff,
+  Server,
+  Scale,
+  LogIn,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -45,13 +71,40 @@ import { jsonSchemaToFormDef } from "./schema-to-form"
 import { api } from "@/lib/api-client"
 import type { PolicyInstance } from "@/types/api"
 
+// --- Tier 0: Custom rich editors (lazy-loaded) ---
+
+export interface CustomEditorProps {
+  config: Record<string, unknown>
+  onChange: (config: Record<string, unknown>) => void
+  readOnly: boolean
+  policyName: string
+}
+
+const CUSTOM_EDITORS: Record<string, React.LazyExoticComponent<React.ComponentType<CustomEditorProps>>> = {
+  "api-composition": lazy(() => import("../editors/composition-editor")),
+  "serverless-pre-function": lazy(() => import("../editors/scripting-editor")),
+  "serverless-post-function": lazy(() => import("../editors/scripting-editor")),
+  "mocking": lazy(() => import("../editors/mocking-editor")),
+  "body-transformer": lazy(() => import("../editors/soap-template-editor")),
+  "ai-proxy": lazy(() => import("../editors/ai-proxy-editor")),
+  "ai-proxy-multi": lazy(() => import("../editors/ai-proxy-multi-editor")),
+  "degraphql": lazy(() => import("../editors/degraphql-editor")),
+}
+
+/** Plugin names that have a custom rich editor and should open in a Sheet */
+export const RICH_EDITOR_PLUGINS = new Set(Object.keys(CUSTOM_EDITORS))
+
 // --- Icon map (same as policy-gallery) ---
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Key, Lock, ShieldCheck, Fingerprint, KeyRound, ArrowRightLeft,
   Shield, Ban, Globe, ShieldAlert, UserX, Gauge, Users, Hash,
-  GitBranch, Database, Replace, FileOutput, ArrowLeftRight, Bug,
+  GitBranch, GitMerge, Database, Replace, FileOutput, ArrowLeftRight, Bug,
   ExternalLink, BarChart3, Send, Radio, FileText, Network, Activity,
+  CheckSquare, Monitor, Link, Copy, Zap, SlidersHorizontal, MapPin,
+  Workflow, Code, Wand2, FlaskConical, Cloud, FileArchive, Search,
+  Cable, Satellite, Bot, Layers, Sparkles, BookOpen, Eye, EyeOff,
+  Server, Scale, LogIn,
 }
 
 function getIcon(iconName?: string): LucideIcon {
@@ -181,8 +234,32 @@ export function PluginConfigPanel({
         </Badge>
       </div>
 
+      {/* Tier 0: Custom rich editor */}
+      {CUSTOM_EDITORS[policy.name] && (() => {
+        const Editor = CUSTOM_EDITORS[policy.name]
+        return (
+          <Suspense fallback={
+            <div className="p-4 space-y-3">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-7 w-full" />
+            </div>
+          }>
+            <div className="flex-1 min-h-0 overflow-auto">
+              <Editor
+                config={policy.config}
+                onChange={onUpdateConfig}
+                readOnly={readOnly}
+                policyName={policy.name}
+              />
+            </div>
+          </Suspense>
+        )
+      })()}
+
       {/* Loading state */}
-      {schemaLoading && !customForm && (
+      {!CUSTOM_EDITORS[policy.name] && schemaLoading && !customForm && (
         <div className="p-4 space-y-3">
           <Skeleton className="h-4 w-24" />
           <Skeleton className="h-7 w-full" />
@@ -194,7 +271,7 @@ export function PluginConfigPanel({
       )}
 
       {/* Content with Form/JSON tabs */}
-      {!schemaLoading && (
+      {!CUSTOM_EDITORS[policy.name] && !schemaLoading && (
         <>
           {hasForm ? (
             <Tabs defaultValue="form" className="flex-1 min-h-0 flex flex-col">

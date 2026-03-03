@@ -3,10 +3,12 @@ set -e
 
 BACKEND_PID=""
 FRONTEND_PID=""
+PORTAL_PID=""
 
 cleanup() {
     echo ""
     echo "Shutting down..."
+    [ -n "$PORTAL_PID" ] && kill "$PORTAL_PID" 2>/dev/null
     [ -n "$FRONTEND_PID" ] && kill "$FRONTEND_PID" 2>/dev/null
     [ -n "$BACKEND_PID" ] && kill "$BACKEND_PID" 2>/dev/null
     wait 2>/dev/null
@@ -62,11 +64,21 @@ pnpm dev &
 FRONTEND_PID=$!
 cd ..
 
+# 6. Start developer portal
+if [ -d "developer-portal" ] && [ -f "developer-portal/package.json" ]; then
+    echo "==> Starting developer portal (Next.js) on :3001..."
+    cd developer-portal
+    pnpm dev &
+    PORTAL_PID=$!
+    cd ..
+fi
+
 echo ""
 echo "============================================"
 echo "  FuseOne API Gateway - Dev Environment"
 echo "============================================"
-echo "  Frontend:  http://localhost:3000"
+echo "  Admin:     http://localhost:3000"
+echo "  Portal:    http://localhost:3001"
 echo "  Backend:   http://localhost:8080"
 echo "  APISIX:    http://localhost:9180"
 echo "  Login:     admin / changeme"

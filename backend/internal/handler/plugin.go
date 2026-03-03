@@ -12,16 +12,22 @@ import (
 )
 
 type PluginHandler struct {
-	apisix *service.APISIXClient
-	audit  *middleware.AuditLogger
+	registry *service.APISIXClientRegistry
+	audit    *middleware.AuditLogger
 }
 
-func NewPluginHandler(apisix *service.APISIXClient, audit *middleware.AuditLogger) *PluginHandler {
-	return &PluginHandler{apisix: apisix, audit: audit}
+func NewPluginHandler(registry *service.APISIXClientRegistry, audit *middleware.AuditLogger) *PluginHandler {
+	return &PluginHandler{registry: registry, audit: audit}
 }
 
 func (h *PluginHandler) ListPlugins(c *gin.Context) {
-	result, err := h.apisix.ListPlugins(c.Request.Context())
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
+	result, err := client.ListPlugins(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusBadGateway, model.NewErrorResponse("APISIX_ERROR", err.Error()))
 		return
@@ -31,9 +37,15 @@ func (h *PluginHandler) ListPlugins(c *gin.Context) {
 }
 
 func (h *PluginHandler) GetPluginSchema(c *gin.Context) {
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
 	name := c.Param("name")
 
-	result, err := h.apisix.GetPluginSchema(c.Request.Context(), name)
+	result, err := client.GetPluginSchema(c.Request.Context(), name)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, model.NewErrorResponse("APISIX_ERROR", err.Error()))
 		return
@@ -43,7 +55,13 @@ func (h *PluginHandler) GetPluginSchema(c *gin.Context) {
 }
 
 func (h *PluginHandler) ReloadPlugins(c *gin.Context) {
-	err := h.apisix.ReloadPlugins(c.Request.Context())
+	client, err := h.registry.GetClient(c.Request.Context(), middleware.GetEnvironmentID(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, model.NewErrorResponse("ENVIRONMENT_ERROR", err.Error()))
+		return
+	}
+
+	err = client.ReloadPlugins(c.Request.Context())
 	if err != nil {
 		if h.audit != nil {
 			h.audit.LogError(c, "RELOAD", "plugins", nil, "", err.Error())

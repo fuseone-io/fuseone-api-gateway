@@ -9,6 +9,7 @@ import {
   Activity,
   AppWindow,
   ArrowRight,
+  Bell,
   CircleDot,
   CreditCard,
   FileJson,
@@ -89,6 +90,9 @@ export default function DashboardPage() {
         { label: "Global Policies", value: summary.global_rules, icon: ShieldCheck, href: "/global-rules", accent: "text-amber-500" },
         { label: "SSL Certificates", value: summary.ssl_certs, icon: Lock, href: "/ssl", accent: "text-cyan-500" },
         { label: "Stream Proxy", value: summary.stream_routes, icon: Wifi, href: "/stream-routes", accent: "text-teal-500" },
+        ...(summary.firing_alerts > 0
+          ? [{ label: "Firing Alerts", value: summary.firing_alerts, icon: Bell, href: "/monitoring", accent: "text-red-500" }]
+          : []),
       ]
     : []
 

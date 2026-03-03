@@ -12,10 +12,11 @@ import (
 
 // MetricsFilter holds all parameters for a metrics query.
 type MetricsFilter struct {
-	RouteIDs []string
-	RangeStr string    // preset: "1h","6h","24h","7d"
-	From     time.Time // custom range (zero = not used)
-	To       time.Time
+	RouteIDs      []string
+	ConsumerNames []string
+	RangeStr      string    // preset: "1h","6h","24h","7d","30d"
+	From          time.Time // custom range (zero = not used)
+	To            time.Time
 }
 
 // IsCustom returns true when the filter uses absolute from/to timestamps.
@@ -29,6 +30,7 @@ type MetricsQuerier interface {
 	TimeSeries(ctx context.Context, filter MetricsFilter) ([]model.TimeSeriesPoint, error)
 	Summary(ctx context.Context, filter MetricsFilter) (*model.MetricsSummary, error)
 	TopRoutes(ctx context.Context, filter MetricsFilter, limit int) ([]model.TopRoute, error)
+	TopConsumers(ctx context.Context, filter MetricsFilter, limit int) ([]model.TopConsumer, error)
 	RollupToHour(ctx context.Context) (int64, error)
 	RollupToDay(ctx context.Context) (int64, error)
 	CleanupExpired(ctx context.Context, ttl1mDays, ttl1hDays int) (int64, error)
@@ -52,12 +54,12 @@ func (r *MetricsRepository) BatchUpsertMinute(ctx context.Context, rows []model.
 	for _, row := range rows {
 		_, err := tx.Exec(ctx, `
 			INSERT INTO metrics_1m (
-				ts, route_id, route_name,
+				ts, route_id, route_name, consumer_name,
 				requests_total, status_2xx, status_3xx, status_4xx, status_5xx,
 				latency_sum, latency_count, latency_p50, latency_p95, latency_p99,
 				bandwidth_ingress, bandwidth_egress
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-			ON CONFLICT (ts, route_id) DO UPDATE SET
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+			ON CONFLICT (ts, route_id, consumer_name) DO UPDATE SET
 				requests_total = metrics_1m.requests_total + EXCLUDED.requests_total,
 				status_2xx = metrics_1m.status_2xx + EXCLUDED.status_2xx,
 				status_3xx = metrics_1m.status_3xx + EXCLUDED.status_3xx,
@@ -71,7 +73,7 @@ func (r *MetricsRepository) BatchUpsertMinute(ctx context.Context, rows []model.
 				bandwidth_ingress = metrics_1m.bandwidth_ingress + EXCLUDED.bandwidth_ingress,
 				bandwidth_egress = metrics_1m.bandwidth_egress + EXCLUDED.bandwidth_egress
 		`,
-			row.Ts, row.RouteID, row.RouteName,
+			row.Ts, row.RouteID, row.RouteName, row.ConsumerName,
 			row.RequestsTotal, row.Status2xx, row.Status3xx, row.Status4xx, row.Status5xx,
 			row.LatencySum, row.LatencyCount, row.LatencyP50, row.LatencyP95, row.LatencyP99,
 			row.BandwidthIngress, row.BandwidthEgress,
@@ -95,6 +97,8 @@ func rangeToTable(rangeStr string) (table string, interval string) {
 		return "metrics_1m", "24 hours"
 	case "7d":
 		return "metrics_1h", "7 days"
+	case "30d":
+		return "metrics_1d", "30 days"
 	default:
 		return "metrics_1m", "1 hour"
 	}
@@ -124,9 +128,18 @@ func resolveFilter(f MetricsFilter) (table string, whereClause string, args []in
 		if len(f.RouteIDs) == 1 {
 			whereClause += fmt.Sprintf(" AND route_id = $%d", nextArg)
 			args = append(args, f.RouteIDs[0])
+			nextArg++
 		} else if len(f.RouteIDs) > 1 {
 			whereClause += fmt.Sprintf(" AND route_id = ANY($%d)", nextArg)
 			args = append(args, f.RouteIDs)
+			nextArg++
+		}
+		if len(f.ConsumerNames) == 1 {
+			whereClause += fmt.Sprintf(" AND consumer_name = $%d", nextArg)
+			args = append(args, f.ConsumerNames[0])
+		} else if len(f.ConsumerNames) > 1 {
+			whereClause += fmt.Sprintf(" AND consumer_name = ANY($%d)", nextArg)
+			args = append(args, f.ConsumerNames)
 		}
 	} else {
 		var interval string
@@ -138,9 +151,18 @@ func resolveFilter(f MetricsFilter) (table string, whereClause string, args []in
 		if len(f.RouteIDs) == 1 {
 			whereClause += fmt.Sprintf(" AND route_id = $%d", nextArg)
 			args = append(args, f.RouteIDs[0])
+			nextArg++
 		} else if len(f.RouteIDs) > 1 {
 			whereClause += fmt.Sprintf(" AND route_id = ANY($%d)", nextArg)
 			args = append(args, f.RouteIDs)
+			nextArg++
+		}
+		if len(f.ConsumerNames) == 1 {
+			whereClause += fmt.Sprintf(" AND consumer_name = $%d", nextArg)
+			args = append(args, f.ConsumerNames[0])
+		} else if len(f.ConsumerNames) > 1 {
+			whereClause += fmt.Sprintf(" AND consumer_name = ANY($%d)", nextArg)
+			args = append(args, f.ConsumerNames)
 		}
 	}
 	return
@@ -149,8 +171,10 @@ func resolveFilter(f MetricsFilter) (table string, whereClause string, args []in
 func (r *MetricsRepository) TimeSeries(ctx context.Context, filter MetricsFilter) ([]model.TimeSeriesPoint, error) {
 	table, where, args := resolveFilter(filter)
 
+	// Always aggregate when there are multiple rows per timestamp
+	// (multiple routes, consumers, or global view)
+	needsAgg := len(filter.RouteIDs) != 1 || len(filter.ConsumerNames) != 1
 	var query string
-	needsAgg := len(filter.RouteIDs) != 1
 	if !needsAgg {
 		query = fmt.Sprintf(`
 			SELECT ts, requests_total, status_2xx, status_3xx, status_4xx, status_5xx,
@@ -293,10 +317,61 @@ func (r *MetricsRepository) TopRoutes(ctx context.Context, filter MetricsFilter,
 	return routes, nil
 }
 
+func (r *MetricsRepository) TopConsumers(ctx context.Context, filter MetricsFilter, limit int) ([]model.TopConsumer, error) {
+	table, where, args := resolveFilter(filter)
+
+	// Only include rows with a non-empty consumer (authenticated traffic)
+	where += " AND consumer_name != ''"
+
+	limitParam := fmt.Sprintf("$%d", len(args)+1)
+	args = append(args, limit)
+
+	query := fmt.Sprintf(`
+		SELECT
+			consumer_name,
+			SUM(requests_total)::BIGINT,
+			CASE WHEN SUM(latency_count) > 0
+				THEN SUM(latency_sum) / SUM(latency_count) ELSE 0 END,
+			CASE WHEN SUM(requests_total) > 0
+				THEN (SUM(status_4xx) + SUM(status_5xx))::FLOAT / SUM(requests_total) ELSE 0 END,
+			SUM(bandwidth_ingress)::BIGINT,
+			SUM(bandwidth_egress)::BIGINT
+		FROM %s
+		WHERE %s
+		GROUP BY consumer_name
+		ORDER BY SUM(requests_total) DESC
+		LIMIT %s
+	`, table, where, limitParam)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query top consumers: %w", err)
+	}
+	defer rows.Close()
+
+	var consumers []model.TopConsumer
+	for rows.Next() {
+		var tc model.TopConsumer
+		if err := rows.Scan(
+			&tc.ConsumerName, &tc.RequestsTotal,
+			&tc.AvgLatencyMs, &tc.ErrorRate,
+			&tc.BandwidthIngress, &tc.BandwidthEgress,
+		); err != nil {
+			return nil, fmt.Errorf("scan row: %w", err)
+		}
+		consumers = append(consumers, tc)
+	}
+
+	if consumers == nil {
+		consumers = []model.TopConsumer{}
+	}
+	return consumers, nil
+}
+
 func (r *MetricsRepository) RollupToHour(ctx context.Context) (int64, error) {
 	result, err := r.pool.Exec(ctx, `
 		INSERT INTO metrics_1h (
-			ts, route_id, route_name,
+			ts, route_id, route_name, consumer_name,
 			requests_total, status_2xx, status_3xx, status_4xx, status_5xx,
 			latency_sum, latency_count, latency_p50, latency_p95, latency_p99,
 			bandwidth_ingress, bandwidth_egress
@@ -305,6 +380,7 @@ func (r *MetricsRepository) RollupToHour(ctx context.Context) (int64, error) {
 			date_trunc('hour', ts),
 			route_id,
 			MAX(route_name),
+			consumer_name,
 			SUM(requests_total),
 			SUM(status_2xx), SUM(status_3xx), SUM(status_4xx), SUM(status_5xx),
 			SUM(latency_sum), SUM(latency_count),
@@ -317,8 +393,8 @@ func (r *MetricsRepository) RollupToHour(ctx context.Context) (int64, error) {
 			SUM(bandwidth_ingress), SUM(bandwidth_egress)
 		FROM metrics_1m
 		WHERE ts < date_trunc('hour', NOW())
-		GROUP BY date_trunc('hour', ts), route_id
-		ON CONFLICT (ts, route_id) DO UPDATE SET
+		GROUP BY date_trunc('hour', ts), route_id, consumer_name
+		ON CONFLICT (ts, route_id, consumer_name) DO UPDATE SET
 			requests_total = EXCLUDED.requests_total,
 			status_2xx = EXCLUDED.status_2xx,
 			status_3xx = EXCLUDED.status_3xx,
@@ -341,7 +417,7 @@ func (r *MetricsRepository) RollupToHour(ctx context.Context) (int64, error) {
 func (r *MetricsRepository) RollupToDay(ctx context.Context) (int64, error) {
 	result, err := r.pool.Exec(ctx, `
 		INSERT INTO metrics_1d (
-			ts, route_id, route_name,
+			ts, route_id, route_name, consumer_name,
 			requests_total, status_2xx, status_3xx, status_4xx, status_5xx,
 			latency_sum, latency_count, latency_p50, latency_p95, latency_p99,
 			bandwidth_ingress, bandwidth_egress
@@ -350,6 +426,7 @@ func (r *MetricsRepository) RollupToDay(ctx context.Context) (int64, error) {
 			date_trunc('day', ts),
 			route_id,
 			MAX(route_name),
+			consumer_name,
 			SUM(requests_total),
 			SUM(status_2xx), SUM(status_3xx), SUM(status_4xx), SUM(status_5xx),
 			SUM(latency_sum), SUM(latency_count),
@@ -362,8 +439,8 @@ func (r *MetricsRepository) RollupToDay(ctx context.Context) (int64, error) {
 			SUM(bandwidth_ingress), SUM(bandwidth_egress)
 		FROM metrics_1h
 		WHERE ts < date_trunc('day', NOW())
-		GROUP BY date_trunc('day', ts), route_id
-		ON CONFLICT (ts, route_id) DO UPDATE SET
+		GROUP BY date_trunc('day', ts), route_id, consumer_name
+		ON CONFLICT (ts, route_id, consumer_name) DO UPDATE SET
 			requests_total = EXCLUDED.requests_total,
 			status_2xx = EXCLUDED.status_2xx,
 			status_3xx = EXCLUDED.status_3xx,

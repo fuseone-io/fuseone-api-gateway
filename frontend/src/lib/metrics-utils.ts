@@ -56,7 +56,7 @@ export function dateRangeToParams(value: DateRangeValue): { range?: TimeRange; f
 }
 
 // Returns span in hours for a DateRangeValue (used for timestamp formatting).
-const PRESET_HOURS: Record<TimeRange, number> = { "1h": 1, "6h": 6, "24h": 24, "7d": 168 }
+const PRESET_HOURS: Record<TimeRange, number> = { "1h": 1, "6h": 6, "24h": 24, "7d": 168, "30d": 720 }
 export function dateRangeSpanHours(value: DateRangeValue): number {
   if (value.type === "preset") return PRESET_HOURS[value.preset]
   return (value.to.getTime() - value.from.getTime()) / (1000 * 60 * 60)

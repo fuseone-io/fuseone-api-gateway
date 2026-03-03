@@ -34,7 +34,16 @@ export interface TopRoute {
   bandwidth_egress: number
 }
 
-export type TimeRange = "1h" | "6h" | "24h" | "7d"
+export interface TopConsumer {
+  consumer_name: string
+  requests_total: number
+  avg_latency_ms: number
+  error_rate: number
+  bandwidth_ingress: number
+  bandwidth_egress: number
+}
+
+export type TimeRange = "1h" | "6h" | "24h" | "7d" | "30d"
 
 export type DateRangeValue =
   | { type: "preset"; preset: TimeRange }
