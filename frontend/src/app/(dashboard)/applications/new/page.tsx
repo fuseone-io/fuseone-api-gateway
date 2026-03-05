@@ -195,8 +195,8 @@ export default function NewApplicationPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No plan (standalone)</SelectItem>
-                {plans.map((p) => (
-                  <SelectItem key={p.id} value={p.id || ""}>
+                {plans.filter((p) => !!p.id).map((p) => (
+                  <SelectItem key={p.id} value={p.id!}>
                     <div className="flex items-center gap-2">
                       <span className="font-mono">{p.id}</span>
                       {p.desc && (

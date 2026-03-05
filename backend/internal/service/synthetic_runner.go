@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -15,7 +16,9 @@ type SyntheticRunner struct {
 	monitorRepo repository.SyntheticMonitorQuerier
 	suiteRepo   repository.TestSuiteQuerier
 	runRepo     repository.TestRunQuerier
+	contactRepo repository.NotificationContactQuerier
 	executor    *TestExecutor
+	notifier    *AlertNotifier
 	logger      *zap.Logger
 	intervalSec int
 }
@@ -25,7 +28,9 @@ func NewSyntheticRunner(
 	monitorRepo repository.SyntheticMonitorQuerier,
 	suiteRepo repository.TestSuiteQuerier,
 	runRepo repository.TestRunQuerier,
+	contactRepo repository.NotificationContactQuerier,
 	executor *TestExecutor,
+	notifier *AlertNotifier,
 	logger *zap.Logger,
 	intervalSec int,
 ) *SyntheticRunner {
@@ -36,7 +41,9 @@ func NewSyntheticRunner(
 		monitorRepo: monitorRepo,
 		suiteRepo:   suiteRepo,
 		runRepo:     runRepo,
+		contactRepo: contactRepo,
 		executor:    executor,
+		notifier:    notifier,
 		logger:      logger,
 		intervalSec: intervalSec,
 	}
@@ -115,6 +122,7 @@ func (r *SyntheticRunner) runMonitor(ctx context.Context, monitor *model.Synthet
 	}
 
 	// Determine new monitor status
+	prevStatus := monitor.LastStatus
 	var newStatus string
 	consecutiveFail := monitor.ConsecutiveFail
 
@@ -160,11 +168,78 @@ func (r *SyntheticRunner) runMonitor(ctx context.Context, monitor *model.Synthet
 		zap.Int("consecutive_fail", consecutiveFail),
 		zap.Float64("uptime_pct", uptimePct),
 	)
+
+	// Send notifications on status transitions
+	if len(monitor.NotifyContactIDs) > 0 && prevStatus != newStatus {
+		r.sendNotifications(ctx, monitor, prevStatus, newStatus)
+	}
+}
+
+// sendNotifications sends notifications to all configured contacts when status changes.
+func (r *SyntheticRunner) sendNotifications(ctx context.Context, monitor *model.SyntheticMonitor, prevStatus, newStatus string) {
+	// Only notify on meaningful transitions
+	shouldNotify := false
+	var eventType, message string
+
+	switch {
+	case newStatus == model.MonitorStatusDown:
+		shouldNotify = true
+		eventType = "fired"
+		message = fmt.Sprintf("Monitor \"%s\" is DOWN — %d consecutive failures", monitor.Name, monitor.ConsecutiveFail+1)
+	case newStatus == model.MonitorStatusDegraded && prevStatus == model.MonitorStatusUp:
+		shouldNotify = true
+		eventType = "fired"
+		message = fmt.Sprintf("Monitor \"%s\" is DEGRADED — test failed", monitor.Name)
+	case newStatus == model.MonitorStatusUp && (prevStatus == model.MonitorStatusDown || prevStatus == model.MonitorStatusDegraded):
+		shouldNotify = true
+		eventType = "resolved"
+		message = fmt.Sprintf("Monitor \"%s\" recovered — status is UP", monitor.Name)
+	}
+
+	if !shouldNotify {
+		return
+	}
+
+	// Build alert channels from notification contact IDs
+	var channels []model.AlertChannel
+	for _, contactID := range monitor.NotifyContactIDs {
+		contact, err := r.contactRepo.Get(ctx, contactID)
+		if err != nil {
+			r.logger.Warn("failed to get notification contact", zap.String("contact_id", contactID.String()), zap.Error(err))
+			continue
+		}
+		if contact == nil || !contact.Enabled {
+			continue
+		}
+		channels = append(channels, contact.ToAlertChannel())
+	}
+
+	if len(channels) == 0 {
+		return
+	}
+
+	// Build a synthetic alert rule + event for the notifier
+	rule := &model.AlertRule{
+		Name:     fmt.Sprintf("Synthetic Monitor: %s", monitor.Name),
+		RuleType: "synthetic_monitor",
+		Channels: channels,
+		State:    model.AlertStateFiring,
+	}
+	event := &model.AlertEvent{
+		EventType: eventType,
+		Message:   message,
+	}
+
+	r.notifier.Notify(ctx, rule, event)
+
+	r.logger.Info("synthetic monitor notification sent",
+		zap.String("monitor_id", monitor.ID.String()),
+		zap.String("transition", fmt.Sprintf("%s → %s", prevStatus, newStatus)),
+		zap.Int("channels", len(channels)),
+	)
 }
 
 // calculateUptime computes a weighted uptime percentage.
-// Uses an exponential moving average: new = old * 0.99 + current * 0.01
-// where current is 100 for "up" and 0 for "down"/"degraded".
 func (r *SyntheticRunner) calculateUptime(currentUptime float64, newStatus string) float64 {
 	var sample float64
 	switch newStatus {
@@ -176,12 +251,10 @@ func (r *SyntheticRunner) calculateUptime(currentUptime float64, newStatus strin
 		sample = 0.0
 	}
 
-	// If this is the first run (uptime is 0), seed with the current sample
 	if currentUptime == 0 && newStatus == model.MonitorStatusUp {
 		return 100.0
 	}
 
-	// Exponential moving average with alpha=0.01 (99% weight on history)
 	alpha := 0.01
 	return currentUptime*(1-alpha) + sample*alpha
 }

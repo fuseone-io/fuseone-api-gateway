@@ -1,0 +1,17 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fuseone.fullname" . }}-postgresql
+  labels:
+    {{- include "fuseone.postgresql.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: tcp-postgresql
+      protocol: TCP
+      name: tcp-postgresql
+  selector:
+    {{- include "fuseone.postgresql.selectorLabels" . | nindent 4 }}
+{{- end }}

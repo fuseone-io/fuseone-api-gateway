@@ -65,6 +65,10 @@ const EXTRA_DESCRIPTIONS: Record<string, string> = {
   "graphql-complexity": "Cost-based GraphQL query complexity analysis",
   "graphql-allowlist": "Persisted query allowlist for GraphQL",
   "graphql-introspection-guard": "Block GraphQL introspection in production",
+  "multi-auth": "Try multiple authentication methods in order",
+  inspect: "Dump request/response context for debugging",
+  "example-plugin": "Reference plugin template (no-op)",
+  "public-api": "Expose internal plugin APIs as public routes",
 }
 
 // --- Heuristic classification for unknown plugins ---

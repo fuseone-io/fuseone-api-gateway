@@ -117,3 +117,16 @@ plugin_attr:
     export_addr:
       ip: 0.0.0.0
       port: 9091
+  opentelemetry:
+    resource:
+      service.name: "fuseone-gateway"
+    batch_span_processor:
+      max_export_batch_size: 64
+      inactive_timeout: 2
+    trace_id_source: x-request-id
+    set_ngx_var: true
+    collector:
+      address: "host.docker.internal:8080"
+      request_timeout: 3
+      request_headers:
+        Content-Type: application/x-protobuf

@@ -20,11 +20,18 @@ import {
   Search,
   HeartPulse,
   FileJson,
+  ScrollText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Switch } from "@/components/ui/switch"
 import {
   Select,
@@ -60,7 +67,9 @@ import {
 import { PolicyTemplateSelector } from "./policy-template-selector"
 import { getPluginDef } from "@/lib/constants"
 import type { PluginPhase } from "@/lib/constants"
-import type { ApiDefinition, ApiFlow, PolicyInstance } from "@/types/api"
+import type { ApiDefinition, ApiFlow, PolicyInstance, FlowContract } from "@/types/api"
+import { ContractPanel } from "./contract-panel"
+import { hasContract, countContractResponses } from "@/lib/contract-utils"
 
 interface ApiFlowEditorProps {
   api: ApiDefinition
@@ -112,6 +121,8 @@ export function ApiFlowEditor({ api: apiDef, onChange, readOnly = false, version
       return next
     })
   }, [apiDef.id])
+
+  const [contractPanelOpen, setContractPanelOpen] = useState(false)
 
   const selectedFlow = apiDef.flows.find((f) => f.id === selectedFlowId) || apiDef.flows[0]
 
@@ -256,6 +267,75 @@ export function ApiFlowEditor({ api: apiDef, onChange, readOnly = false, version
     })
   }, [selectedFlow, updateFlow])
 
+  // --- Contract management ---
+  const handleContractChange = useCallback(
+    (contract: FlowContract) => {
+      if (!selectedFlow) return
+      updateFlow(selectedFlow.id, { contract })
+    },
+    [selectedFlow, updateFlow]
+  )
+
+  const handleGenerateMock = useCallback(
+    (mockConfig: Record<string, unknown>) => {
+      if (!selectedFlow) return
+      const existing = selectedFlow.policies.find((p) => p.name === "mocking")
+      if (existing) {
+        // Update existing mocking policy
+        updateFlow(selectedFlow.id, {
+          policies: selectedFlow.policies.map((p) =>
+            p.name === "mocking" ? { ...p, config: mockConfig, enabled: true } : p
+          ),
+        })
+      } else {
+        // Add mocking policy
+        updateFlow(selectedFlow.id, {
+          policies: [
+            ...selectedFlow.policies,
+            {
+              id: crypto.randomUUID(),
+              name: "mocking",
+              phase: "request" as const,
+              enabled: true,
+              config: mockConfig,
+            },
+          ],
+        })
+      }
+      toast.success("Mock response generated from contract")
+    },
+    [selectedFlow, updateFlow]
+  )
+
+  const handleGenerateValidation = useCallback(
+    (validationConfig: Record<string, unknown>) => {
+      if (!selectedFlow) return
+      const existing = selectedFlow.policies.find((p) => p.name === "request-validation")
+      if (existing) {
+        updateFlow(selectedFlow.id, {
+          policies: selectedFlow.policies.map((p) =>
+            p.name === "request-validation" ? { ...p, config: validationConfig, enabled: true } : p
+          ),
+        })
+      } else {
+        updateFlow(selectedFlow.id, {
+          policies: [
+            ...selectedFlow.policies,
+            {
+              id: crypto.randomUUID(),
+              name: "request-validation",
+              phase: "request" as const,
+              enabled: true,
+              config: validationConfig,
+            },
+          ],
+        })
+      }
+      toast.success("Request validation generated from contract")
+    },
+    [selectedFlow, updateFlow]
+  )
+
   // Current policy being configured
   const configuredPolicy =
     typeof rightPanel === "object" && rightPanel.type === "policy-config" && selectedFlow
@@ -287,7 +367,7 @@ export function ApiFlowEditor({ api: apiDef, onChange, readOnly = false, version
                 )}
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-0.5">
                 {apiDef.flows.map((flow) => (
                   <FlowListItem
                     key={flow.id}
@@ -340,6 +420,8 @@ export function ApiFlowEditor({ api: apiDef, onChange, readOnly = false, version
               version={version}
               onSelectTemplate={handleSelectTemplate}
               onClearTemplate={handleClearTemplate}
+              onOpenContract={() => setContractPanelOpen(true)}
+              contractResponseCount={countContractResponses(selectedFlow.contract)}
             />
             <div className="relative flex-1 min-h-0">
               {/* Flow canvas — always full height */}
@@ -445,6 +527,19 @@ export function ApiFlowEditor({ api: apiDef, onChange, readOnly = false, version
           setAddFlowDialogOpen(false)
         }}
       />
+
+      {/* Contract Panel */}
+      {selectedFlow && (
+        <ContractPanel
+          open={contractPanelOpen}
+          onOpenChange={setContractPanelOpen}
+          flow={selectedFlow}
+          onContractChange={handleContractChange}
+          onGenerateMock={handleGenerateMock}
+          onGenerateValidation={handleGenerateValidation}
+          readOnly={readOnly}
+        />
+      )}
     </div>
   )
 }
@@ -473,78 +568,82 @@ function FlowListItem({
   return (
     <div
       onClick={onSelect}
-      className={`group relative w-full text-left rounded-lg border px-3 py-2 transition-all cursor-pointer overflow-hidden ${
+      className={`group relative flex items-center gap-1.5 w-full text-left rounded-md px-2 py-1.5 transition-all cursor-pointer overflow-hidden ${
         isSelected
-          ? "border-primary bg-primary/5 shadow-sm"
-          : "border-border hover:border-primary/40"
+          ? "bg-primary/10 text-primary"
+          : "hover:bg-accent"
       }`}
     >
-      <div className="flex items-center gap-1.5">
-        <div className="w-0 flex-1 overflow-hidden">
-          {editing ? (
-            <Input
-              autoFocus
-              value={flow.name}
-              onChange={(e) => onRename(e.target.value)}
-              onBlur={() => setEditing(false)}
-              onKeyDown={(e) => e.key === "Enter" && setEditing(false)}
-              className="h-5 text-xs px-1 py-0 border-0 bg-transparent focus-visible:ring-0"
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <p
-              className="text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap"
-              title={flow.name}
-              onDoubleClick={(e) => {
-                if (!readOnly) {
-                  e.stopPropagation()
-                  setEditing(true)
-                }
-              }}
-            >
-              {flow.name || "Untitled"}
-            </p>
-          )}
-          <p className="text-[10px] text-muted-foreground font-mono overflow-hidden text-ellipsis whitespace-nowrap" title={flow.entrypoint.uri || "/"}>
+      {/* Badges */}
+      <div className="flex items-center gap-0.5 shrink-0">
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge className="text-[8px] px-1 py-0 bg-violet-500/15 text-violet-700 hover:bg-violet-500/25 border-0 cursor-default dark:text-violet-400">
+                {flow.entrypoint.methods.length > 0 ? `${flow.entrypoint.methods.length}M` : "ALL"}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">
+              {flow.entrypoint.methods.length > 0
+                ? flow.entrypoint.methods.join(", ")
+                : "All HTTP methods"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        {flow.policies.length > 0 && (
+          <Badge className="text-[8px] px-1 py-0 bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 border-0 dark:text-amber-400">
+            {flow.policies.length}P
+          </Badge>
+        )}
+        {hasContract(flow.contract) && (
+          <Badge className="text-[8px] px-1 py-0 bg-blue-500/15 text-blue-700 hover:bg-blue-500/25 border-0 dark:text-blue-400">
+            C
+          </Badge>
+        )}
+      </div>
+
+      {/* URI */}
+      <div className="w-0 flex-1 overflow-hidden">
+        {editing ? (
+          <Input
+            autoFocus
+            value={flow.name}
+            onChange={(e) => onRename(e.target.value)}
+            onBlur={() => setEditing(false)}
+            onKeyDown={(e) => e.key === "Enter" && setEditing(false)}
+            className="h-5 text-xs px-1 py-0 border-0 bg-transparent focus-visible:ring-0"
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <p
+            className="text-xs font-mono truncate"
+            title={`${flow.name || "Untitled"} — ${flow.entrypoint.uri || "/"}`}
+            onDoubleClick={(e) => {
+              if (!readOnly) {
+                e.stopPropagation()
+                setEditing(true)
+              }
+            }}
+          >
             {flow.entrypoint.uri || "/"}
           </p>
-          {flow.description && (
-            <p className="text-[10px] text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap" title={flow.description}>
-              {flow.description}
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-0.5 shrink-0">
-          {flow.entrypoint.methods.length > 0 ? (
-            <Badge variant="outline" className="text-[8px] px-1 py-0">
-              {flow.entrypoint.methods.length}M
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-[8px] px-1 py-0">
-              ALL
-            </Badge>
-          )}
-          {flow.policies.length > 0 && (
-            <Badge variant="secondary" className="text-[8px] px-1 py-0">
-              {flow.policies.length}P
-            </Badge>
-          )}
-          {!readOnly && canDelete && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete()
-              }}
-            >
-              <Trash2 className="h-2.5 w-2.5" />
-            </Button>
-          )}
-        </div>
+        )}
       </div>
+
+      {/* Delete */}
+      {!readOnly && canDelete && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive shrink-0"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete()
+          }}
+        >
+          <Trash2 className="h-2.5 w-2.5" />
+        </Button>
+      )}
     </div>
   )
 }
@@ -1796,6 +1895,8 @@ function FlowRouteHeader({
   version,
   onSelectTemplate,
   onClearTemplate,
+  onOpenContract,
+  contractResponseCount,
 }: {
   flow: ApiFlow
   onUpdateFlow: (changes: Partial<ApiFlow>) => void
@@ -1810,6 +1911,8 @@ function FlowRouteHeader({
   version?: string
   onSelectTemplate: (id: string, name: string, plugins: Record<string, unknown>) => void
   onClearTemplate: () => void
+  onOpenContract: () => void
+  contractResponseCount: number
 }) {
   const [optionsOpen, setOptionsOpen] = useState(false)
 
@@ -1866,6 +1969,21 @@ function FlowRouteHeader({
             {flow.policyTemplateName || "Template"}
           </Badge>
         )}
+
+        {/* Contract toggle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0 relative"
+          onClick={onOpenContract}
+        >
+          <ScrollText className={`h-3.5 w-3.5 transition-colors ${contractResponseCount > 0 ? "text-blue-500" : ""}`} />
+          {contractResponseCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-500 text-[8px] font-bold text-white">
+              {contractResponseCount}
+            </span>
+          )}
+        </Button>
 
         {/* Endpoint toggle */}
         <Button

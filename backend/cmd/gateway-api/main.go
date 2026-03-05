@@ -64,7 +64,6 @@ func main() {
 	auditRepo := repository.NewAuditRepository(pool)
 	secretRepo := repository.NewSecretRepository(pool)
 	apiDefRepo := repository.NewApiDefinitionRepository(pool)
-	metricsRepo := repository.NewMetricsRepository(pool)
 	debugLogRepo := repository.NewDebugLogRepository(pool)
 	alertRepo := repository.NewAlertRepository(pool)
 	notifContactRepo := repository.NewNotificationContactRepository(pool)
@@ -92,6 +91,7 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handler.NewAuthHandler(authService, userRepo, auditLogger)
+	profileHandler := handler.NewProfileHandler(userRepo, auditLogger)
 	healthHandler := handler.NewHealthHandler(pool, registry)
 	dashboardHandler := handler.NewDashboardHandler(registry, alertRepo)
 	pluginHandler := handler.NewPluginHandler(registry, auditLogger)
@@ -99,13 +99,18 @@ func main() {
 	secretHandler := handler.NewSecretHandler(secretRepo, cryptoService, auditLogger)
 	apiDefHandler := handler.NewApiDefinitionHandler(apiDefService, auditLogger)
 
+	// Analytics proxy (pluggable backend: PostgreSQL / ClickHouse / Elasticsearch)
+	analyticsProxy := repository.NewAnalyticsProxy(pool, logger)
+	analyticsHandler := handler.NewAnalyticsBackendHandler(analyticsProxy, settingsRepo, auditLogger, logger)
+	analyticsHandler.InitFromSettings(context.Background())
+
 	upstreamHealthHandler := handler.NewUpstreamHealthHandler(registry, apiDefRepo)
-	metricsHandler := handler.NewMetricsHandler(metricsRepo)
+	metricsHandler := handler.NewMetricsHandler(analyticsProxy)
 	aiMetricsRepo := repository.NewAIMetricsRepository(pool)
 	aiMetricsHandler := handler.NewAIMetricsHandler(aiMetricsRepo)
 	alertHandler := handler.NewAlertHandler(alertRepo, auditLogger)
 	alertNotifier := service.NewAlertNotifier(logger)
-	reportGenerator := service.NewReportGenerator(metricsRepo)
+	reportGenerator := service.NewReportGenerator(analyticsProxy)
 	reportHandler := handler.NewReportHandler(reportGenerator)
 	notifContactHandler := handler.NewNotificationContactHandler(notifContactRepo, alertNotifier, auditLogger)
 
@@ -151,9 +156,18 @@ func main() {
 	kafkaConnRepo := repository.NewKafkaConnectionRepository(pool)
 	kafkaHandler := handler.NewKafkaHandler(kafkaConnRepo, auditLogger, logger)
 
+	// Backup & Restore
+	backupService := service.NewBackupService(settingsRepo, registry.Fallback(), cryptoService, logger)
+	backupHandler := handler.NewBackupHandler(backupService, settingsRepo, cryptoService, auditLogger, logger)
+
 	// Environment handler
 	envHandler := handler.NewEnvironmentHandler(envRepo, auditLogger, logger)
 	envHandler.SetRegistry(registry)
+
+	// Tracing (uses analytics proxy for storage)
+	traceCollector := service.NewTraceCollector(&cfg.Tracing, analyticsProxy, logger)
+	systemPolicies := service.NewSystemPolicies(registry.Fallback(), &cfg.Tracing, logger)
+	traceHandler := handler.NewTraceHandler(analyticsProxy, traceCollector, &cfg.Tracing, systemPolicies, settingsRepo, apiDefRepo, logger)
 
 	// Debug / Troubleshooting
 	debugHub := service.NewDebugHub()
@@ -192,6 +206,8 @@ func main() {
 
 	// Internal endpoints (called by APISIX, no auth)
 	r.POST("/internal/debug-logs", debugLogHandler.ReceiveLogs)
+	r.POST("/internal/traces", traceHandler.ReceiveTraces)
+	r.POST("/v1/traces", traceHandler.ReceiveTraces) // OTLP HTTP standard path (APISIX sends here)
 
 	// Auth endpoints (unauthenticated)
 	auth := r.Group("/api/auth")
@@ -229,6 +245,11 @@ func main() {
 	api := r.Group("/api", middleware.RequireAuth(cfg.Auth.JWTSecret), middleware.EnvironmentContext())
 	{
 		api.GET("/auth/me", authHandler.Me)
+		api.PUT("/auth/profile", profileHandler.UpdateProfile)
+		api.POST("/auth/profile/password", profileHandler.ChangePassword)
+		api.POST("/auth/totp/setup", profileHandler.TOTPSetup)
+		api.POST("/auth/totp/enable", profileHandler.TOTPEnable)
+		api.POST("/auth/totp/disable", profileHandler.TOTPDisable)
 
 		// Environments
 		envs := api.Group("/environments")
@@ -240,6 +261,7 @@ func main() {
 			envs.DELETE("/:id", middleware.RequirePermission("environments:write"), envHandler.Delete)
 			envs.POST("/:id/set-default", middleware.RequirePermission("environments:write"), envHandler.SetDefault)
 			envs.POST("/:id/test-connection", middleware.RequirePermission("environments:write"), envHandler.TestConnection)
+			envs.GET("/:id/health", envHandler.GatewayHealth)
 		}
 
 		// Dashboard
@@ -264,6 +286,15 @@ func main() {
 			ai.GET("/metrics/summary", middleware.RequirePermission("ai_metrics:read"), aiMetricsHandler.Summary)
 			ai.GET("/metrics/top-providers", middleware.RequirePermission("ai_metrics:read"), aiMetricsHandler.TopProviders)
 			ai.GET("/metrics/top-models", middleware.RequirePermission("ai_metrics:read"), aiMetricsHandler.TopModels)
+		}
+
+		// Tracing
+		tracing := api.Group("/tracing")
+		{
+			tracing.GET("/traces", middleware.RequirePermission("monitoring:read"), traceHandler.ListTraces)
+			tracing.GET("/traces/:trace_id", middleware.RequirePermission("monitoring:read"), traceHandler.GetTrace)
+			tracing.GET("/status", middleware.RequirePermission("monitoring:read"), traceHandler.GetTracingStatus)
+			tracing.PUT("/settings", middleware.RequirePermission("settings:write"), traceHandler.UpdateTracingSettings)
 		}
 
 		// Debug / Troubleshooting
@@ -371,6 +402,27 @@ func main() {
 		{
 			sysSettings.GET("/:key", middleware.RequirePermission("settings:read"), settingsHandler.Get)
 			sysSettings.PUT("/:key", middleware.RequirePermission("settings:write"), settingsHandler.Update)
+
+			// Analytics backend
+			sysSettings.POST("/clickhouse/test", middleware.RequirePermission("settings:write"), analyticsHandler.TestClickHouse)
+			sysSettings.POST("/elasticsearch/test", middleware.RequirePermission("settings:write"), analyticsHandler.TestElasticsearch)
+			sysSettings.POST("/prometheus/test", middleware.RequirePermission("settings:write"), analyticsHandler.TestPrometheus)
+			sysSettings.POST("/analytics-backend/switch", middleware.RequirePermission("settings:write"), analyticsHandler.SwitchBackend)
+			sysSettings.POST("/trace-backend/switch", middleware.RequirePermission("settings:write"), analyticsHandler.SwitchTraceBackend)
+			sysSettings.POST("/metrics-backend/switch", middleware.RequirePermission("settings:write"), analyticsHandler.SwitchMetricsBackend)
+			sysSettings.GET("/analytics-backend/status", middleware.RequirePermission("settings:read"), analyticsHandler.GetStatus)
+		}
+
+		// Backup & Restore
+		backup := api.Group("/backup")
+		{
+			backup.POST("/configure", middleware.RequirePermission("settings:write"), backupHandler.Configure)
+			backup.GET("/config", middleware.RequirePermission("settings:read"), backupHandler.GetConfig)
+			backup.POST("/test-connection", middleware.RequirePermission("settings:write"), backupHandler.TestConnection)
+			backup.POST("/create", middleware.RequirePermission("settings:write"), backupHandler.Create)
+			backup.GET("/history", middleware.RequirePermission("settings:read"), backupHandler.History)
+			backup.POST("/restore", middleware.RequirePermission("settings:write"), backupHandler.Restore)
+			backup.GET("/restore/:sha/preview", middleware.RequirePermission("settings:read"), backupHandler.PreviewRestore)
 		}
 
 		// OAuth Providers (admin)
@@ -450,6 +502,7 @@ func main() {
 			monitors.GET("/:id", middleware.RequirePermission("testing:read"), syntheticMonitorHandler.Get)
 			monitors.POST("", middleware.RequirePermission("testing:write"), syntheticMonitorHandler.Create)
 			monitors.PUT("/:id", middleware.RequirePermission("testing:write"), syntheticMonitorHandler.Update)
+			monitors.PATCH("/:id", middleware.RequirePermission("testing:write"), syntheticMonitorHandler.Update)
 			monitors.DELETE("/:id", middleware.RequirePermission("testing:write"), syntheticMonitorHandler.Delete)
 		}
 
@@ -499,7 +552,6 @@ func main() {
 	}
 
 	// Ensure platform-level global rules (best-effort, non-blocking)
-	systemPolicies := service.NewSystemPolicies(registry.Fallback(), logger)
 	go func() {
 		if err := systemPolicies.EnsureSystemGlobalRules(context.Background()); err != nil {
 			logger.Warn("system policies init failed", zap.Error(err))
@@ -512,10 +564,20 @@ func main() {
 	bgCtx, bgCancel = context.WithCancel(context.Background())
 
 	if cfg.Metrics.Enabled {
-		metricsScraper := service.NewMetricsScraper(&cfg.Metrics, metricsRepo, registry.Fallback(), logger)
-		metricsRollup := service.NewMetricsRollup(metricsRepo, &cfg.Metrics, logger)
-		go metricsScraper.Start(bgCtx)
-		go metricsRollup.Start(bgCtx)
+		// Route name resolver (shared with scraper and Prometheus backend)
+		routeResolver := service.NewRouteNameResolver(registry.Fallback(), logger)
+		analyticsHandler.SetRouteResolver(routeResolver)
+
+		// Only start the built-in scraper/rollup if metrics backend is NOT external (Prometheus/VM)
+		if !analyticsProxy.IsExternalMetrics() {
+			metricsScraper := service.NewMetricsScraper(&cfg.Metrics, analyticsProxy, registry.Fallback(), logger)
+			metricsRollup := service.NewMetricsRollup(analyticsProxy, &cfg.Metrics, logger)
+			go metricsScraper.Start(bgCtx)
+			go metricsRollup.Start(bgCtx)
+		} else {
+			logger.Info("metrics scraper/rollup skipped — external metrics backend active",
+				zap.String("type", string(analyticsProxy.CurrentMetricsType())))
+		}
 
 		// AI token metrics scraper (shares same Prometheus endpoint)
 		aiRouteResolver := service.NewRouteNameResolver(registry.Fallback(), logger)
@@ -526,26 +588,43 @@ func main() {
 
 	// Start alert evaluator (background)
 	if cfg.Alerts.Enabled {
-		alertEvaluator := service.NewAlertEvaluator(alertRepo, metricsRepo, aiMetricsRepo, alertNotifier, logger, cfg.Alerts.EvalIntervalSec)
+		alertEvaluator := service.NewAlertEvaluator(alertRepo, analyticsProxy, aiMetricsRepo, alertNotifier, logger, cfg.Alerts.EvalIntervalSec)
 		go alertEvaluator.Start(bgCtx)
 	}
 
 	// Start synthetic runner (background)
 	if cfg.Testing.SyntheticEnabled {
-		syntheticRunner := service.NewSyntheticRunner(syntheticMonitorRepo, testSuiteRepo, testRunRepo, testExecutor, logger, cfg.Testing.SyntheticIntervalSec)
+		syntheticRunner := service.NewSyntheticRunner(syntheticMonitorRepo, testSuiteRepo, testRunRepo, notifContactRepo, testExecutor, alertNotifier, logger, cfg.Testing.SyntheticIntervalSec)
 		go syntheticRunner.Start(bgCtx)
 	}
 
 	// Start SLA evaluator (background)
 	if cfg.Testing.SLAEnabled {
-		slaEvaluator := service.NewSLAEvaluator(slaRepo, metricsRepo, logger, cfg.Testing.SLAIntervalSec)
+		slaEvaluator := service.NewSLAEvaluator(slaRepo, analyticsProxy, logger, cfg.Testing.SLAIntervalSec)
 		go slaEvaluator.Start(bgCtx)
+	}
+
+	// Start trace collector and cleanup (background)
+	if cfg.Tracing.Enabled {
+		go traceCollector.Start(bgCtx)
+		traceCleanup := service.NewTraceCleanup(analyticsProxy, &cfg.Tracing, logger)
+		go traceCleanup.Start(bgCtx)
 	}
 
 	// Start debug log cleanup (background)
 	if cfg.Debug.Enabled {
 		debugCleanup := service.NewDebugCleanup(debugLogRepo, &cfg.Debug, logger)
 		go debugCleanup.Start(bgCtx)
+	}
+
+	// Start test run cleanup (background) — default 7 days retention
+	{
+		retentionDays := cfg.Testing.RunRetentionDays
+		if retentionDays <= 0 {
+			retentionDays = 7
+		}
+		testRunCleanup := service.NewTestRunCleanup(testRunRepo, retentionDays, logger)
+		go testRunCleanup.Start(bgCtx)
 	}
 
 	// Start server
@@ -592,3 +671,4 @@ func registerResourceRoutes(group *gin.RouterGroup, path string, h *handler.APIS
 		g.DELETE("/:id", middleware.RequirePermission(permBase+":write"), h.Delete)
 	}
 }
+

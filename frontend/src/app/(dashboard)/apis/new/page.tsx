@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Save, Rocket, FileText, Upload, PenLine, ArrowRight, Globe, Route, X, RotateCcw } from "lucide-react"
+import { Save, Rocket, FileText, Upload, PenLine, ArrowRight, Globe, Route, X, RotateCcw, ScrollText, Network } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -95,12 +95,37 @@ export default function NewApiPage() {
   const [importType, setImportType] = useState<"openapi" | "fuseone" | null>(null)
   const [showRoutingConfig, setShowRoutingConfig] = useState(false)
   const [hasDraft, setHasDraft] = useState(false)
+  const [designFirst, setDesignFirst] = useState(false)
   const initialized = useRef(false)
 
-  // Restore draft on mount
+  // Restore draft on mount + handle query params
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
+
+    // Check for query params
+    const params = new URLSearchParams(window.location.search)
+    const modeParam = params.get("mode")
+    if (modeParam === "design") {
+      setDesignFirst(true)
+      setMode("configure")
+      return
+    }
+    if (modeParam === "import") {
+      fileInputRef.current?.click()
+      return
+    }
+    // Auto-resume only from mindmap (mode=from-mindmap query param)
+    if (modeParam === "from-mindmap") {
+      const draft = loadDraft()
+      if (draft && draft.mode === "editor") {
+        setApiDef(draft.apiDef)
+        setMode("editor")
+        return
+      }
+    }
+
+    // For normal visits, show draft banner but never auto-resume
     const draft = loadDraft()
     if (draft && draft.mode !== "choose") {
       setHasDraft(true)
@@ -166,6 +191,7 @@ export default function NewApiPage() {
 
   const handleStartFromScratch = () => {
     setApiDef(DEFAULT_API)
+    setDesignFirst(false)
     setMode("configure")
   }
 
@@ -284,7 +310,7 @@ export default function NewApiPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 max-w-4xl w-full">
           <button
             onClick={handleStartFromScratch}
             className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-dashed hover:border-primary/50 hover:bg-accent/50 transition-all text-center group"
@@ -296,6 +322,25 @@ export default function NewApiPage() {
               <p className="font-semibold">From Scratch</p>
               <p className="text-xs text-muted-foreground mt-1">
                 Start with a blank API definition
+              </p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => {
+              setApiDef(DEFAULT_API)
+              setMode("configure")
+              setDesignFirst(true)
+            }}
+            className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-dashed hover:border-blue-500/50 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition-all text-center group"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20 transition-colors">
+              <ScrollText className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="font-semibold">Design First</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Start with contracts and auto-generate mocks
               </p>
             </div>
           </button>
@@ -319,13 +364,28 @@ export default function NewApiPage() {
             onClick={() => handleImportClick("fuseone")}
             className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-dashed hover:border-primary/50 hover:bg-accent/50 transition-all text-center group"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20 transition-colors">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20 transition-colors">
               <Upload className="h-6 w-6" />
             </div>
             <div>
               <p className="font-semibold">Import FuseOne</p>
               <p className="text-xs text-muted-foreground mt-1">
                 Import a previously exported definition
+              </p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => router.push("/design/mindmap")}
+            className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-dashed hover:border-purple-500/50 hover:bg-purple-50/50 dark:hover:bg-purple-950/30 transition-all text-center group"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500 group-hover:bg-purple-500/20 transition-colors">
+              <Network className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="font-semibold">API Mindmap</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Visual entities &amp; relationships canvas
               </p>
             </div>
           </button>
@@ -574,6 +634,12 @@ export default function NewApiPage() {
               {apiDef.status}
             </Badge>
           </div>
+          {designFirst && (
+            <Badge variant="outline" className="text-[10px] border-blue-400/50 text-blue-600 bg-blue-500/5">
+              <ScrollText className="h-3 w-3 mr-1" />
+              Design First
+            </Badge>
+          )}
           <Button onClick={() => setShowConfirm(true)} disabled={saving || !canSave}>
             <Save className="mr-2 h-4 w-4" />
             {saving ? "Creating..." : "Create API"}

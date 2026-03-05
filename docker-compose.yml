@@ -28,6 +28,7 @@ services:
     volumes:
       - ./apisix-config.yaml:/usr/local/apisix/conf/config.yaml:ro
       - ./custom-plugins:/opt/custom-plugins:ro
+      - ./custom-plugins/apisix/plugins/opentelemetry.lua:/usr/local/apisix/apisix/plugins/opentelemetry.lua:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9080"]
       interval: 10s
@@ -111,8 +112,76 @@ services:
       timeout: 5s
       retries: 5
 
+  # --- ClickHouse (optional, start with: docker compose --profile clickhouse up) ---
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    profiles: [clickhouse]
+    ports:
+      - "8123:8123"   # HTTP
+      - "9000:9000"   # Native TCP
+    environment:
+      CLICKHOUSE_DB: fuseone_analytics
+      CLICKHOUSE_USER: fuseone
+      CLICKHOUSE_PASSWORD: fuseone
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  # --- Elasticsearch (optional, start with: docker compose --profile elasticsearch up) ---
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    profiles: [elasticsearch]
+    ports:
+      - "9200:9200"
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Prometheus (optional, start with: docker compose --profile prometheus up) ---
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    profiles: [prometheus]
+    ports:
+      - "9099:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   etcd_data:
   pg_data:
   zk_data:
   kafka_data:
+  clickhouse_data:
+  clickhouse_logs:
+  es_data:
+  prometheus_data:

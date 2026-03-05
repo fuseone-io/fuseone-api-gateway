@@ -1,0 +1,60 @@
+
+=================================================================
+  FuseOne API Gateway Platform v{{ .Chart.AppVersion }}
+=================================================================
+
+{{- if .Values.apisix.enabled }}
+
+  APISIX Gateway:
+    Gateway:  kubectl port-forward svc/{{ .Release.Name }}-apisix-gateway 9080:80
+    Admin:    kubectl port-forward svc/{{ .Release.Name }}-apisix-admin 9180:9180
+
+{{- end }}
+
+{{- if .Values.backend.enabled }}
+
+  Backend API:
+    kubectl port-forward svc/{{ include "fuseone.fullname" . }}-backend {{ .Values.backend.service.port }}:{{ .Values.backend.service.port }}
+
+  {{- if .Values.backend.ingress.enabled }}
+    URL: https://{{ .Values.backend.ingress.host }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.frontend.enabled }}
+
+  Frontend Console:
+    kubectl port-forward svc/{{ include "fuseone.fullname" . }}-frontend {{ .Values.frontend.service.port }}:{{ .Values.frontend.service.port }}
+
+  {{- if .Values.frontend.ingress.enabled }}
+    URL: https://{{ .Values.frontend.ingress.host }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.postgresql.enabled }}
+
+  PostgreSQL:
+    kubectl port-forward svc/{{ include "fuseone.fullname" . }}-postgresql 5432:5432
+{{- end }}
+
+{{- if .Values.clickhouse.enabled }}
+
+  ClickHouse Analytics:
+    HTTP: kubectl port-forward svc/{{ include "fuseone.fullname" . }}-clickhouse 8123:8123
+    TCP:  kubectl port-forward svc/{{ include "fuseone.fullname" . }}-clickhouse 9000:9000
+
+    Keeper ({{ .Values.clickhouse.keeper.replicas }} replicas): {{ include "fuseone.fullname" . }}-clickhouse-keeper:9181
+    Cluster: {{ .Values.clickhouse.cluster.shards }} shards x {{ .Values.clickhouse.cluster.replicas }} replicas
+{{- end }}
+
+-----------------------------------------------------------------
+  Deployment Modes:
+    Full Platform  : helm install fuseone charts/fuseone
+    Gateway Only   : helm install fuseone charts/fuseone \
+                       --set backend.enabled=false \
+                       --set frontend.enabled=false \
+                       --set postgresql.enabled=false
+    Console Only   : helm install fuseone charts/fuseone \
+                       --set apisix.enabled=false \
+                       --set backend.config.apisixAdminURL=http://remote-gw:9180
+-----------------------------------------------------------------

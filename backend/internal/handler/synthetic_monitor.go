@@ -23,21 +23,23 @@ func NewSyntheticMonitorHandler(repo repository.SyntheticMonitorQuerier, auditor
 }
 
 type createSyntheticMonitorRequest struct {
-	Name        string    `json:"name" binding:"required"`
-	Description string    `json:"description"`
-	Enabled     *bool     `json:"enabled"`
-	SuiteID     uuid.UUID `json:"suite_id" binding:"required"`
-	IntervalSec int       `json:"interval_sec" binding:"required"`
-	Locations   []string  `json:"locations"`
+	Name             string      `json:"name" binding:"required"`
+	Description      string      `json:"description"`
+	Enabled          *bool       `json:"enabled"`
+	SuiteID          uuid.UUID   `json:"suite_id" binding:"required"`
+	IntervalSec      int         `json:"interval_sec" binding:"required"`
+	Locations        []string    `json:"locations"`
+	NotifyContactIDs []uuid.UUID `json:"notify_contact_ids"`
 }
 
 type updateSyntheticMonitorRequest struct {
-	Name        *string   `json:"name"`
-	Description *string   `json:"description"`
-	Enabled     *bool     `json:"enabled"`
-	SuiteID     *uuid.UUID `json:"suite_id"`
-	IntervalSec *int      `json:"interval_sec"`
-	Locations   []string  `json:"locations"`
+	Name             *string     `json:"name"`
+	Description      *string     `json:"description"`
+	Enabled          *bool       `json:"enabled"`
+	SuiteID          *uuid.UUID  `json:"suite_id"`
+	IntervalSec      *int        `json:"interval_sec"`
+	Locations        []string    `json:"locations"`
+	NotifyContactIDs []uuid.UUID `json:"notify_contact_ids"`
 }
 
 // List returns all synthetic monitors.
@@ -101,17 +103,23 @@ func (h *SyntheticMonitorHandler) Create(c *gin.Context) {
 		createdBy = &uid
 	}
 
+	notifyContactIDs := req.NotifyContactIDs
+	if notifyContactIDs == nil {
+		notifyContactIDs = []uuid.UUID{}
+	}
+
 	monitor := &model.SyntheticMonitor{
-		Name:            req.Name,
-		Description:     req.Description,
-		Enabled:         enabled,
-		SuiteID:         req.SuiteID,
-		IntervalSec:     req.IntervalSec,
-		Locations:       locations,
-		UptimePct:       0,
-		LastStatus:      model.MonitorStatusUnknown,
-		ConsecutiveFail: 0,
-		CreatedBy:       createdBy,
+		Name:             req.Name,
+		Description:      req.Description,
+		Enabled:          enabled,
+		SuiteID:          req.SuiteID,
+		IntervalSec:      req.IntervalSec,
+		Locations:        locations,
+		NotifyContactIDs: notifyContactIDs,
+		UptimePct:        0,
+		LastStatus:       model.MonitorStatusUnknown,
+		ConsecutiveFail:  0,
+		CreatedBy:        createdBy,
 	}
 
 	if err := h.repo.Create(c.Request.Context(), monitor); err != nil {
@@ -170,6 +178,9 @@ func (h *SyntheticMonitorHandler) Update(c *gin.Context) {
 	}
 	if req.Locations != nil {
 		existing.Locations = req.Locations
+	}
+	if req.NotifyContactIDs != nil {
+		existing.NotifyContactIDs = req.NotifyContactIDs
 	}
 
 	if err := h.repo.Update(c.Request.Context(), existing); err != nil {

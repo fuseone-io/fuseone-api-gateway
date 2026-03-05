@@ -1,0 +1,88 @@
+# =============================================================================
+# Production Values
+# Full platform with recommended production settings
+# =============================================================================
+
+backend:
+  replicas: 3
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+  ingress:
+    enabled: true
+    className: nginx
+    host: api.fuseone.example.com
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    tls:
+      - secretName: api-fuseone-tls
+        hosts:
+          - api.fuseone.example.com
+  secrets:
+    dbPassword: ""      # CHANGE THIS
+    jwtSecret: ""       # CHANGE THIS
+    apisixApiKey: ""    # CHANGE THIS
+
+frontend:
+  replicas: 3
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  ingress:
+    enabled: true
+    className: nginx
+    host: console.fuseone.example.com
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    tls:
+      - secretName: console-fuseone-tls
+        hosts:
+          - console.fuseone.example.com
+
+postgresql:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2
+      memory: 2Gi
+  persistence:
+    size: 50Gi
+
+apisix:
+  apisix:
+    replicaCount: 3
+  service:
+    type: LoadBalancer
+  etcd:
+    replicaCount: 3
+
+clickhouse:
+  enabled: true
+  keeper:
+    replicas: 3
+    persistence:
+      size: 20Gi
+  cluster:
+    shards: 2
+    replicas: 2
+    storage:
+      size: 100Gi
+    resources:
+      requests:
+        cpu: 1
+        memory: 2Gi
+      limits:
+        cpu: 4
+        memory: 8Gi
+  auth:
+    password: ""  # CHANGE THIS

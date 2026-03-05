@@ -1,0 +1,28 @@
+# =============================================================================
+# Gateway Only Mode
+# Deploy only APISIX + etcd (no management console)
+# Useful when using a centralized console to manage multiple gateways
+# =============================================================================
+
+backend:
+  enabled: false
+
+frontend:
+  enabled: false
+
+postgresql:
+  enabled: false
+
+migrations:
+  enabled: false
+
+apisix:
+  enabled: true
+  service:
+    type: LoadBalancer
+  etcd:
+    enabled: true
+    replicaCount: 3
+
+clickhouse:
+  enabled: false

@@ -8,6 +8,7 @@ import {
   Bug,
   ChevronLeft,
   ChevronRight,
+  Clock,
   ExternalLink,
   Filter,
   Radio,
@@ -29,9 +30,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
@@ -48,7 +51,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { api } from "@/lib/api-client"
 import {
-  statusBadgeVariant,
+  statusBadgeClass,
   methodColor,
   formatLatency,
   formatTime,
@@ -62,64 +65,130 @@ import { toast } from "sonner"
 const PAGE_SIZE = 30
 const POLL_INTERVAL = 3_000
 
+/* ─── Detail Sheet (matches API debug page exactly) ─── */
+
+function SummaryCell({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
+      <p className={`text-sm truncate ${mono ? "font-mono" : ""}`} title={value}>{value}</p>
+    </div>
+  )
+}
+
+const headerVariants = {
+  request: "border-blue-200/50 dark:border-blue-900/30",
+  response: "border-emerald-200/50 dark:border-emerald-900/30",
+} as const
+
+const headerRowVariants = {
+  request: "even:bg-blue-50/50 dark:even:bg-blue-950/15",
+  response: "even:bg-emerald-50/50 dark:even:bg-emerald-950/15",
+} as const
+
+function CollapsibleHeaders({ title, variant, headers, defaultOpen }: { title: string; variant: "request" | "response"; headers: Record<string, string>; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen ?? false)
+  const entries = Object.entries(headers).sort(([a], [b]) => a.localeCompare(b))
+
+  return (
+    <div>
+      <button
+        type="button"
+        className="flex items-center gap-2 w-full text-left group"
+        onClick={() => setOpen(!open)}
+      >
+        <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
+        <h4 className="text-sm font-medium">{title}</h4>
+        <Badge variant="outline" className="text-[10px]">{entries.length}</Badge>
+        <span className="text-xs text-muted-foreground ml-auto group-hover:text-foreground">
+          {open ? "Collapse" : "Expand"}
+        </span>
+      </button>
+      {open && (
+        <div className={`mt-2 rounded-md border overflow-hidden ${headerVariants[variant]}`}>
+          {entries.map(([key, value]) => (
+            <div key={key} className={`flex text-xs ${headerRowVariants[variant]}`}>
+              <span className="w-[40%] shrink-0 px-3 py-1.5 font-mono font-medium text-muted-foreground truncate" title={key}>
+                {key}
+              </span>
+              <span className="flex-1 px-3 py-1.5 font-mono break-all border-l border-inherit">
+                {value}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const codeVariants = {
+  request: "bg-blue-50/70 border-blue-200/50 dark:bg-blue-950/20 dark:border-blue-900/30",
+  response: "bg-emerald-50/70 border-emerald-200/50 dark:bg-emerald-950/20 dark:border-emerald-900/30",
+  default: "bg-muted/50 border",
+} as const
+
+function CollapsibleCode({ title, badge, defaultOpen, variant = "default", children }: { title: string; badge?: string; defaultOpen?: boolean; variant?: keyof typeof codeVariants; children: string }) {
+  const [open, setOpen] = useState(defaultOpen ?? false)
+
+  return (
+    <div>
+      <button
+        type="button"
+        className="flex items-center gap-2 w-full text-left group"
+        onClick={() => setOpen(!open)}
+      >
+        <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
+        <h4 className="text-sm font-medium">{title}</h4>
+        {badge && <Badge variant="outline" className="text-[10px]">{badge}</Badge>}
+        <span className="text-xs text-muted-foreground ml-auto group-hover:text-foreground">
+          {open ? "Collapse" : "Expand"}
+        </span>
+      </button>
+      {open && (
+        <pre className={`mt-2 text-xs rounded-md p-3 overflow-x-auto max-h-72 whitespace-pre-wrap border ${codeVariants[variant]}`}>
+          {children}
+        </pre>
+      )}
+    </div>
+  )
+}
+
 function LogDetailSheet({ log, open, onClose, apis }: { log: DebugLog | null; open: boolean; onClose: () => void; apis: ApiDefRecord[] }) {
   if (!log) return null
 
   const apiName = apis.find((a) => a.apisix_route_ids?.includes(log.route_id))?.name
   const apiRecord = apis.find((a) => a.apisix_route_ids?.includes(log.route_id))
 
-  const sections = [
-    {
-      title: "Request",
-      items: [
-        { label: "Method", value: log.req_method },
-        { label: "URI", value: log.req_uri },
-        { label: "Client IP", value: log.client_ip },
-        { label: "Size", value: formatSize(log.req_size) },
-      ],
-    },
-    {
-      title: "Response",
-      items: [
-        { label: "Status", value: String(log.resp_status) },
-        { label: "Size", value: formatSize(log.resp_size) },
-        { label: "Upstream", value: log.upstream_addr || "-" },
-      ],
-    },
-    {
-      title: "Latency",
-      items: [
-        { label: "Total", value: formatLatency(log.latency_total) },
-        { label: "Upstream", value: log.latency_upstream != null ? formatLatency(log.latency_upstream) : "-" },
-        { label: "Gateway", value: log.latency_gateway != null ? formatLatency(log.latency_gateway) : "-" },
-      ],
-    },
-  ]
-
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="w-full sm:max-w-xl flex flex-col">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <span className={`font-mono font-bold ${methodColor(log.req_method)}`}>{log.req_method}</span>
-            <span className="font-mono text-sm truncate">{log.req_uri}</span>
-            <Badge variant={statusBadgeVariant(log.resp_status)} className="ml-auto shrink-0">
+      <SheetContent className="data-[side=right]:sm:max-w-[50vw] flex flex-col gap-0 p-0">
+        {/* Header */}
+        <SheetHeader className="px-6 pr-12 py-4 border-b">
+          <SheetTitle className="flex items-center gap-2 text-base">
+            <span className={`font-mono font-bold ${methodColor(log.req_method)}`}>
+              {log.req_method}
+            </span>
+            <span className="font-mono text-sm truncate flex-1">{log.req_uri}</span>
+            <Badge variant="outline" className={`shrink-0 font-mono text-[11px] ${statusBadgeClass(log.resp_status)}`}>
               {log.resp_status}
             </Badge>
           </SheetTitle>
+          <SheetDescription className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {formatTime(log.request_time)}
+            </span>
+            {apiName && <span>API: <span className="font-medium text-foreground">{apiName}</span></span>}
+            <span>Route: <span className="font-mono">{log.route_id}</span></span>
+            {log.service_id && <span>Service: <span className="font-mono">{log.service_id}</span></span>}
+            {log.consumer_name && <span>Application: <span className="font-mono">{log.consumer_name}</span></span>}
+          </SheetDescription>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 min-h-0 mt-4">
-          <div className="space-y-6 pr-4">
-            {/* Meta */}
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              {apiName && <span>API: <span className="font-medium text-foreground">{apiName}</span></span>}
-              <span>Route: <span className="font-mono">{log.route_id}</span></span>
-              {log.service_id && <span>Service: <span className="font-mono">{log.service_id}</span></span>}
-              {log.consumer_name && <span>Consumer: <span className="font-mono">{log.consumer_name}</span></span>}
-              <span>{formatTime(log.request_time)}</span>
-            </div>
-
+        {/* Content */}
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="p-6 space-y-6">
             {apiRecord && (
               <Link
                 href={`/apis/${apiRecord.id}/debug`}
@@ -131,60 +200,56 @@ function LogDetailSheet({ log, open, onClose, apis }: { log: DebugLog | null; op
               </Link>
             )}
 
-            {sections.map((section) => (
-              <div key={section.title}>
-                <h4 className="text-sm font-semibold mb-2">{section.title}</h4>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                  {section.items.map((item) => (
-                    <div key={item.label} className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{item.label}</span>
-                      <span className="font-mono">{item.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+            {/* Summary grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <SummaryCell label="Client IP" value={log.client_ip || "-"} mono />
+              <SummaryCell label="Upstream" value={log.upstream_addr || "-"} mono />
+              <SummaryCell label="Req Size" value={formatSize(log.req_size)} />
+              <SummaryCell label="Resp Size" value={formatSize(log.resp_size)} />
+            </div>
 
+            {/* Latency bar */}
+            <div className="flex items-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Total</span>
+                <span className="font-mono font-semibold">{formatLatency(log.latency_total)}</span>
+              </div>
+              <Separator orientation="vertical" className="h-4" />
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Upstream</span>
+                <span className="font-mono">{log.latency_upstream != null ? formatLatency(log.latency_upstream) : "-"}</span>
+              </div>
+              <Separator orientation="vertical" className="h-4" />
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Gateway</span>
+                <span className="font-mono">{log.latency_gateway != null ? formatLatency(log.latency_gateway) : "-"}</span>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Request Headers */}
             {log.req_headers && Object.keys(log.req_headers).length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold mb-2">Request Headers</h4>
-                <pre className="text-xs bg-muted/50 rounded-md p-3 overflow-x-auto max-h-48">
-                  {JSON.stringify(log.req_headers, null, 2)}
-                </pre>
-              </div>
+              <CollapsibleHeaders title="Request Headers" variant="request" headers={log.req_headers} defaultOpen />
             )}
 
+            {/* Request Body */}
             {log.req_body && (
-              <div>
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                  Request Body
-                  <Badge variant="outline" className="text-[10px]">Debug Mode</Badge>
-                </h4>
-                <pre className="text-xs bg-muted/50 rounded-md p-3 overflow-x-auto max-h-64 whitespace-pre-wrap">
-                  {tryFormatJSON(log.req_body)}
-                </pre>
-              </div>
+              <CollapsibleCode title="Request Body" variant="request" badge="Debug Mode">
+                {tryFormatJSON(log.req_body)}
+              </CollapsibleCode>
             )}
 
+            {/* Response Headers */}
             {log.resp_headers && Object.keys(log.resp_headers).length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold mb-2">Response Headers</h4>
-                <pre className="text-xs bg-muted/50 rounded-md p-3 overflow-x-auto max-h-48">
-                  {JSON.stringify(log.resp_headers, null, 2)}
-                </pre>
-              </div>
+              <CollapsibleHeaders title="Response Headers" variant="response" headers={log.resp_headers} defaultOpen />
             )}
 
+            {/* Response Body */}
             {log.resp_body && (
-              <div>
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                  Response Body
-                  <Badge variant="outline" className="text-[10px]">Debug Mode</Badge>
-                </h4>
-                <pre className="text-xs bg-muted/50 rounded-md p-3 overflow-x-auto max-h-64 whitespace-pre-wrap">
-                  {tryFormatJSON(log.resp_body)}
-                </pre>
-              </div>
+              <CollapsibleCode title="Response Body" variant="response" badge="Debug Mode">
+                {tryFormatJSON(log.resp_body)}
+              </CollapsibleCode>
             )}
           </div>
         </ScrollArea>
@@ -446,7 +511,7 @@ export function TroubleshootingTab() {
                       {log.req_uri}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={statusBadgeVariant(log.resp_status)} className="font-mono text-xs">
+                      <Badge variant="outline" className={`font-mono text-[11px] ${statusBadgeClass(log.resp_status)}`}>
                         {log.resp_status}
                       </Badge>
                     </TableCell>

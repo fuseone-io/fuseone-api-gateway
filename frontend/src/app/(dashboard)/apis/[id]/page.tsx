@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowRightLeft, BarChart3, Bug, Eye, Heart, Save, Rocket, Clock, Download, Copy, AlertTriangle, Ban, Globe, Route, X, PenLine, Users, Store } from "lucide-react"
+import { Activity, ArrowRightLeft, BarChart3, Bug, Eye, Heart, Save, Rocket, Clock, Download, Copy, AlertTriangle, Ban, Globe, Route, X, PenLine, Users, Store, MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -14,6 +14,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -52,6 +53,7 @@ import { exportAsFuseOneJson, exportAsOpenAPIYaml } from "@/lib/openapi-converte
 import type { ApiDefinition, ApiDefRecord, ApiDeployment, LifecycleStatus, RoutingMode } from "@/types/api"
 import { api } from "@/lib/api-client"
 import { useEnvironmentStore } from "@/stores/environment-store"
+import { useSidebar } from "@/components/ui/sidebar"
 import {
   Tooltip,
   TooltipContent,
@@ -81,6 +83,7 @@ export default function ApiDetailPage() {
   const [showRetireDialog, setShowRetireDialog] = useState(false)
   const [sunsetDate, setSunsetDate] = useState("")
   const [showRoutingConfig, setShowRoutingConfig] = useState(false)
+  const [showProperties, setShowProperties] = useState(false)
   const [deployments, setDeployments] = useState<ApiDeployment[]>([])
   const [showPortalDialog, setShowPortalDialog] = useState(false)
   const [portalVisible, setPortalVisible] = useState(false)
@@ -89,6 +92,19 @@ export default function ApiDetailPage() {
   const [savingPortal, setSavingPortal] = useState(false)
   const savedSnapshot = useRef<string>("")
   const { environments, fetchEnvironments } = useEnvironmentStore()
+  const { open: sidebarOpen, setOpen: setSidebarOpen } = useSidebar()
+  const prevSidebarState = useRef<boolean | null>(null)
+
+  // Auto-collapse sidebar when entering the flow editor, restore on leave
+  useEffect(() => {
+    prevSidebarState.current = sidebarOpen
+    setSidebarOpen(false)
+    return () => {
+      if (prevSidebarState.current !== null) {
+        setSidebarOpen(prevSidebarState.current)
+      }
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchEnvironments()
@@ -370,97 +386,7 @@ export default function ApiDetailPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Version selector */}
-          {versions.length > 1 ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 text-[10px] font-mono gap-1">
-                  {record.version}
-                  <span className="text-muted-foreground">({versions.length})</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {versions.map((v) => {
-                  const vlc = LIFECYCLE_BADGE[v.lifecycle_status] || LIFECYCLE_BADGE.draft
-                  return (
-                    <DropdownMenuItem
-                      key={v.id}
-                      onClick={() => { if (v.id !== record.id) router.push(`/apis/${v.id}`) }}
-                      className={v.id === record.id ? "bg-accent" : ""}
-                    >
-                      <span className="font-mono mr-2">{v.version}</span>
-                      <Badge variant="outline" className={`text-[9px] ${vlc.className}`}>{vlc.label}</Badge>
-                      {v.id === record.id && <span className="ml-auto text-xs text-muted-foreground">(current)</span>}
-                    </DropdownMenuItem>
-                  )
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Badge variant="outline" className="text-[10px] font-mono h-7">
-              {record.version}
-            </Badge>
-          )}
-
-          {/* Lifecycle badge (hidden when draft to avoid duplicate with sync badge) */}
-          {record.lifecycle_status !== "draft" && (
-            <Badge variant="outline" className={`text-[10px] ${lifecycleBadge.className}`}>
-              {lifecycleBadge.label}
-            </Badge>
-          )}
-
-          {/* Properties popover */}
-          {!isRetired && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] hover:bg-accent transition-colors">
-                  <PenLine className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-muted-foreground">Properties</span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-80 space-y-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Name</Label>
-                  <Input
-                    value={apiDef.name}
-                    onChange={(e) => setApiDef({ ...apiDef, name: e.target.value })}
-                    placeholder="API name"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Description</Label>
-                  <Input
-                    value={apiDef.description}
-                    onChange={(e) => setApiDef({ ...apiDef, description: e.target.value })}
-                    placeholder="Description..."
-                  />
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
-
-          {/* Routing config */}
-          {!isRetired && (
-            <button
-              onClick={() => setShowRoutingConfig(true)}
-              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] hover:bg-accent transition-colors"
-            >
-              <Globe className="h-3 w-3 text-muted-foreground" />
-              {apiDef.context_path && (
-                <span className="font-mono">{apiDef.context_path}</span>
-              )}
-              {apiDef.hosts && apiDef.hosts.length > 0 && (
-                <span className="font-mono text-blue-500">
-                  {apiDef.hosts.length === 1 ? apiDef.hosts[0] : `${apiDef.hosts.length} hosts`}
-                </span>
-              )}
-              {!apiDef.context_path && (!apiDef.hosts || apiDef.hosts.length === 0) && (
-                <span className="text-muted-foreground">Routing</span>
-              )}
-            </button>
-          )}
-
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* Deployed timestamp */}
           {record.deployed_at && (
             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
@@ -499,9 +425,55 @@ export default function ApiDetailPage() {
             </TooltipProvider>
           )}
 
+          {/* Lifecycle badge */}
+          {record.lifecycle_status !== "draft" && (
+            <Badge variant="outline" className={`text-[10px] ${lifecycleBadge.className}`}>
+              {lifecycleBadge.label}
+            </Badge>
+          )}
+
+          <div className="w-px h-4 bg-border shrink-0" />
+
+          {/* Version selector */}
+          {versions.length > 1 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] font-mono hover:bg-accent transition-colors">
+                  {record.version}
+                  <span className="text-muted-foreground">({versions.length})</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {versions.map((v) => {
+                  const vlc = LIFECYCLE_BADGE[v.lifecycle_status] || LIFECYCLE_BADGE.draft
+                  return (
+                    <DropdownMenuItem
+                      key={v.id}
+                      onClick={() => { if (v.id !== record.id) router.push(`/apis/${v.id}`) }}
+                      className={v.id === record.id ? "bg-accent" : ""}
+                    >
+                      <span className="font-mono mr-2">{v.version}</span>
+                      <Badge variant="outline" className={`text-[9px] ${vlc.className}`}>{vlc.label}</Badge>
+                      {v.id === record.id && <span className="ml-auto text-xs text-muted-foreground">(current)</span>}
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Badge variant="outline" className="text-[10px] font-mono">
+              {record.version}
+            </Badge>
+          )}
+
+          {/* Flows count */}
+          <Badge variant="outline" className="text-[10px]">
+            {apiDef.flows.length} {apiDef.flows.length === 1 ? "flow" : "flows"}
+          </Badge>
+
           {/* Status toggle */}
           {!isRetired && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               <Switch
                 checked={apiDef.status === "enabled"}
                 onCheckedChange={(checked) =>
@@ -515,29 +487,214 @@ export default function ApiDetailPage() {
             </div>
           )}
 
-          {apiDef.flows.length > 1 && (
-            <Badge variant="outline" className="text-[10px]">
-              {apiDef.flows.length} flows
-            </Badge>
-          )}
+          <div className="w-px h-4 bg-border shrink-0" />
 
-          {/* Portal settings */}
+          {/* Properties popover (controlled — triggered from expanded buttons or condensed menu) */}
           {!isRetired && (
-            <Button variant="outline" size="sm" className="h-8" onClick={openPortalDialog}>
-              <Store className="mr-1.5 h-3.5 w-3.5" />
-              Portal
-            </Button>
+            <Popover open={showProperties} onOpenChange={setShowProperties}>
+              <PopoverTrigger asChild>
+                <button className="hidden xl:flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] hover:bg-accent transition-colors">
+                  <PenLine className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-muted-foreground">Properties</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Name</Label>
+                  <Input
+                    value={apiDef.name}
+                    onChange={(e) => setApiDef({ ...apiDef, name: e.target.value })}
+                    placeholder="API name"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Description</Label>
+                  <Input
+                    value={apiDef.description}
+                    onChange={(e) => setApiDef({ ...apiDef, description: e.target.value })}
+                    placeholder="Description..."
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
           )}
 
-          {/* Observe */}
+          {/* Expanded action buttons — visible on wide screens */}
+          <div className="hidden xl:flex items-center gap-1.5">
+            {/* Routing config */}
+            {!isRetired && (
+              <button
+                onClick={() => setShowRoutingConfig(true)}
+                className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] hover:bg-accent transition-colors"
+              >
+                <Globe className="h-3 w-3 text-muted-foreground" />
+                {apiDef.context_path && (
+                  <span className="font-mono">{apiDef.context_path}</span>
+                )}
+                {apiDef.hosts && apiDef.hosts.length > 0 && (
+                  <span className="font-mono text-blue-500">
+                    {apiDef.hosts.length === 1 ? apiDef.hosts[0] : `${apiDef.hosts.length} hosts`}
+                  </span>
+                )}
+                {!apiDef.context_path && (!apiDef.hosts || apiDef.hosts.length === 0) && (
+                  <span className="text-muted-foreground">Routing</span>
+                )}
+              </button>
+            )}
+
+            {/* Portal settings */}
+            {!isRetired && (
+              <button
+                onClick={openPortalDialog}
+                className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] hover:bg-accent transition-colors"
+              >
+                <Store className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Portal</span>
+              </button>
+            )}
+
+            {/* Observe */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] hover:bg-accent transition-colors">
+                  <Eye className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-muted-foreground">Observe</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => router.push(`/apis/${id}/analytics`)}>
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Analytics
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push(`/apis/${id}/health`)}>
+                  <Heart className="mr-2 h-4 w-4" />
+                  Upstream Health
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push(`/apis/${id}/traces`)}>
+                  <Activity className="mr-2 h-4 w-4" />
+                  Traces
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push(`/apis/${id}/debug`)}>
+                  <Bug className="mr-2 h-4 w-4" />
+                  Debug Logs
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push(`/apis/${id}/subscriptions`)}>
+                  <Users className="mr-2 h-4 w-4" />
+                  Subscribers
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Promote to... */}
+            {environments.length > 1 && hasBeenDeployed && !isRetired && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] hover:bg-accent transition-colors">
+                    <ArrowRightLeft className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">Promote</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {environments
+                    .filter((env) => {
+                      const activeId = useEnvironmentStore.getState().activeEnvironmentId
+                      const sourceId = activeId || environments.find((e) => e.is_default)?.id
+                      return env.id !== sourceId
+                    })
+                    .map((env) => (
+                      <DropdownMenuItem key={env.id} onClick={() => handlePromote(env.id)}>
+                        <span
+                          className="h-2.5 w-2.5 rounded-full shrink-0 mr-2"
+                          style={{ backgroundColor: env.color }}
+                        />
+                        Promote to {env.name}
+                      </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* Export / Clone */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] hover:bg-accent transition-colors">
+                  <Download className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-muted-foreground">Export</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleClone}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Clone API
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => exportAsFuseOneJson(apiDef)}>
+                  Export FuseOne JSON
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportAsOpenAPIYaml(apiDef)}>
+                  Export OpenAPI YAML
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Lifecycle actions */}
+            {record.lifecycle_status === "active" && (
+              <button
+                onClick={() => setShowDeprecateDialog(true)}
+                className="flex items-center gap-1.5 rounded-md border border-amber-500/30 px-2.5 py-1 text-[10px] text-amber-600 hover:bg-amber-500/10 transition-colors"
+              >
+                <AlertTriangle className="h-3 w-3" />
+                <span>Deprecate</span>
+              </button>
+            )}
+            {record.lifecycle_status === "deprecated" && (
+              <>
+                <button
+                  onClick={handleUndeprecate}
+                  className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] hover:bg-accent transition-colors"
+                >
+                  <span className="text-muted-foreground">Reactivate</span>
+                </button>
+                <button
+                  onClick={() => setShowRetireDialog(true)}
+                  className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-2.5 py-1 text-[10px] text-red-600 hover:bg-red-500/10 transition-colors"
+                >
+                  <Ban className="h-3 w-3" />
+                  <span>Retire</span>
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Condensed actions dropdown — visible on narrow screens */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8">
-                <Eye className="mr-1.5 h-3.5 w-3.5" />
-                Observe
-              </Button>
+              <button className="xl:hidden flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] hover:bg-accent transition-colors">
+                <MoreHorizontal className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Actions</span>
+              </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="min-w-52">
+              {!isRetired && (
+                <>
+                  <DropdownMenuItem onClick={() => setShowProperties(true)}>
+                    <PenLine className="mr-2 h-4 w-4" />
+                    Properties
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowRoutingConfig(true)}>
+                    <Globe className="mr-2 h-4 w-4" />
+                    Routing
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={openPortalDialog}>
+                    <Store className="mr-2 h-4 w-4" />
+                    Portal
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Observe</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => router.push(`/apis/${id}/analytics`)}>
                 <BarChart3 className="mr-2 h-4 w-4" />
                 Analytics
@@ -546,113 +703,110 @@ export default function ApiDetailPage() {
                 <Heart className="mr-2 h-4 w-4" />
                 Upstream Health
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push(`/apis/${id}/traces`)}>
+                <Activity className="mr-2 h-4 w-4" />
+                Traces
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push(`/apis/${id}/debug`)}>
                 <Bug className="mr-2 h-4 w-4" />
                 Debug Logs
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => router.push(`/apis/${id}/subscriptions`)}>
                 <Users className="mr-2 h-4 w-4" />
                 Subscribers
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Promote to... */}
-          {environments.length > 1 && hasBeenDeployed && !isRetired && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8">
-                  <ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" />
-                  Promote
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {environments
-                  .filter((env) => {
-                    const activeId = useEnvironmentStore.getState().activeEnvironmentId
-                    const sourceId = activeId || environments.find((e) => e.is_default)?.id
-                    return env.id !== sourceId
-                  })
-                  .map((env) => (
-                    <DropdownMenuItem key={env.id} onClick={() => handlePromote(env.id)}>
-                      <span
-                        className="h-2.5 w-2.5 rounded-full shrink-0 mr-2"
-                        style={{ backgroundColor: env.color }}
-                      />
-                      Promote to {env.name}
-                    </DropdownMenuItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-
-          {/* More actions */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <Download className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+              {environments.length > 1 && hasBeenDeployed && !isRetired && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">Promote</DropdownMenuLabel>
+                  {environments
+                    .filter((env) => {
+                      const activeId = useEnvironmentStore.getState().activeEnvironmentId
+                      const sourceId = activeId || environments.find((e) => e.is_default)?.id
+                      return env.id !== sourceId
+                    })
+                    .map((env) => (
+                      <DropdownMenuItem key={env.id} onClick={() => handlePromote(env.id)}>
+                        <span
+                          className="h-2.5 w-2.5 rounded-full shrink-0 mr-2"
+                          style={{ backgroundColor: env.color }}
+                        />
+                        Promote to {env.name}
+                      </DropdownMenuItem>
+                    ))}
+                </>
+              )}
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleClone}>
                 <Copy className="mr-2 h-4 w-4" />
                 Clone API
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => exportAsFuseOneJson(apiDef)}>
+                <Download className="mr-2 h-4 w-4" />
                 Export FuseOne JSON
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => exportAsOpenAPIYaml(apiDef)}>
+                <Download className="mr-2 h-4 w-4" />
                 Export OpenAPI YAML
               </DropdownMenuItem>
+              {record.lifecycle_status === "active" && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowDeprecateDialog(true)} className="text-amber-600">
+                    <AlertTriangle className="mr-2 h-4 w-4" />
+                    Deprecate
+                  </DropdownMenuItem>
+                </>
+              )}
+              {record.lifecycle_status === "deprecated" && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleUndeprecate}>
+                    Reactivate
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowRetireDialog(true)} className="text-red-600">
+                    <Ban className="mr-2 h-4 w-4" />
+                    Retire
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Lifecycle actions */}
-          {record.lifecycle_status === "active" && (
-            <Button variant="outline" size="sm" onClick={() => setShowDeprecateDialog(true)} className="h-8">
-              <AlertTriangle className="mr-1.5 h-3.5 w-3.5" />
-              Deprecate
-            </Button>
-          )}
-          {record.lifecycle_status === "deprecated" && (
-            <>
-              <Button variant="outline" size="sm" onClick={handleUndeprecate} className="h-8">
-                Reactivate
-              </Button>
-              <Button variant="destructive" size="sm" onClick={() => setShowRetireDialog(true)} className="h-8">
-                <Ban className="mr-1.5 h-3.5 w-3.5" />
-                Retire
-              </Button>
-            </>
-          )}
+          <div className="w-px h-4 bg-border shrink-0" />
 
-          {/* Save / Apply */}
+          {/* Save / Deploy / Apply */}
           {!isRetired && (
-            <Button variant="outline" onClick={handleSave} disabled={saving}>
-              <Save className="mr-2 h-4 w-4" />
-              {saving ? "Saving..." : "Save"}
-            </Button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] hover:bg-accent transition-colors disabled:opacity-50"
+            >
+              <Save className="h-3 w-3 text-muted-foreground" />
+              <span className="text-muted-foreground">{saving ? "Saving..." : "Save"}</span>
+            </button>
           )}
 
           {!isRetired && !hasBeenDeployed && (
-            <Button onClick={handleDeploy} disabled={deploying || saving}>
-              <Rocket className="mr-2 h-4 w-4" />
-              {deploying ? "Deploying..." : "Deploy"}
-            </Button>
+            <button
+              onClick={handleDeploy}
+              disabled={deploying || saving}
+              className="flex items-center gap-1.5 rounded-md border border-primary bg-primary text-primary-foreground px-2.5 py-1 text-[10px] hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <Rocket className="h-3 w-3" />
+              <span>{deploying ? "Deploying..." : "Deploy"}</span>
+            </button>
           )}
 
           {!isRetired && needsApply && (
-            <Button
+            <button
               onClick={handleDeploy}
               disabled={deploying || saving}
-              className="bg-amber-600 hover:bg-amber-700 text-white"
+              className="flex items-center gap-1.5 rounded-md border border-amber-600 bg-amber-600 text-white px-2.5 py-1 text-[10px] hover:bg-amber-700 transition-colors disabled:opacity-50"
             >
-              <Rocket className="mr-2 h-4 w-4" />
-              {deploying ? "Applying..." : "Apply"}
-            </Button>
+              <Rocket className="h-3 w-3" />
+              <span>{deploying ? "Applying..." : "Apply"}</span>
+            </button>
           )}
         </div>
       </div>

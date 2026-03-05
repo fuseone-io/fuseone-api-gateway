@@ -393,13 +393,15 @@ function EnumField({
   onChange: (value: unknown) => void
   readOnly: boolean
 }) {
-  const currentValue = (value as string) ?? (field.defaultValue as string) ?? ""
+  const EMPTY_SENTINEL = "__none__"
+  const rawValue = (value as string) ?? (field.defaultValue as string) ?? ""
+  const currentValue = rawValue === "" ? EMPTY_SENTINEL : rawValue
 
   return (
     <FieldWrapper label={field.label} required={field.required} description={field.description}>
       <Select
         value={currentValue}
-        onValueChange={(v) => onChange(v || undefined)}
+        onValueChange={(v) => onChange(v === EMPTY_SENTINEL ? undefined : v)}
         disabled={readOnly}
       >
         <SelectTrigger className="h-7 text-xs">
@@ -407,7 +409,7 @@ function EnumField({
         </SelectTrigger>
         <SelectContent>
           {field.options?.map((opt) => (
-            <SelectItem key={opt.value} value={opt.value} className="text-xs">
+            <SelectItem key={opt.value || EMPTY_SENTINEL} value={opt.value || EMPTY_SENTINEL} className="text-xs">
               {opt.label}
             </SelectItem>
           ))}

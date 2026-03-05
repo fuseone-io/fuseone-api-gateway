@@ -59,6 +59,16 @@ interface TestingState {
     suite_id: string
     interval_sec: number
     locations: string[]
+    notify_contact_ids?: string[]
+  }) => Promise<SyntheticMonitor>
+  updateMonitor: (id: string, data: {
+    name?: string
+    description?: string
+    suite_id?: string
+    interval_sec?: number
+    locations?: string[]
+    notify_contact_ids?: string[]
+    enabled?: boolean
   }) => Promise<SyntheticMonitor>
   toggleMonitor: (id: string, enabled: boolean) => Promise<void>
   deleteMonitor: (id: string) => Promise<void>
@@ -150,6 +160,12 @@ export const useTestingStore = create<TestingState>((set, get) => ({
   createMonitor: async (data) => {
     const monitor = await api.createSyntheticMonitor(data)
     set({ monitors: [...get().monitors, monitor] })
+    return monitor
+  },
+
+  updateMonitor: async (id, data) => {
+    const monitor = await api.updateSyntheticMonitor(id, data)
+    set({ monitors: get().monitors.map((m) => (m.id === id ? monitor : m)) })
     return monitor
   },
 

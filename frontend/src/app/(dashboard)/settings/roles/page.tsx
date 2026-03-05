@@ -9,10 +9,6 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  CardDescription,
-  CardTitle,
-} from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
@@ -22,6 +18,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -125,10 +128,10 @@ export default function RolesContent() {
           </p>
         </div>
       ) : (
-        <div>
-          <div className="mb-3">
-            <CardTitle className="text-base">Roles</CardTitle>
-            <CardDescription>{roles.length} role{roles.length !== 1 ? "s" : ""} configured</CardDescription>
+        <div className="rounded-lg border bg-card p-6">
+          <div className="mb-5">
+            <h4 className="text-sm font-semibold">Roles</h4>
+            <p className="text-xs text-muted-foreground mt-0.5">{roles.length} role{roles.length !== 1 ? "s" : ""} configured</p>
           </div>
           <div className="rounded-lg border">
             <Table>
@@ -325,15 +328,15 @@ function RoleDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4" />
             {editingRole ? "Edit Role" : "New Role"}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
+          </SheetTitle>
+        </SheetHeader>
+        <div className="flex-1 overflow-y-auto space-y-4 px-4">
           <div className="space-y-2">
             <Label>Name</Label>
             <Input
@@ -410,15 +413,15 @@ function RoleDialog({
             </p>
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter className="border-t pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={saving}>
             {saving ? "Saving..." : editingRole ? "Save Changes" : "Create Role"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

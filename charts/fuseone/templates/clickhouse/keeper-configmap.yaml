@@ -1,0 +1,74 @@
+{{- if and .Values.clickhouse.enabled .Values.clickhouse.keeper.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fuseone.fullname" . }}-clickhouse-keeper
+  labels:
+    {{- include "fuseone.clickhouse.keeper.labels" . | nindent 4 }}
+data:
+  entrypoint.sh: |
+    #!/bin/bash
+    set -e
+
+    # Extract pod ordinal from hostname (e.g., fuseone-clickhouse-keeper-0 -> 0)
+    ORDINAL=$(echo "$HOSTNAME" | rev | cut -d'-' -f1 | rev)
+    SERVER_ID=$((ORDINAL + 1))
+
+    KEEPER_NAME="{{ include "fuseone.fullname" . }}-clickhouse-keeper"
+    NAMESPACE="{{ .Release.Namespace }}"
+    REPLICAS={{ .Values.clickhouse.keeper.replicas }}
+
+    # Build raft peer list
+    RAFT_SERVERS=""
+    for i in $(seq 0 $((REPLICAS - 1))); do
+      ID=$((i + 1))
+      HOST="${KEEPER_NAME}-${i}.{{ include "fuseone.clickhouse.keeper.headless" . }}.${NAMESPACE}.svc.cluster.local"
+      RAFT_SERVERS="${RAFT_SERVERS}
+                <server>
+                    <id>${ID}</id>
+                    <hostname>${HOST}</hostname>
+                    <port>9234</port>
+                </server>"
+    done
+
+    # Generate ClickHouse Keeper config
+    cat > /tmp/keeper_config.xml <<EOF
+    <clickhouse>
+        <logger>
+            <level>information</level>
+            <console>true</console>
+        </logger>
+
+        <listen_host>0.0.0.0</listen_host>
+
+        <keeper_server>
+            <tcp_port>9181</tcp_port>
+            <server_id>${SERVER_ID}</server_id>
+
+            <log_storage_path>/var/lib/clickhouse-keeper/coordination/log</log_storage_path>
+            <snapshot_storage_path>/var/lib/clickhouse-keeper/coordination/snapshots</snapshot_storage_path>
+
+            <coordination_settings>
+                <operation_timeout_ms>10000</operation_timeout_ms>
+                <session_timeout_ms>30000</session_timeout_ms>
+                <raft_logs_level>information</raft_logs_level>
+                <force_sync>true</force_sync>
+                <auto_forwarding>true</auto_forwarding>
+            </coordination_settings>
+
+            <raft_configuration>
+                ${RAFT_SERVERS}
+            </raft_configuration>
+        </keeper_server>
+
+        <prometheus>
+            <endpoint>/metrics</endpoint>
+            <port>9363</port>
+            <metrics>true</metrics>
+            <asynchronous_metrics>true</asynchronous_metrics>
+        </prometheus>
+    </clickhouse>
+    EOF
+
+    exec clickhouse-keeper --config-file=/tmp/keeper_config.xml
+{{- end }}

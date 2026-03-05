@@ -1,11 +1,17 @@
 package handler
 
 import (
+	"fmt"
+	"io"
+	"math"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
 
 	"github.com/fuseone/api-gateway/internal/config"
 	"github.com/fuseone/api-gateway/internal/middleware"
@@ -288,4 +294,172 @@ func (h *EnvironmentHandler) TestConnection(c *gin.Context) {
 		"message":    "Connected",
 		"latency_ms": latency.Milliseconds(),
 	}})
+}
+
+// GatewayHealth returns live health metrics for an environment's APISIX instance.
+// Scrapes Prometheus metrics endpoint to extract connections, memory, etcd status, and node info.
+func (h *EnvironmentHandler) GatewayHealth(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "invalid environment ID"}})
+		return
+	}
+
+	env, err := h.repo.GetByID(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"message": err.Error()}})
+		return
+	}
+	if env == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"message": "environment not found"}})
+		return
+	}
+
+	metricsURL := env.MetricsURL
+	if metricsURL == "" {
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{
+			"available": false,
+			"message":   "No metrics URL configured for this environment",
+		}})
+		return
+	}
+
+	// Ensure path is appended
+	if !strings.Contains(metricsURL, "/apisix/prometheus") {
+		metricsURL = strings.TrimRight(metricsURL, "/") + "/apisix/prometheus/metrics"
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, metricsURL, nil)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{
+			"available": false,
+			"message":   fmt.Sprintf("Invalid metrics URL: %s", err.Error()),
+		}})
+		return
+	}
+
+	start := time.Now()
+	resp, err := client.Do(req)
+	latency := time.Since(start)
+
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{
+			"available": false,
+			"message":   fmt.Sprintf("Metrics unreachable: %s", err.Error()),
+		}})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{
+			"available": false,
+			"message":   fmt.Sprintf("Metrics returned status %d: %s", resp.StatusCode, string(body)),
+		}})
+		return
+	}
+
+	var parser expfmt.TextParser
+	families, err := parser.TextToMetricFamilies(resp.Body)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{
+			"available": false,
+			"message":   fmt.Sprintf("Failed to parse metrics: %s", err.Error()),
+		}})
+		return
+	}
+
+	health := buildGatewayHealth(families)
+	health["available"] = true
+	health["latency_ms"] = latency.Milliseconds()
+
+	c.JSON(http.StatusOK, gin.H{"data": health})
+}
+
+// buildGatewayHealth extracts relevant system metrics from Prometheus metric families.
+func buildGatewayHealth(families map[string]*dto.MetricFamily) gin.H {
+	result := gin.H{}
+
+	// Nginx connections
+	if fam, ok := families["apisix_nginx_http_current_connections"]; ok {
+		conns := gin.H{}
+		for _, m := range fam.Metric {
+			state := promLabel(m.Label, "state")
+			if state != "" && m.Gauge != nil {
+				conns[state] = int64(m.Gauge.GetValue())
+			}
+		}
+		result["connections"] = conns
+	}
+
+	// etcd reachable
+	if fam, ok := families["apisix_etcd_reachable"]; ok {
+		for _, m := range fam.Metric {
+			if m.Gauge != nil {
+				result["etcd_reachable"] = m.Gauge.GetValue() == 1
+			}
+		}
+	}
+
+	// Shared memory usage
+	var totalCapacity, totalFree float64
+	if fam, ok := families["apisix_shared_dict_capacity_bytes"]; ok {
+		for _, m := range fam.Metric {
+			if m.Gauge != nil {
+				totalCapacity += m.Gauge.GetValue()
+			}
+		}
+	}
+	if fam, ok := families["apisix_shared_dict_free_space_bytes"]; ok {
+		for _, m := range fam.Metric {
+			if m.Gauge != nil {
+				totalFree += m.Gauge.GetValue()
+			}
+		}
+	}
+	if totalCapacity > 0 {
+		usedPct := math.Round(((totalCapacity-totalFree)/totalCapacity)*1000) / 10
+		result["shared_memory"] = gin.H{
+			"capacity_mb": math.Round(totalCapacity/1024/1024*10) / 10,
+			"used_mb":     math.Round((totalCapacity-totalFree)/1024/1024*10) / 10,
+			"free_mb":     math.Round(totalFree/1024/1024*10) / 10,
+			"used_pct":    usedPct,
+		}
+	}
+
+	// Node info (hostname, version)
+	if fam, ok := families["apisix_node_info"]; ok {
+		for _, m := range fam.Metric {
+			hostname := promLabel(m.Label, "hostname")
+			version := promLabel(m.Label, "version")
+			if hostname != "" || version != "" {
+				result["node"] = gin.H{
+					"hostname": hostname,
+					"version":  version,
+				}
+			}
+		}
+	}
+
+	// Total requests
+	if fam, ok := families["apisix_http_requests_total"]; ok {
+		for _, m := range fam.Metric {
+			if m.Counter != nil {
+				result["total_requests"] = int64(m.Counter.GetValue())
+			}
+		}
+	}
+
+	return result
+}
+
+func promLabel(labels []*dto.LabelPair, name string) string {
+	for _, lp := range labels {
+		if lp.GetName() == name {
+			return lp.GetValue()
+		}
+	}
+	return ""
 }

@@ -41,3 +41,29 @@ export interface TestConnectionResult {
   message: string
   latency_ms?: number
 }
+
+export interface GatewayHealth {
+  available: boolean
+  message?: string
+  latency_ms?: number
+  connections?: {
+    active?: number
+    reading?: number
+    writing?: number
+    waiting?: number
+    accepted?: number
+    handled?: number
+  }
+  etcd_reachable?: boolean
+  shared_memory?: {
+    capacity_mb: number
+    used_mb: number
+    free_mb: number
+    used_pct: number
+  }
+  node?: {
+    hostname: string
+    version: string
+  }
+  total_requests?: number
+}

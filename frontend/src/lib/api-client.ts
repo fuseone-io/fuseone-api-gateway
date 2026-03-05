@@ -70,10 +70,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // Auth
 export const api = {
-  login: (username: string, password: string) =>
+  login: (username: string, password: string, totp_code?: string) =>
     request<{ data: import("@/types/auth").TokenResponse }>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, ...(totp_code ? { totp_code } : {}) }),
     }).then((r) => {
       setToken(r.data.access_token)
       setRefreshToken(r.data.refresh_token)
@@ -106,6 +106,36 @@ export const api = {
 
   me: () =>
     request<{ data: import("@/types/auth").User }>("/api/auth/me").then((r) => r.data),
+
+  // Profile
+  updateProfile: (data: import("@/types/auth").UpdateProfileRequest) =>
+    request<{ data: import("@/types/auth").User }>("/api/auth/profile", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  changePassword: (data: import("@/types/auth").ChangePasswordRequest) =>
+    request<{ data: { message: string } }>("/api/auth/profile/password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  totpSetup: () =>
+    request<{ data: import("@/types/auth").TOTPSetupResponse }>("/api/auth/totp/setup", {
+      method: "POST",
+    }).then((r) => r.data),
+
+  totpEnable: (code: string) =>
+    request<{ data: { message: string } }>("/api/auth/totp/enable", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }).then((r) => r.data),
+
+  totpDisable: (password: string) =>
+    request<{ data: { message: string } }>("/api/auth/totp/disable", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    }).then((r) => r.data),
 
   // Dashboard
   dashboardSummary: () =>
@@ -562,6 +592,9 @@ export const api = {
       method: "POST",
     }).then((r) => r.data),
 
+  getEnvironmentHealth: (id: string) =>
+    request<{ data: import("@/types/environment").GatewayHealth }>(`/api/environments/${id}/health`).then((r) => r.data),
+
   // Users
   listUsers: (params?: { search?: string; page?: number; page_size?: number }) => {
     const qs = new URLSearchParams()
@@ -737,7 +770,7 @@ export const api = {
 
   // Testing - Runs
   listTestRuns: (suiteId: string) =>
-    request<{ data: import("@/types/testing").TestRun[] }>(`/api/testing/suites/${suiteId}/runs`).then((r) => r.data),
+    request<{ data: import("@/types/testing").TestRun[] }>(`/api/testing/runs?suite_id=${suiteId}`).then((r) => r.data),
 
   runTestSuite: (suiteId: string) =>
     request<{ data: import("@/types/testing").TestRun }>(`/api/testing/suites/${suiteId}/run`, {
@@ -748,9 +781,15 @@ export const api = {
   listSyntheticMonitors: () =>
     request<{ data: import("@/types/testing").SyntheticMonitor[] }>("/api/testing/monitors").then((r) => r.data),
 
-  createSyntheticMonitor: (data: { name: string; description: string; suite_id: string; interval_sec: number; locations: string[] }) =>
+  createSyntheticMonitor: (data: { name: string; description: string; suite_id: string; interval_sec: number; locations: string[]; notify_contact_ids?: string[] }) =>
     request<{ data: import("@/types/testing").SyntheticMonitor }>("/api/testing/monitors", {
       method: "POST",
+      body: JSON.stringify(data),
+    }).then((r) => r.data),
+
+  updateSyntheticMonitor: (id: string, data: Record<string, unknown>) =>
+    request<{ data: import("@/types/testing").SyntheticMonitor }>(`/api/testing/monitors/${id}`, {
+      method: "PUT",
       body: JSON.stringify(data),
     }).then((r) => r.data),
 
@@ -834,4 +873,106 @@ export const api = {
 
   listKafkaConsumerGroups: (connectionId: string) =>
     request<{ data: import("@/types/kafka").ConsumerGroupInfo[] }>(`/api/kafka/${connectionId}/consumer-groups`),
+
+  // Request Tracing
+  listTraces: (params?: import("@/types/trace").TraceListParams) => {
+    const qs = new URLSearchParams()
+    if (params?.route_id) qs.set("route_id", params.route_id)
+    if (params?.api_id) qs.set("api_id", params.api_id)
+    if (params?.method) qs.set("method", params.method)
+    if (params?.status_min) qs.set("status_min", String(params.status_min))
+    if (params?.status_max) qs.set("status_max", String(params.status_max))
+    if (params?.min_duration_ms) qs.set("min_duration_ms", String(params.min_duration_ms))
+    if (params?.max_duration_ms) qs.set("max_duration_ms", String(params.max_duration_ms))
+    if (params?.search) qs.set("search", params.search)
+    if (params?.from) qs.set("from", params.from)
+    if (params?.to) qs.set("to", params.to)
+    if (params?.limit) qs.set("limit", String(params.limit))
+    if (params?.offset) qs.set("offset", String(params.offset))
+    const query = qs.toString()
+    return request<{ data: import("@/types/trace").RequestTrace[]; meta: { total: number; page: number; page_size: number } }>(`/api/tracing/traces${query ? "?" + query : ""}`)
+  },
+
+  getTrace: (traceId: string) =>
+    request<{ data: import("@/types/trace").RequestTrace }>(`/api/tracing/traces/${traceId}`).then((r) => r.data),
+
+  getTracingStatus: () =>
+    request<{ data: import("@/types/trace").TracingStatus }>("/api/tracing/status").then((r) => r.data),
+
+  updateTracingSettings: (settings: Partial<import("@/types/trace").TracingStatus>) =>
+    request<{ data: import("@/types/trace").TracingStatus }>("/api/tracing/settings", {
+      method: "PUT",
+      body: JSON.stringify(settings),
+    }).then((r) => r.data),
+
+  testClickHouseConnection: (params: { addr: string; database: string; user: string; password: string }) =>
+    request<{ data: { ok: boolean; message: string } }>("/api/settings/clickhouse/test", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }).then((r) => r.data),
+
+  testElasticsearchConnection: (params: { addresses: string[]; username: string; password: string; api_key: string }) =>
+    request<{ data: { ok: boolean; message: string } }>("/api/settings/elasticsearch/test", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }).then((r) => r.data),
+
+  switchAnalyticsBackend: (settings: import("@/types/trace").AnalyticsBackendSettings) =>
+    request<{ data: { type: string; message: string } }>("/api/settings/analytics-backend/switch", {
+      method: "POST",
+      body: JSON.stringify(settings),
+    }).then((r) => r.data),
+
+  switchTraceBackend: (config: import("@/types/trace").BackendConfig) =>
+    request<{ data: { trace_backend: string; message: string } }>("/api/settings/trace-backend/switch", {
+      method: "POST",
+      body: JSON.stringify(config),
+    }).then((r) => r.data),
+
+  switchMetricsBackend: (config: import("@/types/trace").BackendConfig) =>
+    request<{ data: { metrics_backend: string; message: string } }>("/api/settings/metrics-backend/switch", {
+      method: "POST",
+      body: JSON.stringify(config),
+    }).then((r) => r.data),
+
+  testPrometheusConnection: (params: { url: string; username: string; password: string }) =>
+    request<{ data: { ok: boolean; message: string } }>("/api/settings/prometheus/test", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }).then((r) => r.data),
+
+  getAnalyticsBackendStatus: () =>
+    request<{ data: import("@/types/trace").AnalyticsBackendStatus }>("/api/settings/analytics-backend/status").then((r) => r.data),
+
+  // Backup & Restore
+  getBackupConfig: () =>
+    request<{ data: Record<string, unknown> | null }>("/api/backup/config").then((r) => r.data),
+
+  saveBackupConfig: (config: Record<string, unknown>) =>
+    request<{ data: Record<string, unknown> }>("/api/backup/configure", {
+      method: "POST",
+      body: JSON.stringify(config),
+    }).then((r) => r.data),
+
+  testBackupConnection: () =>
+    request<{ data: { ok: boolean; message: string } }>("/api/backup/test-connection", {
+      method: "POST",
+    }).then((r) => r.data),
+
+  createBackup: () =>
+    request<{ data: { commit_sha: string; message: string } }>("/api/backup/create", {
+      method: "POST",
+    }).then((r) => r.data),
+
+  getBackupHistory: () =>
+    request<{ data: Array<{ sha: string; message: string; date: string; author: string }> }>("/api/backup/history").then((r) => r.data),
+
+  previewRestore: (sha: string) =>
+    request<{ data: { added: string[]; modified: string[]; deleted: string[] } }>(`/api/backup/restore/${sha}/preview`).then((r) => r.data),
+
+  restoreBackup: (sha: string, dryRun?: boolean) =>
+    request<{ data: { message: string; applied: number } }>("/api/backup/restore", {
+      method: "POST",
+      body: JSON.stringify({ sha, dry_run: dryRun }),
+    }).then((r) => r.data),
 }

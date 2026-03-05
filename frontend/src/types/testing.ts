@@ -75,6 +75,7 @@ export interface SyntheticMonitor {
   suite_id: string
   interval_sec: number
   locations: string[]
+  notify_contact_ids: string[]
   uptime_pct: number
   last_status: "unknown" | "up" | "down" | "degraded"
   last_run_at?: string

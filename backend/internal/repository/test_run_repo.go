@@ -18,6 +18,7 @@ type TestRunQuerier interface {
 	Get(ctx context.Context, id uuid.UUID) (*model.TestRun, error)
 	ListBySuite(ctx context.Context, suiteID uuid.UUID, limit int) ([]model.TestRun, error)
 	UpdateStatus(ctx context.Context, run *model.TestRun) error
+	CleanupOlderThan(ctx context.Context, days int) (int64, error)
 }
 
 // TestRunRepository implements TestRunQuerier with PostgreSQL.
@@ -128,4 +129,14 @@ func (r *TestRunRepository) UpdateStatus(ctx context.Context, run *model.TestRun
 		run.ID,
 	)
 	return err
+}
+
+// CleanupOlderThan deletes test runs older than the given number of days.
+func (r *TestRunRepository) CleanupOlderThan(ctx context.Context, days int) (int64, error) {
+	query := `DELETE FROM test_runs WHERE created_at < NOW() - make_interval(days => $1)`
+	tag, err := r.pool.Exec(ctx, query, days)
+	if err != nil {
+		return 0, fmt.Errorf("cleanup test runs: %w", err)
+	}
+	return tag.RowsAffected(), nil
 }

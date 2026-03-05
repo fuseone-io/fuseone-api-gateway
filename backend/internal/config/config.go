@@ -8,16 +8,50 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	APISIX   APISIXConfig   `mapstructure:"apisix"`
-	Auth     AuthConfig     `mapstructure:"auth"`
-	Secrets  SecretsConfig  `mapstructure:"secrets"`
-	Metrics  MetricsConfig  `mapstructure:"metrics"`
-	Debug    DebugConfig    `mapstructure:"debug"`
-	Alerts   AlertConfig    `mapstructure:"alerts"`
-	Testing  TestingConfig  `mapstructure:"testing"`
-	Kafka    KafkaConfig    `mapstructure:"kafka"`
+	Server        ServerConfig        `mapstructure:"server"`
+	Database      DatabaseConfig      `mapstructure:"database"`
+	APISIX        APISIXConfig        `mapstructure:"apisix"`
+	Auth          AuthConfig          `mapstructure:"auth"`
+	Secrets       SecretsConfig       `mapstructure:"secrets"`
+	Metrics       MetricsConfig       `mapstructure:"metrics"`
+	Debug         DebugConfig         `mapstructure:"debug"`
+	Alerts        AlertConfig         `mapstructure:"alerts"`
+	Testing       TestingConfig       `mapstructure:"testing"`
+	Kafka         KafkaConfig         `mapstructure:"kafka"`
+	Tracing       TracingConfig       `mapstructure:"tracing"`
+	ClickHouse    ClickHouseConfig    `mapstructure:"clickhouse"`
+	Elasticsearch ElasticsearchConfig `mapstructure:"elasticsearch"`
+	Prometheus    PrometheusConfig    `mapstructure:"prometheus"`
+}
+
+type ClickHouseConfig struct {
+	Addr     string `mapstructure:"addr"`
+	Database string `mapstructure:"database"`
+	User     string `mapstructure:"user"`
+	Password string `mapstructure:"password"`
+}
+
+type ElasticsearchConfig struct {
+	Addresses   []string `mapstructure:"addresses"`
+	Username    string   `mapstructure:"username"`
+	Password    string   `mapstructure:"password"`
+	IndexPrefix string   `mapstructure:"index_prefix"`
+	APIKey      string   `mapstructure:"api_key"`
+}
+
+type PrometheusConfig struct {
+	URL      string `mapstructure:"url"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+}
+
+type TracingConfig struct {
+	Enabled          bool    `mapstructure:"enabled"`
+	SampleRate       float64 `mapstructure:"sample_rate"`
+	RetentionDays    int     `mapstructure:"retention_days"`
+	BufferSize       int     `mapstructure:"buffer_size"`
+	FlushIntervalSec int     `mapstructure:"flush_interval_sec"`
+	CollectorAddress string  `mapstructure:"collector_address"` // OTLP collector address for APISIX (host:port)
 }
 
 type KafkaConfig struct {
@@ -26,10 +60,11 @@ type KafkaConfig struct {
 }
 
 type TestingConfig struct {
-	SyntheticEnabled bool `mapstructure:"synthetic_enabled"`
-	SyntheticIntervalSec int `mapstructure:"synthetic_interval_sec"`
-	SLAEnabled       bool `mapstructure:"sla_enabled"`
-	SLAIntervalSec   int  `mapstructure:"sla_interval_sec"`
+	SyntheticEnabled     bool `mapstructure:"synthetic_enabled"`
+	SyntheticIntervalSec int  `mapstructure:"synthetic_interval_sec"`
+	SLAEnabled           bool `mapstructure:"sla_enabled"`
+	SLAIntervalSec       int  `mapstructure:"sla_interval_sec"`
+	RunRetentionDays     int  `mapstructure:"run_retention_days"`
 }
 
 type AlertConfig struct {
@@ -185,6 +220,20 @@ func Load() (*Config, error) {
 	v.BindEnv("testing.synthetic_interval_sec", "TESTING_SYNTHETIC_INTERVAL_SEC")
 	v.BindEnv("testing.sla_enabled", "TESTING_SLA_ENABLED")
 	v.BindEnv("testing.sla_interval_sec", "TESTING_SLA_INTERVAL_SEC")
+
+	// Tracing defaults
+	v.SetDefault("tracing.enabled", true)
+	v.SetDefault("tracing.sample_rate", 1.0)
+	v.SetDefault("tracing.retention_days", 7)
+	v.SetDefault("tracing.buffer_size", 1000)
+	v.SetDefault("tracing.flush_interval_sec", 5)
+	v.SetDefault("tracing.collector_address", "host.docker.internal:8080")
+	v.BindEnv("tracing.enabled", "TRACING_ENABLED")
+	v.BindEnv("tracing.sample_rate", "TRACING_SAMPLE_RATE")
+	v.BindEnv("tracing.retention_days", "TRACING_RETENTION_DAYS")
+	v.BindEnv("tracing.buffer_size", "TRACING_BUFFER_SIZE")
+	v.BindEnv("tracing.flush_interval_sec", "TRACING_FLUSH_INTERVAL_SEC")
+	v.BindEnv("tracing.collector_address", "TRACING_COLLECTOR_ADDRESS")
 
 	// Kafka defaults
 	v.SetDefault("kafka.enabled", false)

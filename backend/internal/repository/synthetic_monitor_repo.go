@@ -33,17 +33,21 @@ func NewSyntheticMonitorRepository(pool *pgxpool.Pool) *SyntheticMonitorReposito
 }
 
 const syntheticMonitorColumns = `id, name, description, enabled, suite_id, interval_sec, locations,
-	uptime_pct, last_status, last_run_at, last_run_id, consecutive_fail, created_by, created_at, updated_at`
+	notify_contact_ids, uptime_pct, last_status, last_run_at, last_run_id, consecutive_fail,
+	created_by, created_at, updated_at`
 
 func scanSyntheticMonitor(row pgx.Row) (*model.SyntheticMonitor, error) {
 	var m model.SyntheticMonitor
 	err := row.Scan(
 		&m.ID, &m.Name, &m.Description, &m.Enabled, &m.SuiteID, &m.IntervalSec,
-		&m.Locations, &m.UptimePct, &m.LastStatus, &m.LastRunAt, &m.LastRunID,
+		&m.Locations, &m.NotifyContactIDs, &m.UptimePct, &m.LastStatus, &m.LastRunAt, &m.LastRunID,
 		&m.ConsecutiveFail, &m.CreatedBy, &m.CreatedAt, &m.UpdatedAt,
 	)
 	if m.Locations == nil {
 		m.Locations = []string{}
+	}
+	if m.NotifyContactIDs == nil {
+		m.NotifyContactIDs = []uuid.UUID{}
 	}
 	return &m, err
 }
@@ -54,13 +58,16 @@ func scanSyntheticMonitors(rows pgx.Rows) ([]model.SyntheticMonitor, error) {
 		var m model.SyntheticMonitor
 		if err := rows.Scan(
 			&m.ID, &m.Name, &m.Description, &m.Enabled, &m.SuiteID, &m.IntervalSec,
-			&m.Locations, &m.UptimePct, &m.LastStatus, &m.LastRunAt, &m.LastRunID,
+			&m.Locations, &m.NotifyContactIDs, &m.UptimePct, &m.LastStatus, &m.LastRunAt, &m.LastRunID,
 			&m.ConsecutiveFail, &m.CreatedBy, &m.CreatedAt, &m.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scanning synthetic monitor: %w", err)
 		}
 		if m.Locations == nil {
 			m.Locations = []string{}
+		}
+		if m.NotifyContactIDs == nil {
+			m.NotifyContactIDs = []uuid.UUID{}
 		}
 		result = append(result, m)
 	}
@@ -73,13 +80,17 @@ func (r *SyntheticMonitorRepository) Create(ctx context.Context, monitor *model.
 	if locations == nil {
 		locations = []string{}
 	}
+	contactIDs := monitor.NotifyContactIDs
+	if contactIDs == nil {
+		contactIDs = []uuid.UUID{}
+	}
 
-	query := `INSERT INTO synthetic_monitors (name, description, enabled, suite_id, interval_sec, locations, uptime_pct, last_status, consecutive_fail, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	query := `INSERT INTO synthetic_monitors (name, description, enabled, suite_id, interval_sec, locations, notify_contact_ids, uptime_pct, last_status, consecutive_fail, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, created_at, updated_at`
 	return r.pool.QueryRow(ctx, query,
 		monitor.Name, monitor.Description, monitor.Enabled, monitor.SuiteID,
-		monitor.IntervalSec, locations, monitor.UptimePct, monitor.LastStatus,
+		monitor.IntervalSec, locations, contactIDs, monitor.UptimePct, monitor.LastStatus,
 		monitor.ConsecutiveFail, monitor.CreatedBy,
 	).Scan(&monitor.ID, &monitor.CreatedAt, &monitor.UpdatedAt)
 }
@@ -103,13 +114,17 @@ func (r *SyntheticMonitorRepository) Update(ctx context.Context, monitor *model.
 	if locations == nil {
 		locations = []string{}
 	}
+	contactIDs := monitor.NotifyContactIDs
+	if contactIDs == nil {
+		contactIDs = []uuid.UUID{}
+	}
 
 	query := `UPDATE synthetic_monitors SET name=$1, description=$2, enabled=$3, suite_id=$4,
-		interval_sec=$5, locations=$6, updated_at=NOW()
-		WHERE id=$7`
+		interval_sec=$5, locations=$6, notify_contact_ids=$7, updated_at=NOW()
+		WHERE id=$8`
 	_, err := r.pool.Exec(ctx, query,
 		monitor.Name, monitor.Description, monitor.Enabled, monitor.SuiteID,
-		monitor.IntervalSec, locations, monitor.ID,
+		monitor.IntervalSec, locations, contactIDs, monitor.ID,
 	)
 	return err
 }

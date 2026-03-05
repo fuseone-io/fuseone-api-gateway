@@ -9,6 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/fuseone/api-gateway/internal/config"
@@ -56,6 +57,16 @@ func (s *AuthService) Login(ctx context.Context, req LoginRequest) (*TokenRespon
 
 	if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(req.Password)); err != nil {
 		return nil, fmt.Errorf("invalid credentials")
+	}
+
+	// Verify TOTP if 2FA is enabled
+	if user.TOTPEnabled {
+		if req.TOTPCode == "" {
+			return nil, fmt.Errorf("totp_required")
+		}
+		if !totp.Validate(req.TOTPCode, user.TOTPSecret) {
+			return nil, fmt.Errorf("invalid TOTP code")
+		}
 	}
 
 	// Get role permissions

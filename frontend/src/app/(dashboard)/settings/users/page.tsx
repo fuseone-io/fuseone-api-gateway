@@ -15,17 +15,22 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  CardDescription,
-  CardTitle,
-} from "@/components/ui/card"
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -172,10 +177,10 @@ export default function UsersContent() {
         </div>
       ) : (
         <>
-          <div>
-            <div className="mb-3">
-              <CardTitle className="text-base">Users</CardTitle>
-              <CardDescription>{total} user{total !== 1 ? "s" : ""} total</CardDescription>
+          <div className="rounded-lg border bg-card p-6">
+            <div className="mb-5">
+              <h4 className="text-sm font-semibold">Users</h4>
+              <p className="text-xs text-muted-foreground mt-0.5">{total} user{total !== 1 ? "s" : ""} total</p>
             </div>
             <div className="rounded-lg border">
               <Table>
@@ -312,24 +317,27 @@ export default function UsersContent() {
         userId={resetUserId}
       />
 
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete User</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
               Are you sure you want to delete this user? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowDeleteDialog(false)}>
               Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+            >
               Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -428,15 +436,15 @@ function UserDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-md flex flex-col">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             {editingUser ? "Edit User" : "New User"}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
+          </SheetTitle>
+        </SheetHeader>
+        <div className="flex-1 overflow-y-auto space-y-4 px-4">
           <div className="space-y-2">
             <Label>Username</Label>
             <Input
@@ -511,16 +519,16 @@ function UserDialog({
             </Label>
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter className="border-t pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={saving}>
             {saving ? "Saving..." : editingUser ? "Save Changes" : "Create User"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }
 
@@ -563,15 +571,15 @@ function ResetPasswordDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-md flex flex-col">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <KeyRound className="h-4 w-4" />
             Reset Password
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
+          </SheetTitle>
+        </SheetHeader>
+        <div className="flex-1 overflow-y-auto space-y-4 px-4">
           <div className="space-y-2">
             <Label>New Password</Label>
             <div className="relative">
@@ -598,7 +606,7 @@ function ResetPasswordDialog({
             </div>
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter className="border-t pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
@@ -612,8 +620,8 @@ function ResetPasswordDialog({
               "Reset Password"
             )}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

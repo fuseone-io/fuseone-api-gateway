@@ -1,14 +1,17 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { toast } from "sonner"
 import {
   Activity,
   AlertTriangle,
+  Bell,
   CheckCircle2,
   Clock,
   MonitorCheck,
+  Pencil,
   Plus,
+  Search,
   Trash2,
   XCircle,
 } from "lucide-react"
@@ -28,7 +31,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -43,6 +45,12 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -54,7 +62,9 @@ import {
 } from "@/components/ui/alert-dialog"
 import { PageHeader } from "@/components/page-header"
 import { useTestingStore } from "@/stores/testing-store"
+import { api } from "@/lib/api-client"
 import type { SyntheticMonitor } from "@/types/testing"
+import type { NotificationContact } from "@/types/notification-contact"
 
 const STATUS_CONFIG: Record<
   SyntheticMonitor["last_status"],
@@ -93,6 +103,163 @@ function formatInterval(sec: number): string {
   return `${Math.floor(sec / 3600)}h`
 }
 
+// ── Monitor Form (shared between create and edit) ──
+interface MonitorFormState {
+  name: string
+  description: string
+  suite_id: string
+  interval: string
+  locations: string[]
+  notify_contact_ids: string[]
+}
+
+const emptyForm: MonitorFormState = {
+  name: "",
+  description: "",
+  suite_id: "",
+  interval: "60",
+  locations: ["sa-east-1"],
+  notify_contact_ids: [],
+}
+
+function MonitorForm({
+  suites,
+  contacts,
+  formState,
+  setFormState,
+}: {
+  suites: { id: string; name: string }[]
+  contacts: NotificationContact[]
+  formState: MonitorFormState
+  setFormState: (s: MonitorFormState) => void
+}) {
+  const toggleLocation = (loc: string) => {
+    setFormState({
+      ...formState,
+      locations: formState.locations.includes(loc)
+        ? formState.locations.filter((l) => l !== loc)
+        : [...formState.locations, loc],
+    })
+  }
+
+  const toggleContact = (id: string) => {
+    setFormState({
+      ...formState,
+      notify_contact_ids: formState.notify_contact_ids.includes(id)
+        ? formState.notify_contact_ids.filter((c) => c !== id)
+        : [...formState.notify_contact_ids, id],
+    })
+  }
+
+  return (
+    <div className="space-y-4 py-2">
+      <div className="space-y-2">
+        <Label>Nome</Label>
+        <Input
+          placeholder="Ex: Health Check - API Usuarios"
+          value={formState.name}
+          onChange={(e) => setFormState({ ...formState, name: e.target.value })}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Descricao</Label>
+        <Textarea
+          placeholder="Descricao do monitor..."
+          value={formState.description}
+          onChange={(e) => setFormState({ ...formState, description: e.target.value })}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Suite de Teste</Label>
+        <Select value={formState.suite_id} onValueChange={(v) => setFormState({ ...formState, suite_id: v })}>
+          <SelectTrigger>
+            <SelectValue placeholder="Selecione uma suite" />
+          </SelectTrigger>
+          <SelectContent>
+            {suites.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Intervalo</Label>
+        <Select value={formState.interval} onValueChange={(v) => setFormState({ ...formState, interval: v })}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="30">30 segundos</SelectItem>
+            <SelectItem value="60">1 minuto</SelectItem>
+            <SelectItem value="300">5 minutos</SelectItem>
+            <SelectItem value="600">10 minutos</SelectItem>
+            <SelectItem value="1800">30 minutos</SelectItem>
+            <SelectItem value="3600">1 hora</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Localizacoes</Label>
+        <div className="flex flex-wrap gap-2">
+          {LOCATIONS.map((loc) => (
+            <Badge
+              key={loc.value}
+              variant={formState.locations.includes(loc.value) ? "default" : "outline"}
+              className="cursor-pointer"
+              onClick={() => toggleLocation(loc.value)}
+            >
+              {loc.label}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      {/* Notification Contacts */}
+      <div className="space-y-2">
+        <Label className="flex items-center gap-1.5">
+          <Bell className="h-3.5 w-3.5" />
+          Canais de Notificacao
+        </Label>
+        <p className="text-[11px] text-muted-foreground">
+          Selecione os canais que serao notificados quando o monitor falhar ou recuperar.
+        </p>
+        {contacts.length === 0 ? (
+          <p className="text-xs text-muted-foreground italic">
+            Nenhum canal configurado. Configure em Configuracoes &rarr; Notificacoes.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {contacts.map((contact) => (
+              <label
+                key={contact.id}
+                className="flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  className="rounded"
+                  checked={formState.notify_contact_ids.includes(contact.id)}
+                  onChange={() => toggleContact(contact.id)}
+                />
+                <Badge variant="outline" className="text-[10px] shrink-0">
+                  {contact.type}
+                </Badge>
+                <span className="text-sm truncate">{contact.name}</span>
+                {!contact.enabled && (
+                  <Badge variant="outline" className="text-[10px] text-muted-foreground ml-auto shrink-0">
+                    Desativado
+                  </Badge>
+                )}
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function SyntheticMonitorsPage() {
   const {
     monitors,
@@ -101,44 +268,97 @@ export default function SyntheticMonitorsPage() {
     fetchMonitors,
     fetchSuites,
     createMonitor,
+    updateMonitor,
     toggleMonitor,
     deleteMonitor,
   } = useTestingStore()
 
+  const [contacts, setContacts] = useState<NotificationContact[]>([])
   const [createOpen, setCreateOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<SyntheticMonitor | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<SyntheticMonitor | null>(null)
+  const [search, setSearch] = useState("")
 
-  // Create form state
-  const [newName, setNewName] = useState("")
-  const [newDescription, setNewDescription] = useState("")
-  const [newSuiteId, setNewSuiteId] = useState("")
-  const [newInterval, setNewInterval] = useState("60")
-  const [newLocations, setNewLocations] = useState<string[]>(["sa-east-1"])
-  const [creating, setCreating] = useState(false)
+  // Form state (shared for create/edit)
+  const [formState, setFormState] = useState<MonitorFormState>(emptyForm)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     fetchMonitors()
     fetchSuites()
+    api.listNotificationContacts().then(setContacts).catch(() => {})
   }, [fetchMonitors, fetchSuites])
 
+  // Filter monitors by search
+  const filteredMonitors = useMemo(() => {
+    if (!search.trim()) return monitors
+    const q = search.toLowerCase()
+    return monitors.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.description.toLowerCase().includes(q) ||
+        m.last_status.includes(q)
+    )
+  }, [monitors, search])
+
+  // Open edit dialog
+  const openEdit = (monitor: SyntheticMonitor) => {
+    setFormState({
+      name: monitor.name,
+      description: monitor.description,
+      suite_id: monitor.suite_id,
+      interval: String(monitor.interval_sec),
+      locations: monitor.locations,
+      notify_contact_ids: monitor.notify_contact_ids || [],
+    })
+    setEditTarget(monitor)
+  }
+
+  // Open create dialog
+  const openCreate = () => {
+    setFormState(emptyForm)
+    setCreateOpen(true)
+  }
+
   const handleCreate = async () => {
-    if (!newName.trim() || !newSuiteId) return
-    setCreating(true)
+    if (!formState.name.trim() || !formState.suite_id) return
+    setSubmitting(true)
     try {
       await createMonitor({
-        name: newName.trim(),
-        description: newDescription.trim(),
-        suite_id: newSuiteId,
-        interval_sec: parseInt(newInterval) || 60,
-        locations: newLocations,
+        name: formState.name.trim(),
+        description: formState.description.trim(),
+        suite_id: formState.suite_id,
+        interval_sec: parseInt(formState.interval) || 60,
+        locations: formState.locations,
+        notify_contact_ids: formState.notify_contact_ids,
       })
       toast.success("Monitor criado com sucesso")
       setCreateOpen(false)
-      resetForm()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao criar monitor")
     } finally {
-      setCreating(false)
+      setSubmitting(false)
+    }
+  }
+
+  const handleUpdate = async () => {
+    if (!editTarget || !formState.name.trim() || !formState.suite_id) return
+    setSubmitting(true)
+    try {
+      await updateMonitor(editTarget.id, {
+        name: formState.name.trim(),
+        description: formState.description.trim(),
+        suite_id: formState.suite_id,
+        interval_sec: parseInt(formState.interval) || 60,
+        locations: formState.locations,
+        notify_contact_ids: formState.notify_contact_ids,
+      })
+      toast.success("Monitor atualizado com sucesso")
+      setEditTarget(null)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao atualizar monitor")
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -162,20 +382,6 @@ export default function SyntheticMonitorsPage() {
     }
   }
 
-  const resetForm = () => {
-    setNewName("")
-    setNewDescription("")
-    setNewSuiteId("")
-    setNewInterval("60")
-    setNewLocations(["sa-east-1"])
-  }
-
-  const toggleLocation = (loc: string) => {
-    setNewLocations((prev) =>
-      prev.includes(loc) ? prev.filter((l) => l !== loc) : [...prev, loc]
-    )
-  }
-
   if (monitorsLoading) {
     return (
       <div className="space-y-6">
@@ -192,105 +398,33 @@ export default function SyntheticMonitorsPage() {
     )
   }
 
+  const isFormValid = formState.name.trim() && formState.suite_id && formState.locations.length > 0
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Monitores Sinteticos"
         description="Execute suites de teste automaticamente em intervalos regulares"
         actions={
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Novo Monitor
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[480px]">
-              <DialogHeader>
-                <DialogTitle>Novo Monitor Sintetico</DialogTitle>
-                <DialogDescription>
-                  Configure um monitor que executa uma suite de teste periodicamente.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-2">
-                <div className="space-y-2">
-                  <Label>Nome</Label>
-                  <Input
-                    placeholder="Ex: Health Check - API Usuarios"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Descricao</Label>
-                  <Textarea
-                    placeholder="Descricao do monitor..."
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Suite de Teste</Label>
-                  <Select value={newSuiteId} onValueChange={setNewSuiteId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma suite" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suites.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Intervalo</Label>
-                  <Select value={newInterval} onValueChange={setNewInterval}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="30">30 segundos</SelectItem>
-                      <SelectItem value="60">1 minuto</SelectItem>
-                      <SelectItem value="300">5 minutos</SelectItem>
-                      <SelectItem value="600">10 minutos</SelectItem>
-                      <SelectItem value="1800">30 minutos</SelectItem>
-                      <SelectItem value="3600">1 hora</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Localizacoes</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {LOCATIONS.map((loc) => (
-                      <Badge
-                        key={loc.value}
-                        variant={newLocations.includes(loc.value) ? "default" : "outline"}
-                        className="cursor-pointer"
-                        onClick={() => toggleLocation(loc.value)}
-                      >
-                        {loc.label}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setCreateOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleCreate}
-                  disabled={creating || !newName.trim() || !newSuiteId || newLocations.length === 0}
-                >
-                  {creating ? "Criando..." : "Criar Monitor"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Monitor
+          </Button>
         }
       />
+
+      {/* Search bar */}
+      {monitors.length > 0 && (
+        <div className="relative max-w-sm">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar monitores..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      )}
 
       {/* Monitor cards */}
       {monitors.length === 0 ? (
@@ -303,18 +437,23 @@ export default function SyntheticMonitorsPage() {
             <p className="text-sm text-muted-foreground mb-4">
               Crie um monitor sintetico para verificar suas APIs automaticamente
             </p>
-            <Button onClick={() => setCreateOpen(true)}>
+            <Button onClick={openCreate}>
               <Plus className="mr-2 h-4 w-4" />
               Novo Monitor
             </Button>
           </CardContent>
         </Card>
+      ) : filteredMonitors.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-8">
+          Nenhum monitor encontrado para &ldquo;{search}&rdquo;
+        </p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {monitors.map((monitor) => {
+          {filteredMonitors.map((monitor) => {
             const statusConf = STATUS_CONFIG[monitor.last_status] || STATUS_CONFIG.unknown
             const StatusIcon = statusConf.icon
             const suite = suites.find((s) => s.id === monitor.suite_id)
+            const notifyCount = (monitor.notify_contact_ids || []).length
 
             return (
               <Card key={monitor.id} className="relative">
@@ -387,13 +526,28 @@ export default function SyntheticMonitorsPage() {
                     </div>
                   )}
 
-                  {/* Locations */}
-                  <div className="flex flex-wrap gap-1">
+                  {/* Locations + Notification badge */}
+                  <div className="flex flex-wrap gap-1 items-center">
                     {monitor.locations.map((loc) => (
                       <Badge key={loc} variant="outline" className="text-[10px] px-1.5 py-0">
                         {loc}
                       </Badge>
                     ))}
+                    {notifyCount > 0 && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-600 border-blue-500/30">
+                              <Bell className="h-2.5 w-2.5 mr-0.5" />
+                              {notifyCount}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">{notifyCount} canal(is) de notificacao configurado(s)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                   </div>
 
                   {/* Footer */}
@@ -404,15 +558,26 @@ export default function SyntheticMonitorsPage() {
                         ? formatRelativeTime(monitor.last_run_at)
                         : "Nunca executado"}
                     </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs text-destructive hover:text-destructive"
-                      onClick={() => setDeleteTarget(monitor)}
-                    >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      Excluir
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => openEdit(monitor)}
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-destructive hover:text-destructive"
+                        onClick={() => setDeleteTarget(monitor)}
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Excluir
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -420,6 +585,58 @@ export default function SyntheticMonitorsPage() {
           })}
         </div>
       )}
+
+      {/* Create Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-[520px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Novo Monitor Sintetico</DialogTitle>
+            <DialogDescription>
+              Configure um monitor que executa uma suite de teste periodicamente.
+            </DialogDescription>
+          </DialogHeader>
+          <MonitorForm
+            suites={suites}
+            contacts={contacts}
+            formState={formState}
+            setFormState={setFormState}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreate} disabled={submitting || !isFormValid}>
+              {submitting ? "Criando..." : "Criar Monitor"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
+        <DialogContent className="sm:max-w-[520px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Monitor</DialogTitle>
+            <DialogDescription>
+              Altere as configuracoes do monitor sintetico.
+            </DialogDescription>
+          </DialogHeader>
+          <MonitorForm
+            suites={suites}
+            contacts={contacts}
+            formState={formState}
+            setFormState={setFormState}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTarget(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdate} disabled={submitting || !isFormValid}>
+              {submitting ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>

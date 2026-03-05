@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
+  Activity,
   AlertTriangle,
   BarChart3,
   Bell,
@@ -42,6 +43,7 @@ import { useAlertStore } from "@/stores/alert-store"
 import { AnalyticsTab } from "./analytics-tab"
 import { TroubleshootingTab } from "./troubleshooting-tab"
 import { AlertsTab } from "./alerts-tab"
+import { TracesTab } from "./traces-tab"
 
 const AUTO_REFRESH_INTERVAL = 10_000
 
@@ -368,6 +370,10 @@ export default function MonitoringPage() {
             <Search className="h-4 w-4" />
             Troubleshooting
           </TabsTrigger>
+          <TabsTrigger value="traces" className="gap-1.5">
+            <Activity className="h-4 w-4" />
+            Traces
+          </TabsTrigger>
           <TabsTrigger value="analytics" className="gap-1.5">
             <BarChart3 className="h-4 w-4" />
             Analytics
@@ -389,6 +395,10 @@ export default function MonitoringPage() {
 
         <TabsContent value="troubleshooting" className="mt-4">
           <TroubleshootingTab />
+        </TabsContent>
+
+        <TabsContent value="traces" className="mt-4">
+          <TracesTab />
         </TabsContent>
 
         <TabsContent value="analytics" className="mt-4">

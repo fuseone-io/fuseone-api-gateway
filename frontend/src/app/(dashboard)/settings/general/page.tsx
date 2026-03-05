@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Loader2, Save, Sliders } from "lucide-react"
+import { Loader2, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api } from "@/lib/api-client"
 import { toast } from "sonner"
@@ -131,7 +130,8 @@ export default function GeneralContent() {
           <h3 className="text-lg font-semibold">General Settings</h3>
           <p className="text-sm text-muted-foreground mt-1">Gateway name, preferences, and defaults</p>
         </div>
-        <Skeleton className="h-[300px] rounded-lg" />
+        <Skeleton className="h-[160px] rounded-lg" />
+        <Skeleton className="h-[250px] rounded-lg" />
       </div>
     )
   }
@@ -155,12 +155,14 @@ export default function GeneralContent() {
         </Button>
       </div>
 
-      <div className="rounded-lg border p-6 space-y-6">
-        <div className="flex items-center gap-2 mb-2">
-          <Sliders className="h-4 w-4 text-primary" />
-          <h4 className="text-sm font-medium">Identity</h4>
+      {/* Identity Card */}
+      <div className="rounded-lg border bg-card p-6">
+        <div className="mb-5">
+          <h4 className="text-sm font-semibold">Identity</h4>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            The name used across the platform
+          </p>
         </div>
-
         <div className="grid gap-4 max-w-lg">
           <div className="space-y-2">
             <Label>Gateway Name</Label>
@@ -174,15 +176,17 @@ export default function GeneralContent() {
             </p>
           </div>
         </div>
+      </div>
 
-        <Separator />
-
-        <div className="flex items-center gap-2 mb-2">
-          <Sliders className="h-4 w-4 text-primary" />
-          <h4 className="text-sm font-medium">Preferences</h4>
+      {/* Preferences Card */}
+      <div className="rounded-lg border bg-card p-6">
+        <div className="mb-5">
+          <h4 className="text-sm font-semibold">Preferences</h4>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Regional and display preferences
+          </p>
         </div>
-
-        <div className="grid gap-4 max-w-lg">
+        <div className="grid gap-5 max-w-lg">
           <div className="space-y-2">
             <Label>Time Zone</Label>
             <Select value={timezone} onValueChange={setTimezone}>

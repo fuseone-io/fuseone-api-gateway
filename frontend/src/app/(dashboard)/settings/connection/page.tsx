@@ -2,19 +2,22 @@
 
 import { useCallback, useEffect, useState } from "react"
 import {
+  Activity,
   CheckCircle2,
+  Database,
   ExternalLink,
+  HardDrive,
   KeyRound,
   Loader2,
+  Network,
   Plug,
+  RefreshCw,
+  Server,
   XCircle,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  CardDescription,
-  CardTitle,
-} from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
 import {
   Table,
   TableBody,
@@ -23,11 +26,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { api } from "@/lib/api-client"
 import { useEnvironmentStore } from "@/stores/environment-store"
-import type { TestConnectionResult } from "@/types/environment"
+import type { TestConnectionResult, GatewayHealth } from "@/types/environment"
 import { toast } from "sonner"
 
 interface TestState {
@@ -35,10 +43,16 @@ interface TestState {
   result: TestConnectionResult | null
 }
 
+interface HealthState {
+  loading: boolean
+  data: GatewayHealth | null
+}
+
 export default function ConnectionContent() {
   const { environments, activeEnvironmentId, fetchEnvironments } = useEnvironmentStore()
   const [loading, setLoading] = useState(true)
   const [testStates, setTestStates] = useState<Record<string, TestState>>({})
+  const [healthStates, setHealthStates] = useState<Record<string, HealthState>>({})
 
   const load = useCallback(async () => {
     try {
@@ -53,6 +67,37 @@ export default function ConnectionContent() {
   useEffect(() => {
     load()
   }, [load])
+
+  // Auto-fetch health for all environments on load
+  useEffect(() => {
+    if (!loading && environments.length > 0) {
+      environments.forEach((env) => {
+        if (!healthStates[env.id]) {
+          fetchHealth(env.id)
+        }
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, environments.length])
+
+  const fetchHealth = async (envId: string) => {
+    setHealthStates((prev) => ({
+      ...prev,
+      [envId]: { loading: true, data: null },
+    }))
+    try {
+      const data = await api.getEnvironmentHealth(envId)
+      setHealthStates((prev) => ({
+        ...prev,
+        [envId]: { loading: false, data },
+      }))
+    } catch {
+      setHealthStates((prev) => ({
+        ...prev,
+        [envId]: { loading: false, data: { available: false, message: "Failed to fetch health" } },
+      }))
+    }
+  }
 
   const handleTest = async (envId: string) => {
     setTestStates((prev) => ({
@@ -83,7 +128,12 @@ export default function ConnectionContent() {
     }
   }
 
+  const handleRefreshAll = () => {
+    environments.forEach((env) => fetchHealth(env.id))
+  }
+
   const activeEnv = environments.find((e) => e.id === activeEnvironmentId)
+  const activeHealth = activeEnv ? healthStates[activeEnv.id] : undefined
 
   if (loading) {
     return (
@@ -109,17 +159,17 @@ export default function ConnectionContent() {
         </p>
       </div>
 
-      {/* Active environment card */}
+      {/* Active Environment Card */}
       {activeEnv ? (
-        <div className="rounded-lg border p-6 space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="rounded-lg border bg-card p-6">
+          <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
-              <div
-                className="h-3 w-3 rounded-full shrink-0"
-                style={{ backgroundColor: activeEnv.color || "#3b82f6" }}
+              <Server
+                className="h-4 w-4 shrink-0"
+                style={{ color: activeEnv.color || "#3b82f6" }}
               />
               <div>
-                <h4 className="text-sm font-medium">{activeEnv.name}</h4>
+                <h4 className="text-sm font-semibold">{activeEnv.name}</h4>
                 <p className="text-xs text-muted-foreground">Active Environment</p>
               </div>
             </div>
@@ -140,7 +190,7 @@ export default function ConnectionContent() {
 
           {testStates[activeEnv.id]?.result && (
             <div
-              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
+              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm mb-4 ${
                 testStates[activeEnv.id].result!.success
                   ? "bg-green-500/10 text-green-700"
                   : "bg-red-500/10 text-red-700"
@@ -160,7 +210,7 @@ export default function ConnectionContent() {
             </div>
           )}
 
-          <Separator />
+          <Separator className="mb-4" />
 
           <div className="grid gap-3">
             <ConnectionField
@@ -181,6 +231,14 @@ export default function ConnectionContent() {
               icon={<Plug className="h-3.5 w-3.5" />}
             />
           </div>
+
+          {/* Gateway Health for Active Environment */}
+          {activeHealth?.data?.available && (
+            <>
+              <Separator className="my-4" />
+              <GatewayHealthPanel health={activeHealth.data} />
+            </>
+          )}
         </div>
       ) : (
         <div className="py-8 text-center rounded-lg border border-dashed bg-muted/30">
@@ -192,37 +250,46 @@ export default function ConnectionContent() {
         </div>
       )}
 
-      {/* All environments table */}
+      {/* All Environments Table Card */}
       {environments.length > 0 && (
-        <div>
-          <div className="mb-3">
-            <CardTitle className="text-base">All Environments</CardTitle>
-            <CardDescription>
-              {environments.length} environment{environments.length !== 1 ? "s" : ""} configured
-            </CardDescription>
+        <div className="rounded-lg border bg-card p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h4 className="text-sm font-semibold">All Environments</h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {environments.length} environment{environments.length !== 1 ? "s" : ""} configured
+              </p>
+            </div>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleRefreshAll}>
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Refresh Health
+            </Button>
           </div>
           <div className="rounded-lg border">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Environment</TableHead>
-                  <TableHead>Admin API</TableHead>
-                  <TableHead>Control API</TableHead>
-                  <TableHead>Metrics</TableHead>
+                  <TableHead>Connections</TableHead>
+                  <TableHead>Memory</TableHead>
+                  <TableHead>etcd</TableHead>
+                  <TableHead>Version</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {environments.map((env) => {
-                  const state = testStates[env.id]
+                  const testState = testStates[env.id]
+                  const health = healthStates[env.id]
+                  const h = health?.data
                   return (
                     <TableRow key={env.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <div
-                            className="h-2.5 w-2.5 rounded-full shrink-0"
-                            style={{ backgroundColor: env.color || "#3b82f6" }}
+                          <Server
+                            className="h-3.5 w-3.5 shrink-0"
+                            style={{ color: env.color || "#3b82f6" }}
                           />
                           <span className="font-medium text-sm">{env.name}</span>
                           {env.id === activeEnvironmentId && (
@@ -238,32 +305,101 @@ export default function ConnectionContent() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-xs font-mono text-muted-foreground truncate max-w-[200px] block">
-                          {env.admin_url || "—"}
-                        </span>
+                        {health?.loading ? (
+                          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                        ) : h?.available && h.connections ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <Network className="h-3 w-3 text-muted-foreground" />
+                                <span className="font-mono">{h.connections.active ?? 0}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs">
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                                <span className="text-muted-foreground">Active:</span>
+                                <span className="font-mono">{h.connections.active ?? 0}</span>
+                                <span className="text-muted-foreground">Reading:</span>
+                                <span className="font-mono">{h.connections.reading ?? 0}</span>
+                                <span className="text-muted-foreground">Writing:</span>
+                                <span className="font-mono">{h.connections.writing ?? 0}</span>
+                                <span className="text-muted-foreground">Waiting:</span>
+                                <span className="font-mono">{h.connections.waiting ?? 0}</span>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <span className="text-xs font-mono text-muted-foreground truncate max-w-[180px] block">
-                          {env.control_url || "—"}
-                        </span>
+                        {health?.loading ? (
+                          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                        ) : h?.available && h.shared_memory ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <HardDrive className="h-3 w-3 text-muted-foreground" />
+                                <span className="font-mono">{h.shared_memory.used_pct}%</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs">
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                                <span className="text-muted-foreground">Used:</span>
+                                <span className="font-mono">{h.shared_memory.used_mb} MB</span>
+                                <span className="text-muted-foreground">Free:</span>
+                                <span className="font-mono">{h.shared_memory.free_mb} MB</span>
+                                <span className="text-muted-foreground">Capacity:</span>
+                                <span className="font-mono">{h.shared_memory.capacity_mb} MB</span>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <span className="text-xs font-mono text-muted-foreground truncate max-w-[180px] block">
-                          {env.metrics_url || "—"}
-                        </span>
+                        {health?.loading ? (
+                          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                        ) : h?.available && h.etcd_reachable !== undefined ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-1.5">
+                                <Database className={`h-3 w-3 ${h.etcd_reachable ? "text-emerald-500" : "text-destructive"}`} />
+                                <span className={`text-xs ${h.etcd_reachable ? "text-emerald-600" : "text-destructive"}`}>
+                                  {h.etcd_reachable ? "OK" : "Down"}
+                                </span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs">
+                              etcd {h.etcd_reachable ? "reachable" : "unreachable"}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
-                        {state?.result ? (
+                        {health?.loading ? (
+                          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                        ) : h?.available && h.node?.version ? (
+                          <span className="text-xs font-mono text-muted-foreground">{h.node.version}</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {testState?.result ? (
                           <Badge
                             variant="outline"
                             className={`text-xs ${
-                              state.result.success
+                              testState.result.success
                                 ? "bg-green-500/10 text-green-600 border-green-200"
                                 : "bg-red-500/10 text-red-600 border-red-200"
                             }`}
                           >
-                            {state.result.success
-                              ? `OK (${state.result.latency_ms}ms)`
+                            {testState.result.success
+                              ? `OK (${testState.result.latency_ms}ms)`
                               : "Failed"}
                           </Badge>
                         ) : (
@@ -276,9 +412,9 @@ export default function ConnectionContent() {
                           size="sm"
                           className="h-7 text-xs"
                           onClick={() => handleTest(env.id)}
-                          disabled={state?.loading}
+                          disabled={testState?.loading}
                         >
-                          {state?.loading ? (
+                          {testState?.loading ? (
                             <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                           ) : (
                             <Plug className="h-3 w-3 mr-1" />
@@ -301,6 +437,97 @@ export default function ConnectionContent() {
           To edit connection details, switch to the{" "}
           <span className="font-medium text-foreground">Environments</span> tab.
         </span>
+      </div>
+    </div>
+  )
+}
+
+function GatewayHealthPanel({ health }: { health: GatewayHealth }) {
+  const memPct = health.shared_memory?.used_pct ?? 0
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Gateway Health</h4>
+        {health.node?.version && (
+          <Badge variant="outline" className="text-[10px] ml-auto">
+            APISIX {health.node.version}
+          </Badge>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {/* Connections */}
+        <div className="rounded-md border p-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Network className="h-3.5 w-3.5 text-blue-500" />
+            <span className="text-xs text-muted-foreground">Connections</span>
+          </div>
+          <div className="text-2xl font-bold tabular-nums">
+            {health.connections?.active ?? 0}
+          </div>
+          <div className="flex gap-3 mt-1 text-[10px] text-muted-foreground">
+            <span>R:{health.connections?.reading ?? 0}</span>
+            <span>W:{health.connections?.writing ?? 0}</span>
+            <span>I:{health.connections?.waiting ?? 0}</span>
+          </div>
+        </div>
+
+        {/* Shared Memory */}
+        <div className="rounded-md border p-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <HardDrive className="h-3.5 w-3.5 text-purple-500" />
+            <span className="text-xs text-muted-foreground">Shared Memory</span>
+          </div>
+          <div className="text-2xl font-bold tabular-nums">
+            {memPct}<span className="text-sm font-normal text-muted-foreground">%</span>
+          </div>
+          <Progress
+            value={memPct}
+            className="h-1.5 mt-1.5"
+          />
+          <div className="text-[10px] text-muted-foreground mt-1">
+            {health.shared_memory?.used_mb ?? 0} / {health.shared_memory?.capacity_mb ?? 0} MB
+          </div>
+        </div>
+
+        {/* etcd */}
+        <div className="rounded-md border p-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Database className="h-3.5 w-3.5 text-amber-500" />
+            <span className="text-xs text-muted-foreground">etcd</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {health.etcd_reachable ? (
+              <>
+                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                <span className="text-sm font-medium text-emerald-600">Reachable</span>
+              </>
+            ) : (
+              <>
+                <XCircle className="h-5 w-5 text-destructive" />
+                <span className="text-sm font-medium text-destructive">Unreachable</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Total Requests */}
+        <div className="rounded-md border p-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Activity className="h-3.5 w-3.5 text-emerald-500" />
+            <span className="text-xs text-muted-foreground">Total Requests</span>
+          </div>
+          <div className="text-2xl font-bold tabular-nums">
+            {formatNumber(health.total_requests ?? 0)}
+          </div>
+          {health.node?.hostname && (
+            <div className="text-[10px] text-muted-foreground mt-1 truncate">
+              {health.node.hostname}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -332,4 +559,10 @@ function ConnectionField({
       </div>
     </div>
   )
+}
+
+function formatNumber(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
 }

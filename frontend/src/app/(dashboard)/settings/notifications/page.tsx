@@ -14,16 +14,12 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  CardDescription,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -182,10 +178,10 @@ export default function NotificationsContent() {
           </Button>
         </div>
       ) : (
-        <div>
-          <div className="mb-3">
-            <CardTitle className="text-base">Channels</CardTitle>
-            <CardDescription>{contacts.length} channel{contacts.length !== 1 ? "s" : ""} configured</CardDescription>
+        <div className="rounded-lg border bg-card p-6">
+          <div className="mb-5">
+            <h4 className="text-sm font-semibold">Channels</h4>
+            <p className="text-xs text-muted-foreground mt-0.5">{contacts.length} channel{contacts.length !== 1 ? "s" : ""} configured</p>
           </div>
           <div className="rounded-lg border">
             <Table>
@@ -368,15 +364,15 @@ function ContactDialog({
     : "URL"
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-md flex flex-col">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
             {editingContact ? "Edit Channel" : "New Notification Channel"}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
+          </SheetTitle>
+        </SheetHeader>
+        <div className="flex-1 overflow-y-auto space-y-4 px-4">
           <div className="space-y-2">
             <Label>Name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., #ops-alerts, DevOps Webhook" />
@@ -413,13 +409,13 @@ function ContactDialog({
             <Label htmlFor="contact-enabled" className="text-sm cursor-pointer">Enabled</Label>
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter className="border-t pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={saving}>
             {saving ? "Saving..." : editingContact ? "Save Changes" : "Create Channel"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

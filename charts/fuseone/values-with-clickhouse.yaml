@@ -1,0 +1,50 @@
+# =============================================================================
+# Full Platform + ClickHouse Analytics
+# Includes everything plus ClickHouse for analytics/logging
+#
+# Prerequisites:
+#   scripts/install-clickhouse-operator.sh
+# =============================================================================
+
+clickhouse:
+  enabled: true
+
+  image:
+    repository: clickhouse/clickhouse-server
+    tag: "24.8"
+
+  keeper:
+    enabled: true
+    replicas: 3
+    image:
+      repository: clickhouse/clickhouse-keeper
+      tag: "24.8"
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1
+        memory: 1Gi
+    persistence:
+      enabled: true
+      size: 10Gi
+
+  cluster:
+    name: fuseone
+    shards: 2
+    replicas: 2
+    storage:
+      size: 50Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2
+        memory: 4Gi
+
+  auth:
+    username: fuseone
+    password: "change-me-in-production"
+    database: fuseone_analytics

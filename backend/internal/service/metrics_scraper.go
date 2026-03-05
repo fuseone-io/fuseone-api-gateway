@@ -97,6 +97,20 @@ func (r *RouteNameResolver) Resolve(name string) string {
 	return name
 }
 
+// ReverseLookup returns the APISIX route name for a given route object ID.
+// Used by PrometheusMetricsRepository to translate internal IDs to Prometheus labels.
+// If no mapping exists, returns the ID itself as fallback.
+func (r *RouteNameResolver) ReverseLookup(id string) string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for name, routeID := range r.nameMap {
+		if routeID == id {
+			return name
+		}
+	}
+	return id
+}
+
 // MetricsScraper periodically scrapes APISIX Prometheus metrics and flushes to DB.
 type MetricsScraper struct {
 	cfg           *config.MetricsConfig

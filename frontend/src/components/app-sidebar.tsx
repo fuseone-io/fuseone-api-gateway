@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   Lock,
   Network,
+  PenTool,
   Puzzle,
   Radio,
   ScrollText,
@@ -35,6 +36,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 import {
   Sidebar,
@@ -46,7 +54,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { NavUser } from "@/components/nav-user"
 import type { User } from "@/types/auth"
@@ -68,6 +76,7 @@ const navGroups: NavGroup[] = [
   {
     label: "API Management",
     items: [
+      { path: "/design", label: "Design Studio", icon: PenTool },
       { path: "/apis", label: "APIs", icon: Workflow },
       { path: "/promotions", label: "Promotions", icon: ArrowRightLeft },
       { path: "/applications", label: "Applications", icon: AppWindow },
@@ -189,7 +198,6 @@ export function AppSidebar({ user }: { user: User | null }) {
         </SidebarMenu>
         <NavUser user={user} />
       </SidebarFooter>
-      <SidebarRail />
     </Sidebar>
   )
 }
@@ -206,7 +214,7 @@ function FlatNavGroup({
 }) {
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+      <SidebarGroupLabel className="uppercase">{group.label}</SidebarGroupLabel>
       <SidebarMenu>
         {group.items.map((item) => (
           <NavItemButton key={item.path} item={item} pathname={pathname} firingCount={firingCount} />
@@ -216,7 +224,8 @@ function FlatNavGroup({
   )
 }
 
-/** Collapsible group — auto-opens when any child route is active */
+/** Collapsible group — auto-opens when any child route is active.
+ *  When sidebar is collapsed (icon mode), renders a dropdown menu instead. */
 function CollapsibleNavGroup({
   group,
   pathname,
@@ -226,13 +235,55 @@ function CollapsibleNavGroup({
   pathname: string
   firingCount: number
 }) {
+  const { state } = useSidebar()
   const isActive = group.items.some((item) => pathname.startsWith(item.path))
 
+  // Collapsed sidebar: show first item icon as trigger with floating dropdown
+  if (state === "collapsed") {
+    const firstItem = group.items[0]
+    return (
+      <SidebarGroup>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  isActive={isActive}
+                  tooltip={group.label}
+                >
+                  <firstItem.icon />
+                  <span>{group.label}</span>
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="start" className="min-w-48">
+                <DropdownMenuLabel className="text-xs text-muted-foreground">{group.label}</DropdownMenuLabel>
+                {group.items.map((item) => (
+                  <DropdownMenuItem key={item.path} asChild className={pathname.startsWith(item.path) ? "bg-accent" : ""}>
+                    <Link href={item.path} className="flex items-center gap-2">
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                      {item.badge === "firing" && firingCount > 0 && (
+                        <Badge variant="destructive" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px]">
+                          {firingCount}
+                        </Badge>
+                      )}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
+    )
+  }
+
+  // Expanded sidebar: normal collapsible
   return (
     <Collapsible defaultOpen={isActive} className="group/collapsible">
       <SidebarGroup>
         <SidebarGroupLabel asChild>
-          <CollapsibleTrigger className="flex w-full items-center">
+          <CollapsibleTrigger className="flex w-full items-center uppercase">
             {group.label}
             <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform group-data-[state=open]/collapsible:rotate-90" />
           </CollapsibleTrigger>

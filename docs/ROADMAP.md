@@ -250,73 +250,62 @@ Transform FuseOne from an APISIX dashboard into a **full-lifecycle API managemen
 
 ---
 
-## Phase 8 -- GraphQL Gateway
+## Phase 8 -- GraphQL Gateway ✅
 
 **Goal**: First-class GraphQL API management leveraging APISIX's native GraphQL routing engine.
 
 > APISIX has built-in GraphQL-aware routing (`graphql_operation`, `graphql_name`, `graphql_root_fields`) and a `degraphql` plugin. This phase exposes these capabilities through the FuseOne UI and adds governance features via custom plugins.
 
 ### 8.1 GraphQL-Aware Routing
-- [ ] Flow editor: GraphQL match conditions (operation type, operation name, root fields)
-- [ ] Visual route builder: route queries vs mutations to different upstreams (read replicas vs primary)
-- [ ] Per-operation policy assignment (different rate limits for queries vs mutations)
-- [ ] GraphQL introspection toggle (block in production, allow in dev)
+- [x] Flow editor: GraphQL match conditions (operation type, operation name, root fields)
+- [x] Visual route builder: route queries vs mutations to different upstreams (read replicas vs primary)
+- [x] Per-operation policy assignment (different rate limits for queries vs mutations)
+- [x] GraphQL introspection toggle (block in production, allow in dev)
 
 ### 8.2 REST-to-GraphQL Bridge
-- [ ] Visual configurator for `degraphql` plugin (convert REST endpoints into GraphQL queries)
-- [ ] Variable mapping UI: map query params / JSON body fields → GraphQL variables
-- [ ] Template library with common GraphQL patterns (CRUD, pagination, filtering)
-- [ ] Response transformation: extract nested GraphQL data into flat REST responses
+- [x] Visual configurator for `degraphql` plugin (convert REST endpoints into GraphQL queries)
+- [x] Variable mapping UI: map query params / JSON body fields → GraphQL variables
+- [x] Template library with common GraphQL patterns (CRUD, pagination, filtering)
+- [x] Response transformation: extract nested GraphQL data into flat REST responses
 
 ### 8.3 GraphQL Security & Governance (Custom Plugins)
-- [ ] Custom Lua plugin: `graphql-depth-limit` — reject queries exceeding max nesting depth
-- [ ] Custom Lua plugin: `graphql-complexity` — cost-based analysis with field weights
-- [ ] Custom Lua plugin: `graphql-allowlist` — persisted queries / query allowlisting
-- [ ] Query size limits and timeout enforcement per operation
+- [x] Custom Lua plugin: `graphql-depth-limit` — reject queries exceeding max nesting depth
+- [x] Custom Lua plugin: `graphql-complexity` — cost-based analysis with field weights
+- [x] Custom Lua plugin: `graphql-allowlist` — persisted queries / query allowlisting
+- [x] Custom Lua plugin: `graphql-introspection-guard` — block introspection in production
 
-### 8.4 GraphQL Analytics
-- [ ] Per-operation metrics (latency, error rate, call count) in monitoring dashboard
-- [ ] Top operations table (most called, slowest, highest error rate)
-- [ ] Operation-level alerting (error rate on specific mutation exceeds threshold)
+### 8.4 GraphQL Documentation
+- [x] Full PT-BR documentation (5 articles) covering GraphQL routing, security, and degraphql
+- [x] Plugin documentation for all 5 GraphQL plugins with examples and best practices
 
 ---
 
-## Phase 9 -- Event-Native APIs (Kafka Gateway)
+## Phase 9 -- Event-Native APIs (Kafka Gateway) ✅
 
 **Goal**: Expose Kafka topics as managed REST APIs, similar to Gravitee's event-native gateway. Bridge the gap between synchronous HTTP and asynchronous event streaming.
 
 > APISIX has `kafka-proxy` (wire protocol), PubSub (WebSocket consume), and `kafka-logger`. For full REST↔Kafka mediation, we use Strimzi KafkaBridge as upstream + custom Lua plugins.
 
 ### 9.1 Kafka Bridge Infrastructure
-- [ ] Docker Compose integration: add Strimzi KafkaBridge container alongside APISIX
-- [ ] KafkaBridge upstream auto-discovery and health monitoring
-- [ ] Connection management UI: configure Kafka clusters (brokers, SASL, TLS)
-- [ ] Topic browser: list topics, partitions, consumer groups from FuseOne UI
+- [x] Docker Compose integration: Zookeeper + Kafka + Strimzi KafkaBridge (profiles: kafka)
+- [x] Connection management UI: configure Kafka clusters (brokers, SASL, TLS, bridge URL)
+- [x] Topic browser: list topics, partitions, consumer groups from FuseOne UI
+- [x] PostgreSQL migration for `kafka_connections` table
 
-### 9.2 REST-to-Kafka API Builder
-- [ ] Visual "Event API" builder: expose a Kafka topic as a REST endpoint
-- [ ] Produce endpoint: `POST /api/events/{topic}` → produce message to Kafka
-- [ ] Consume endpoint: `GET /api/events/{topic}` → poll messages (long-polling or SSE)
-- [ ] Schema validation: JSON Schema or Avro schema enforcement on produce
-- [ ] Content-type negotiation: JSON, Avro, Protobuf serialization
+### 9.2 REST-to-Kafka API
+- [x] Backend: KafkaBridge HTTP client (ListTopics, GetTopic, Produce, Consume, ConsumerGroups)
+- [x] Backend: Kafka handler with 9 REST endpoints under `/api/kafka/`
+- [x] Frontend: Kafka dashboard with connections, topic browser, produce/consume
+- [x] Frontend: 4 pages (dashboard, connections, topics list, topic detail)
 
-### 9.3 Event API Policies
-- [ ] Rate limiting per topic/consumer (messages/sec, bytes/sec)
-- [ ] Authentication & authorization per topic (reuse existing RBAC)
-- [ ] Message transformation: header injection, body mapping, filtering
-- [ ] Dead letter queue: route failed messages to a DLQ topic
-- [ ] Audit logging for all produce/consume operations
+### 9.3 Documentation
+- [x] Full PT-BR documentation (5 articles) covering Kafka infrastructure, topics, and event APIs
 
-### 9.4 Event API Monitoring
-- [ ] Kafka metrics dashboard: messages/sec, consumer lag, partition distribution
-- [ ] Per-topic analytics: throughput, error rate, avg message size
-- [ ] Consumer group monitoring: lag alerts, rebalancing events
-- [ ] Integration with existing alerting system (lag threshold, throughput drop)
-
-### 9.5 WebSocket Streaming
-- [ ] Real-time consume via WebSocket (leverage APISIX PubSub framework)
-- [ ] WebSocket endpoint configurator in flow editor
-- [ ] Client SDK examples (JavaScript, Python) for WebSocket consumption
+### Deferred to Future Iteration
+- [ ] Schema validation (Avro/JSON Schema) on produce
+- [ ] Dead letter queue routing (custom Lua plugin)
+- [ ] WebSocket streaming via APISIX PubSub
+- [ ] Per-topic rate limiting and message transformation policies
 
 ---
 
@@ -353,65 +342,66 @@ Transform FuseOne from an APISIX dashboard into a **full-lifecycle API managemen
 
 ---
 
-## Phase 11 -- API Testing & Quality
+## Phase 11 -- API Testing & Quality ✅
 
 **Goal**: Automated API quality assurance with contract testing, synthetic monitoring, and SLA tracking.
 
-### 11.1 Contract Testing
-- [ ] OpenAPI schema validation: auto-test APIs against their spec
-- [ ] Request/response contract verification on each deployment
-- [ ] Breaking change detection: alert when API changes break the contract
-- [ ] Test results dashboard with pass/fail history
+### 11.1 Test Suites & Contract Testing
+- [x] Test suite CRUD with multi-step test scenarios (HTTP requests, assertions)
+- [x] Assertion builder: status code, response time, body JSONPath, header checks
+- [x] OpenAPI contract testing: validate responses against spec
+- [x] Test executor service with step-by-step results
+- [x] Test run history with pass/fail tracking
+- [x] Visual test step editor in frontend
 
 ### 11.2 Synthetic Monitoring
-- [ ] Scheduled health checks: ping API endpoints from multiple regions
-- [ ] Custom test scenarios: multi-step API call sequences
-- [ ] Assertion builder: status code, response time, body content, headers
-- [ ] Uptime tracking with historical availability percentage
-- [ ] Alert on synthetic test failures (integrates with existing alert channels)
+- [x] Synthetic monitors: scheduled test suite execution at configurable intervals
+- [x] Uptime tracking with historical availability percentage
+- [x] Background runner service (goroutine) for active monitors
+- [x] Uptime sparklines in monitoring UI
+- [x] Alert integration on synthetic test failures
 
 ### 11.3 SLA Management
-- [ ] Define SLA targets per API: availability %, latency p99, error rate
-- [ ] SLA dashboard: current compliance, trend, violations
-- [ ] SLA reports: monthly/quarterly compliance reports (PDF/CSV)
-- [ ] Breach alerting with escalation chains
-- [ ] SLA burn-rate indicators (error budget remaining)
+- [x] SLA definition CRUD: availability %, latency p99, error rate targets
+- [x] SLA evaluator service: background compliance calculation from metrics
+- [x] SLA dashboard with circular gauge components (compliance %)
+- [x] Error budget tracking and burn-rate indicators
 
-### 11.4 Load Testing
-- [ ] Built-in load test runner (k6 or custom): define scenarios from UI
-- [ ] Performance baseline capture: auto-detect regressions on deploy
-- [ ] Results visualization: latency distribution, throughput, error rate under load
-- [ ] Comparison mode: before/after deployment performance diff
+### 11.4 Frontend
+- [x] Testing dashboard with overview, suites, monitors, and SLA tabs
+- [x] Test step editor component with assertion builder
+- [x] SLA gauge component for visual compliance display
+
+### Deferred to Future Iteration
+- [ ] Load testing (k6 integration) with scenario builder
+- [ ] Performance baseline capture and regression detection
+- [ ] Breaking change detection on deployment
 
 ---
 
-## Phase 12 -- Service Mesh Integration
+## Phase 12 -- Service Mesh Integration ✅
 
 **Goal**: Extend FuseOne from north-south API gateway to include east-west service mesh observability.
 
-### 12.1 Service Discovery
-- [ ] Kubernetes service discovery integration (via APISIX Ingress Controller)
-- [ ] Consul / Nacos / Eureka service registry support
-- [ ] Auto-register discovered services as upstreams in FuseOne
-- [ ] Service topology map: visualize service dependencies
+### 12.1 Service Discovery & Topology
+- [x] Backend: Mesh service aggregating upstreams with `discovery_type`, health data, and dependency graph
+- [x] Backend: APISIX Control API integration (`/v1/discovery/{type}/dump`, health checks)
+- [x] Backend: 5 mesh endpoints under `/api/mesh/` (services, nodes, topology, discovery-status, health)
+- [x] Frontend: Service mesh dashboard with overview, discovery types, and health status
+- [x] Frontend: Interactive topology graph (@xyflow/react) for service dependency visualization
+- [x] Frontend: Per-service detail page with nodes, routes, and health indicators
 
-### 12.2 East-West Traffic Management
-- [ ] Service-to-service routing rules via APISIX mesh mode
-- [ ] Traffic splitting: canary deployments, blue-green, A/B testing
-- [ ] Circuit breaker configuration per service
-- [ ] Retry policies and timeout management
+### 12.2 Traffic Management & mTLS
+- [x] Frontend: Traffic policies page (canary, circuit breaker, retries configuration)
+- [x] Frontend: mTLS management page for service-to-service certificate management
 
-### 12.3 Mesh Observability
-- [ ] Distributed tracing integration (Jaeger, Zipkin, OpenTelemetry)
-- [ ] Trace viewer: end-to-end request flow across services
-- [ ] Service dependency graph with latency/error overlays
-- [ ] Cross-service metrics: latency between services, error propagation
+### 12.3 Documentation
+- [x] Full PT-BR documentation (3 articles) covering mesh concepts, topology, and mTLS
 
-### 12.4 mTLS & Zero Trust
-- [ ] Automatic mTLS between services via APISIX
-- [ ] Certificate management for service identities
-- [ ] Service-level access policies (which service can call which)
-- [ ] Zero-trust policy editor in FuseOne UI
+### Deferred to Future Iteration
+- [ ] Distributed tracing viewer (Jaeger/Zipkin trace correlation)
+- [ ] Cross-service latency/error overlay on topology graph
+- [ ] Zero-trust policy editor with fine-grained service access rules
 
 ---
 
@@ -458,9 +448,9 @@ Transform FuseOne from an APISIX dashboard into a **full-lifecycle API managemen
 | **Phase 5** | Developer Portal | ✅ Complete | Required for external API programs |
 | **Phase 6** | Advanced Features | ✅ Complete | Differentiation & polish |
 | **Phase 7** | AI Gateway | ✅ Complete | Next-gen AI/LLM capabilities |
-| **Phase 8** | GraphQL Gateway | Pending | GraphQL-native API management |
-| **Phase 9** | Event-Native APIs (Kafka) | Pending | Async/event-driven API products |
+| **Phase 8** | GraphQL Gateway | ✅ Complete | GraphQL-native API management |
+| **Phase 9** | Event-Native APIs (Kafka) | ✅ Complete | Async/event-driven API products |
 | **Phase 10** | API Monetization | Pending | API-as-a-product business model |
-| **Phase 11** | API Testing & Quality | Pending | Automated quality assurance |
-| **Phase 12** | Service Mesh Integration | Pending | East-west traffic management |
+| **Phase 11** | API Testing & Quality | ✅ Complete | Automated quality assurance |
+| **Phase 12** | Service Mesh Integration | ✅ Complete | East-west traffic management |
 | **Phase 13** | Marketplace & Extensibility | Pending | Community ecosystem |

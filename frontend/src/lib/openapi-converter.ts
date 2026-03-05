@@ -1,5 +1,5 @@
 import yaml from "js-yaml"
-import type { ApiDefinition, ApiFlow, PolicyInstance } from "@/types/api"
+import type { ApiDefinition, ApiFlow, PolicyInstance, FlowContract, ContractParameter, JsonSchemaDefinition, ContractResponse } from "@/types/api"
 import { getPluginDef } from "@/lib/constants"
 
 // --- Export: ApiDefinition → OpenAPI 3.0 ---
@@ -46,9 +46,39 @@ export function apiToOpenAPI(api: ApiDefinition): OpenAPISpec {
       const operation: Record<string, unknown> = {
         summary: flow.name,
         operationId: `${flow.name.replace(/\s+/g, "_").toLowerCase()}_${method.toLowerCase()}`,
-        responses: {
-          "200": { description: "Success" },
-        },
+        responses: {} as Record<string, unknown>,
+      }
+
+      // Build responses from contract or default
+      const responses = operation.responses as Record<string, unknown>
+      if (flow.contract?.response_schemas && Object.keys(flow.contract.response_schemas).length > 0) {
+        for (const [code, resp] of Object.entries(flow.contract.response_schemas)) {
+          const respObj: Record<string, unknown> = { description: resp.description || "" }
+          if (resp.schema) {
+            respObj.content = {
+              "application/json": {
+                schema: resp.schema,
+                ...(resp.example !== undefined ? { example: resp.example } : {}),
+              },
+            }
+          }
+          responses[code] = respObj
+        }
+      } else {
+        responses["200"] = { description: "Success" }
+      }
+
+      // Build requestBody from contract
+      if (flow.contract?.request_schema && ["post", "put", "patch"].includes(method.toLowerCase())) {
+        operation.requestBody = {
+          required: true,
+          content: {
+            "application/json": {
+              schema: flow.contract.request_schema,
+              ...(flow.contract.request_example !== undefined ? { example: flow.contract.request_example } : {}),
+            },
+          },
+        }
       }
 
       if (plugins.length > 0) {
@@ -59,17 +89,34 @@ export function apiToOpenAPI(api: ApiDefinition): OpenAPISpec {
         operation["x-hosts"] = flow.entrypoint.hosts
       }
 
-      // Add path parameter if wildcard
-      if (openApiPath.includes("{path}")) {
-        operation.parameters = [
-          {
-            name: "path",
-            in: "path",
-            required: true,
-            schema: { type: "string" },
-            description: "Wildcard path segment",
-          },
-        ]
+      // Build parameters from contract + wildcard path params
+      const parameters: Record<string, unknown>[] = []
+
+      if (flow.contract?.parameters) {
+        for (const param of flow.contract.parameters) {
+          parameters.push({
+            name: param.name,
+            in: param.in,
+            required: param.required,
+            schema: param.schema || { type: "string" },
+            ...(param.description ? { description: param.description } : {}),
+            ...(param.example !== undefined ? { example: param.example } : {}),
+          })
+        }
+      }
+
+      if (openApiPath.includes("{path}") && !parameters.some((p) => (p as { name: string }).name === "path")) {
+        parameters.push({
+          name: "path",
+          in: "path",
+          required: true,
+          schema: { type: "string" },
+          description: "Wildcard path segment",
+        })
+      }
+
+      if (parameters.length > 0) {
+        operation.parameters = parameters
       }
 
       paths[openApiPath][method.toLowerCase()] = operation
@@ -162,6 +209,7 @@ export function openAPIToApi(raw: Record<string, unknown>): ApiDefinition {
     let flowName = ""
     const allPlugins: PolicyInstance[] = []
     const hosts: string[] = []
+    const contract: FlowContract = {}
 
     const httpMethodNames = ["get", "post", "put", "patch", "delete", "head", "options"]
 
@@ -173,6 +221,57 @@ export function openAPIToApi(raw: Record<string, unknown>): ApiDefinition {
 
       if (!flowName && op.summary) {
         flowName = op.summary as string
+      }
+
+      // Extract request body schema
+      const requestBody = op.requestBody as Record<string, unknown> | undefined
+      if (requestBody && !contract.request_schema) {
+        const content = requestBody.content as Record<string, Record<string, unknown>> | undefined
+        if (content) {
+          const jsonContent = content["application/json"] || Object.values(content)[0]
+          if (jsonContent) {
+            if (jsonContent.schema) contract.request_schema = jsonContent.schema as JsonSchemaDefinition
+            if (jsonContent.example !== undefined) contract.request_example = jsonContent.example
+          }
+        }
+      }
+
+      // Extract response schemas
+      const responses = op.responses as Record<string, Record<string, unknown>> | undefined
+      if (responses) {
+        for (const [code, resp] of Object.entries(responses)) {
+          if (contract.response_schemas?.[code]) continue
+          const content = resp.content as Record<string, Record<string, unknown>> | undefined
+          const respEntry: ContractResponse = { description: (resp.description as string) || "" }
+          if (content) {
+            const jsonContent = content["application/json"] || Object.values(content)[0]
+            if (jsonContent) {
+              if (jsonContent.schema) respEntry.schema = jsonContent.schema as JsonSchemaDefinition
+              if (jsonContent.example !== undefined) respEntry.example = jsonContent.example
+            }
+          }
+          if (respEntry.schema || respEntry.description) {
+            if (!contract.response_schemas) contract.response_schemas = {}
+            contract.response_schemas[code] = respEntry
+          }
+        }
+      }
+
+      // Extract parameters
+      const params = op.parameters as Record<string, unknown>[] | undefined
+      if (params && !contract.parameters) {
+        const contractParams: ContractParameter[] = []
+        for (const p of params) {
+          contractParams.push({
+            name: (p.name as string) || "",
+            in: (p.in as ContractParameter["in"]) || "query",
+            required: (p.required as boolean) || false,
+            schema: p.schema as JsonSchemaDefinition | undefined,
+            description: p.description as string | undefined,
+            example: p.example,
+          })
+        }
+        if (contractParams.length > 0) contract.parameters = contractParams
       }
 
       // Extract gateway plugins extension
@@ -204,6 +303,9 @@ export function openAPIToApi(raw: Record<string, unknown>): ApiDefinition {
 
     if (httpMethods.length === 0) continue
 
+    // Build contract if we found any schema data
+    const hasContract = contract.request_schema || contract.response_schemas || contract.parameters
+
     flows.push({
       id: crypto.randomUUID(),
       name: flowName || `Flow ${uri}`,
@@ -213,6 +315,7 @@ export function openAPIToApi(raw: Record<string, unknown>): ApiDefinition {
         methods: httpMethods,
       },
       policies: allPlugins,
+      ...(hasContract ? { contract } : {}),
     })
   }
 

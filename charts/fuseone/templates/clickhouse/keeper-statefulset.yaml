@@ -1,0 +1,95 @@
+{{- if and .Values.clickhouse.enabled .Values.clickhouse.keeper.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "fuseone.fullname" . }}-clickhouse-keeper
+  labels:
+    {{- include "fuseone.clickhouse.keeper.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "fuseone.clickhouse.keeper.headless" . }}
+  replicas: {{ .Values.clickhouse.keeper.replicas }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "fuseone.clickhouse.keeper.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fuseone.clickhouse.keeper.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/clickhouse/keeper-configmap.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: clickhouse-keeper
+          image: "{{ .Values.clickhouse.keeper.image.repository }}:{{ .Values.clickhouse.keeper.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "/etc/clickhouse-keeper/entrypoint.sh"]
+          ports:
+            - name: client
+              containerPort: 9181
+              protocol: TCP
+            - name: raft
+              containerPort: 9234
+              protocol: TCP
+            - name: metrics
+              containerPort: 9363
+              protocol: TCP
+          livenessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - 'echo ruok | nc localhost 9181 | grep -q imok'
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - 'echo ruok | nc localhost 9181 | grep -q imok'
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.clickhouse.keeper.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/clickhouse-keeper
+            - name: data
+              mountPath: /var/lib/clickhouse-keeper
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "fuseone.fullname" . }}-clickhouse-keeper
+            defaultMode: 0755
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    {{- include "fuseone.clickhouse.keeper.selectorLabels" . | nindent 20 }}
+                topologyKey: kubernetes.io/hostname
+  {{- if .Values.clickhouse.keeper.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        {{- if .Values.clickhouse.keeper.persistence.storageClass }}
+        storageClassName: {{ .Values.clickhouse.keeper.persistence.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.clickhouse.keeper.persistence.size }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,22 @@
+{{- if .Values.backend.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fuseone.fullname" . }}-backend
+  labels:
+    {{- include "fuseone.backend.labels" . | nindent 4 }}
+data:
+  SERVER_PORT: {{ .Values.backend.config.serverPort | default "8080" | quote }}
+  DB_HOST: {{ include "fuseone.postgresql.host" . | quote }}
+  DB_PORT: {{ include "fuseone.postgresql.port" . | quote }}
+  DB_NAME: {{ .Values.backend.config.dbName | quote }}
+  DB_SSLMODE: {{ .Values.backend.config.dbSSLMode | quote }}
+  APISIX_ADMIN_URL: {{ include "fuseone.apisix.adminURL" . | quote }}
+  APISIX_CONTROL_URL: {{ include "fuseone.apisix.controlURL" . | quote }}
+  JWT_EXPIRY_MINUTES: {{ .Values.backend.config.jwtExpiryMinutes | quote }}
+  REFRESH_EXPIRY_DAYS: {{ .Values.backend.config.refreshExpiryDays | quote }}
+  SERVER_CORS_ORIGINS: {{ .Values.backend.config.corsOrigins | quote }}
+  DEBUG_ENABLED: {{ .Values.backend.config.debugEnabled | quote }}
+  DEBUG_RETENTION_HOURS: {{ .Values.backend.config.debugRetentionHours | quote }}
+  DEBUG_MAX_ROWS: {{ .Values.backend.config.debugMaxRows | quote }}
+{{- end }}

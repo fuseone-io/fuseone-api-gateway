@@ -1,0 +1,45 @@
+{{- if and .Values.clickhouse.enabled .Values.clickhouse.keeper.enabled }}
+---
+# Headless service for StatefulSet DNS
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fuseone.clickhouse.keeper.headless" . }}
+  labels:
+    {{- include "fuseone.clickhouse.keeper.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: 9181
+      targetPort: client
+      protocol: TCP
+      name: client
+    - port: 9234
+      targetPort: raft
+      protocol: TCP
+      name: raft
+    - port: 9363
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "fuseone.clickhouse.keeper.selectorLabels" . | nindent 4 }}
+---
+# Client service for ClickHouse to connect to Keeper
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fuseone.fullname" . }}-clickhouse-keeper
+  labels:
+    {{- include "fuseone.clickhouse.keeper.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9181
+      targetPort: client
+      protocol: TCP
+      name: client
+  selector:
+    {{- include "fuseone.clickhouse.keeper.selectorLabels" . | nindent 4 }}
+{{- end }}

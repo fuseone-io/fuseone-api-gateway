@@ -15,6 +15,9 @@ import { graphqlGatewayCategory } from "./13-graphql-gateway"
 import { apiTestingCategory } from "./14-api-testing"
 import { serviceMeshCategory } from "./15-service-mesh"
 import { kafkaGatewayCategory } from "./16-kafka-gateway"
+import { designStudioCategory } from "./17-design-studio"
+import { apiMindmapCategory } from "./18-api-mindmap"
+import { requestTracingCategory } from "./19-request-tracing"
 
 export type { DocCategory, DocArticle, DocSection } from "./types"
 
@@ -30,6 +33,9 @@ export const DOC_CATEGORIES: DocCategory[] = [
   apiTestingCategory,
   serviceMeshCategory,
   kafkaGatewayCategory,
+  designStudioCategory,
+  apiMindmapCategory,
+  requestTracingCategory,
   monitoramentoCategory,
   segurancaCategory,
   multiAmbienteCategory,

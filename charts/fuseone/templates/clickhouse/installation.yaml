@@ -1,0 +1,152 @@
+{{- if .Values.clickhouse.enabled }}
+# ClickHouseInstallation CR - requires Altinity ClickHouse Operator
+# Install operator first: scripts/install-clickhouse-operator.sh
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: {{ include "fuseone.fullname" . }}-clickhouse
+  labels:
+    {{- include "fuseone.labels" . | nindent 4 }}
+    app.kubernetes.io/component: clickhouse
+spec:
+  configuration:
+    # ---------- Keeper (replaces ZooKeeper) ----------
+    zookeeper:
+      nodes:
+        {{- $keeperHeadless := include "fuseone.clickhouse.keeper.headless" . }}
+        {{- $keeperName := printf "%s-clickhouse-keeper" (include "fuseone.fullname" .) }}
+        {{- range $i := until (int .Values.clickhouse.keeper.replicas) }}
+        - host: {{ $keeperName }}-{{ $i }}.{{ $keeperHeadless }}.{{ $.Release.Namespace }}.svc.cluster.local
+          port: 9181
+        {{- end }}
+
+    # ---------- Cluster layout ----------
+    clusters:
+      - name: {{ .Values.clickhouse.cluster.name | default "fuseone" }}
+        templates:
+          podTemplate: clickhouse-pod
+          dataVolumeClaimTemplate: data-volume
+        layout:
+          shardsCount: {{ .Values.clickhouse.cluster.shards }}
+          replicasCount: {{ .Values.clickhouse.cluster.replicas }}
+
+    # ---------- Server settings ----------
+    settings:
+      default_database: {{ .Values.clickhouse.auth.database }}
+      logger/level: information
+      logger/console: "1"
+      max_connections: {{ .Values.clickhouse.settings.maxConnections }}
+      max_concurrent_queries: {{ .Values.clickhouse.settings.maxConcurrentQueries }}
+      max_memory_usage: {{ .Values.clickhouse.settings.maxMemoryUsage | quote }}
+      # Merge tree optimizations
+      merge_tree/max_suspicious_broken_parts: "5"
+      merge_tree/parts_to_delay_insert: "150"
+      merge_tree/parts_to_throw_insert: "300"
+
+    # ---------- Profiles ----------
+    profiles:
+      default/max_memory_usage: {{ .Values.clickhouse.settings.maxMemoryUsage | quote }}
+      default/max_execution_time: "300"
+      default/load_balancing: random
+      readonly/readonly: "1"
+
+    # ---------- Quotas ----------
+    quotas:
+      default/interval/duration: "3600"
+      default/interval/queries: "0"
+      default/interval/errors: "0"
+      default/interval/result_rows: "0"
+
+    # ---------- Users ----------
+    users:
+      {{ .Values.clickhouse.auth.username }}/networks/ip:
+        - 0.0.0.0/0
+      {{ .Values.clickhouse.auth.username }}/profile: default
+      {{ .Values.clickhouse.auth.username }}/quota: default
+      {{- if .Values.clickhouse.auth.password }}
+      {{ .Values.clickhouse.auth.username }}/password: {{ .Values.clickhouse.auth.password | quote }}
+      {{- end }}
+      # Read-only user for dashboards/grafana
+      readonly/networks/ip:
+        - 0.0.0.0/0
+      readonly/profile: readonly
+      readonly/quota: default
+
+    # ---------- Files ----------
+    files:
+      config.d/prometheus.xml: |
+        <clickhouse>
+            <prometheus>
+                <endpoint>/metrics</endpoint>
+                <port>9363</port>
+                <metrics>true</metrics>
+                <events>true</events>
+                <asynchronous_metrics>true</asynchronous_metrics>
+            </prometheus>
+        </clickhouse>
+
+  # ---------- Defaults ----------
+  defaults:
+    templates:
+      dataVolumeClaimTemplate: data-volume
+      podTemplate: clickhouse-pod
+
+  # ---------- Templates ----------
+  templates:
+    podTemplates:
+      - name: clickhouse-pod
+        spec:
+          {{- with .Values.global.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: clickhouse
+              image: "{{ .Values.clickhouse.image.repository }}:{{ .Values.clickhouse.image.tag }}"
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: tcp
+                  containerPort: 9000
+                - name: interserver
+                  containerPort: 9009
+                - name: metrics
+                  containerPort: 9363
+              resources:
+                {{- toYaml .Values.clickhouse.cluster.resources | nindent 16 }}
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: clickhouse.altinity.com/chi
+                          operator: In
+                          values:
+                            - {{ include "fuseone.fullname" . }}-clickhouse
+                    topologyKey: kubernetes.io/hostname
+
+    volumeClaimTemplates:
+      - name: data-volume
+        spec:
+          {{- if .Values.clickhouse.cluster.storage.storageClass }}
+          storageClassName: {{ .Values.clickhouse.cluster.storage.storageClass }}
+          {{- end }}
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: {{ .Values.clickhouse.cluster.storage.size }}
+
+    serviceTemplates:
+      - name: clickhouse-service
+        generateName: {{ include "fuseone.fullname" . }}-clickhouse
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: tcp
+              port: 9000
+          type: ClusterIP
+{{- end }}

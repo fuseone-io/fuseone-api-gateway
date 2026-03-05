@@ -245,6 +245,338 @@ export const PLUGIN_DOCS: Record<string, PluginDoc> = {
     relatedPlugins: ["jwt-auth", "openid-connect", "consumer-restriction"],
   },
 
+  "authz-keycloak": {
+    overview:
+      "Keycloak Authorization integrates the gateway with Keycloak's authorization services to enforce fine-grained access control. It validates JWT tokens issued by Keycloak and checks realm roles, client roles, and resource permissions using Keycloak's Protection API. This plugin is ideal when you already use Keycloak as your identity provider and want centralized policy management.",
+    useCases: [
+      "Enforce realm-level and client-level role checks on API routes",
+      "Leverage Keycloak's UMA (User-Managed Access) for resource-based authorization",
+      "Centralize access policies in Keycloak and enforce them at the gateway layer",
+      "Protect microservices with Keycloak-issued JWTs without adding authorization logic to each service",
+    ],
+    bestPractices: [
+      "Use the discovery endpoint to auto-configure token and authorization endpoints from Keycloak's realm metadata",
+      "Prefer lazy loading of grants ('lazy_load_paths: true') to avoid performance overhead on routes that don't require fine-grained authorization",
+      "Set 'ssl_verify' to true in production to ensure the gateway validates Keycloak's TLS certificate",
+      "Use client roles for service-specific access and realm roles for cross-service permissions",
+    ],
+    cautions: [
+      "Keycloak must be reachable from the gateway — network issues will cause all protected requests to fail",
+      "Enabling resource-level permission checks (UMA) adds latency due to the round-trip to Keycloak's authorization endpoint",
+      "Token audience ('aud') must include the client_id configured in this plugin, otherwise authorization will be rejected",
+      "Complex Keycloak policies (e.g., time-based, aggregate) can be difficult to debug at the gateway level",
+    ],
+    examples: [
+      {
+        title: "Basic Keycloak JWT Validation",
+        description: "Validate Keycloak tokens and enforce client role requirements",
+        config: {
+          client_id: "my-api-client",
+          client_secret: "client-secret-here",
+          discovery: "https://keycloak.example.com/realms/my-realm/.well-known/uma2-configuration",
+          bearer_only: true,
+          realm: "my-realm",
+          ssl_verify: true,
+        },
+      },
+      {
+        title: "Resource-based Authorization (UMA)",
+        description: "Check fine-grained resource permissions via Keycloak's Protection API",
+        config: {
+          client_id: "my-api-client",
+          client_secret: "client-secret-here",
+          discovery: "https://keycloak.example.com/realms/my-realm/.well-known/uma2-configuration",
+          bearer_only: true,
+          policy_enforcement_mode: "ENFORCING",
+          permissions: ["resource-name#scope-read", "resource-name#scope-write"],
+          lazy_load_paths: true,
+          ssl_verify: true,
+        },
+      },
+    ],
+    relatedPlugins: ["openid-connect", "jwt-auth", "consumer-restriction"],
+  },
+
+  "wolf-rbac": {
+    overview:
+      "Wolf RBAC integrates with wolf-server, a role-based access control platform, to manage user authentication and permission checks. The plugin redirects unauthenticated requests to wolf-server for login and validates session tokens on subsequent requests. It is suited for organizations already using wolf-server as their RBAC backend.",
+    useCases: [
+      "Add role-based access control to APIs using an existing wolf-server deployment",
+      "Centralize user and permission management through wolf-server's admin console",
+      "Protect internal APIs with wolf's user-role-permission model",
+    ],
+    bestPractices: [
+      "Deploy wolf-server as a highly available service since every auth check depends on it",
+      "Use the appid field to isolate permissions per application or API group",
+      "Keep wolf-server close to the gateway (same network) to minimize authentication latency",
+    ],
+    cautions: [
+      "Wolf-server is a niche RBAC platform — ensure your team can maintain and operate it",
+      "Every request requires a round-trip to wolf-server, adding latency compared to local JWT validation",
+      "Limited community adoption means fewer resources for troubleshooting compared to mainstream solutions",
+    ],
+    examples: [
+      {
+        title: "Wolf RBAC Integration",
+        description: "Authenticate users and check permissions via wolf-server",
+        config: {
+          server: "http://wolf-server:12180",
+          appid: "my-api-app",
+          header_prefix: "X-",
+        },
+      },
+    ],
+    relatedPlugins: ["forward-auth", "authz-keycloak", "authz-casbin"],
+  },
+
+  "ldap-auth": {
+    overview:
+      "LDAP Authentication validates user credentials against an LDAP directory server or Microsoft Active Directory. The plugin extracts Basic Auth credentials from the request and performs an LDAP bind to verify the username and password. This is the standard approach for integrating APIs with corporate directory services.",
+    useCases: [
+      "Authenticate API users against a corporate Active Directory",
+      "Protect internal APIs with existing LDAP/AD credentials — no separate API keys needed",
+      "Integrate the gateway with enterprise identity infrastructure without deploying an IdP",
+      "Enforce directory-based access control for on-premise API deployments",
+    ],
+    bestPractices: [
+      "Always use LDAPS (port 636) or STARTTLS to encrypt credentials in transit",
+      "Use a service account (bind DN) with read-only permissions for user lookups",
+      "Set a reasonable search scope and base DN to minimize LDAP query time",
+      "Enable 'hide_credentials' to prevent Basic Auth headers from being forwarded upstream",
+    ],
+    cautions: [
+      "LDAP bind is performed on every request, adding latency — consider adding caching or combining with JWT for session management",
+      "Misconfigured base DN or user DN template will cause all authentication to fail silently",
+      "If the LDAP server is unreachable, all protected routes become inaccessible — ensure high availability",
+      "LDAP credentials are sent as Basic Auth (Base64) — HTTPS is mandatory to protect them in transit",
+    ],
+    examples: [
+      {
+        title: "Active Directory Authentication",
+        description: "Authenticate users against a corporate AD using LDAPS",
+        config: {
+          ldap_uri: "ldaps://ad.example.com:636",
+          base_dn: "ou=Users,dc=example,dc=com",
+          uid: "sAMAccountName",
+          use_tls: true,
+          hide_credentials: true,
+        },
+      },
+      {
+        title: "OpenLDAP Integration",
+        description: "Authenticate against an OpenLDAP directory server",
+        config: {
+          ldap_uri: "ldap://ldap.internal:389",
+          base_dn: "ou=people,dc=example,dc=org",
+          uid: "uid",
+          use_tls: false,
+          hide_credentials: true,
+        },
+      },
+    ],
+    relatedPlugins: ["basic-auth", "openid-connect", "forward-auth"],
+  },
+
+  "authz-casbin": {
+    overview:
+      "Casbin Authorization enforces access control policies defined using Casbin's flexible model language. Casbin supports ACL, RBAC, ABAC, and more complex authorization models. Policies can be stored in files or external adapters (databases, etcd). This plugin is ideal for teams that need customizable, model-driven access control without writing code.",
+    useCases: [
+      "Implement fine-grained RBAC with hierarchical role inheritance",
+      "Enforce ABAC policies based on request attributes (method, path, headers)",
+      "Centralize authorization rules in a policy file or database adapter",
+      "Create multi-tenant access control models with per-tenant policies",
+    ],
+    bestPractices: [
+      "Start with a simple RBAC model and evolve to more complex models as needed",
+      "Store policies in a database adapter for dynamic updates without gateway restarts",
+      "Use Casbin's built-in model editor to validate your model before deploying",
+      "Combine with an authentication plugin that sets the username or role in a header",
+    ],
+    cautions: [
+      "Casbin's model language has a learning curve — invest time in understanding matchers and effect rules",
+      "Policy evaluation performance depends on the number of rules — monitor latency with large policy sets",
+      "Model and policy files must be accessible to the gateway — use absolute paths or config maps in Kubernetes",
+    ],
+    examples: [
+      {
+        title: "RBAC Authorization Model",
+        description: "Enforce role-based access using Casbin's RBAC model",
+        config: {
+          model_path: "/conf/casbin/model.conf",
+          policy_path: "/conf/casbin/policy.csv",
+          username: "user",
+        },
+      },
+      {
+        title: "Request-based ACL",
+        description: "Control access based on HTTP method and path",
+        config: {
+          model_path: "/conf/casbin/restful_model.conf",
+          policy_path: "/conf/casbin/restful_policy.csv",
+          username: "user",
+        },
+      },
+    ],
+    relatedPlugins: ["authz-keycloak", "wolf-rbac", "consumer-restriction"],
+  },
+
+  "authz-casdoor": {
+    overview:
+      "Casdoor Authentication integrates the gateway with Casdoor, an open-source SSO and identity platform. The plugin implements the OAuth2 authorization code flow with Casdoor, handling login redirects, token exchange, and session management. It is designed for organizations using Casdoor as their centralized identity and access management solution.",
+    useCases: [
+      "Add SSO authentication to APIs using an existing Casdoor deployment",
+      "Implement OAuth2 login flows for web applications behind the gateway",
+      "Centralize user management, MFA, and social login through Casdoor's admin console",
+      "Protect APIs with Casdoor-issued tokens in multi-application environments",
+    ],
+    bestPractices: [
+      "Configure the callback URL in Casdoor to match the gateway's redirect endpoint exactly",
+      "Use HTTPS for all Casdoor communication to protect tokens and credentials",
+      "Set appropriate token expiration times in Casdoor to balance security and usability",
+      "Leverage Casdoor's built-in social login providers instead of configuring them separately",
+    ],
+    cautions: [
+      "Casdoor must be reachable from both the gateway and the end user's browser — plan network routing accordingly",
+      "Session state is managed by the gateway, increasing memory usage under high concurrency",
+      "The callback URL must be registered in Casdoor — mismatches will silently fail the login flow",
+    ],
+    examples: [
+      {
+        title: "Casdoor SSO Integration",
+        description: "Implement OAuth2 authorization code flow with Casdoor",
+        config: {
+          endpoint_addr: "https://casdoor.example.com",
+          client_id: "my-api-app-id",
+          client_secret: "my-api-app-secret",
+          callback_url: "https://api.example.com/callback",
+        },
+      },
+    ],
+    relatedPlugins: ["openid-connect", "authz-keycloak", "forward-auth"],
+  },
+
+  "cas-auth": {
+    overview:
+      "CAS Authentication implements the Central Authentication Service (CAS) protocol for single sign-on. The plugin redirects unauthenticated users to the CAS server login page and validates service tickets upon return. CAS is commonly used in university and enterprise environments that standardized on the CAS protocol.",
+    useCases: [
+      "Integrate APIs with a university or enterprise CAS server for single sign-on",
+      "Protect web applications behind the gateway with CAS-based authentication",
+      "Migrate legacy CAS-authenticated services to an API gateway architecture",
+    ],
+    bestPractices: [
+      "Ensure the CAS server URL uses HTTPS to protect ticket exchange",
+      "Configure the service URL to match the route exposed by the gateway exactly",
+      "Use CAS 3.0 protocol (serviceValidate) instead of CAS 1.0 for richer attribute support",
+      "Implement a logout endpoint that calls CAS single logout (SLO) to invalidate sessions globally",
+    ],
+    cautions: [
+      "CAS is a redirect-based protocol — it is not suitable for pure API-to-API communication",
+      "Service ticket validation requires a round-trip to the CAS server for every new session",
+      "The CAS protocol does not define scopes or claims like OIDC — attribute release must be configured server-side",
+    ],
+    examples: [
+      {
+        title: "CAS Server Integration",
+        description: "Authenticate users via CAS protocol with ticket validation",
+        config: {
+          idp_uri: "https://cas.example.edu/cas",
+          cas_callback_uri: "/cas/callback",
+          logout_uri: "/cas/logout",
+        },
+      },
+    ],
+    relatedPlugins: ["openid-connect", "forward-auth", "authz-casdoor"],
+  },
+
+  opa: {
+    overview:
+      "Open Policy Agent (OPA) authorization sends incoming request metadata to an OPA server for policy evaluation. OPA uses the Rego policy language to make allow/deny decisions based on request attributes such as method, path, headers, and user identity. This decouples authorization logic from the gateway, enabling policy-as-code workflows.",
+    useCases: [
+      "Implement complex authorization rules that go beyond simple RBAC (e.g., time-based, geo-based, attribute-based)",
+      "Enforce organization-wide policies consistently across multiple services via a shared OPA server",
+      "Enable policy-as-code workflows where authorization rules are versioned in Git",
+      "Create dynamic authorization that adapts based on external data sources loaded into OPA",
+    ],
+    bestPractices: [
+      "Keep OPA policies focused and modular — use packages to organize rules by domain",
+      "Pre-load static data into OPA bundles instead of fetching it at evaluation time for better performance",
+      "Deploy OPA as a sidecar alongside the gateway to minimize network latency",
+      "Test policies thoroughly with OPA's built-in test framework before deploying to production",
+    ],
+    cautions: [
+      "Every request triggers an HTTP call to OPA — this adds latency, especially if OPA is not co-located with the gateway",
+      "Rego has a steep learning curve — plan for team training and policy review processes",
+      "OPA must be highly available since the gateway depends on it for every authorization decision",
+      "Complex policies with deep recursion or large data sets can slow down evaluation time",
+    ],
+    examples: [
+      {
+        title: "Basic OPA Authorization",
+        description: "Send request details to OPA and enforce the policy decision",
+        config: {
+          host: "http://opa:8181",
+          policy: "gateway/allow",
+          with_route: true,
+          with_consumer: true,
+        },
+      },
+      {
+        title: "OPA with Custom Input",
+        description: "Include additional request metadata in the OPA input document",
+        config: {
+          host: "http://opa:8181",
+          policy: "gateway/authz/allow",
+          with_route: true,
+          with_service: true,
+          with_consumer: true,
+          keepalive: true,
+          keepalive_timeout: 60000,
+          keepalive_pool: 5,
+        },
+      },
+    ],
+    relatedPlugins: ["authz-casbin", "authz-keycloak", "forward-auth"],
+  },
+
+  "multi-auth": {
+    overview:
+      "Multi Auth allows you to configure multiple authentication methods on a single route, trying each one in order until one succeeds. This enables flexible authentication where different consumers may use different auth mechanisms (e.g., some use API keys while others use JWT). If all configured methods fail, the request is rejected.",
+    useCases: [
+      "Support both API key and JWT authentication on the same endpoint during a migration period",
+      "Allow internal services to use Basic Auth while external clients use OAuth2/OIDC",
+      "Enable gradual migration from one authentication method to another without breaking existing consumers",
+      "Serve multiple client types (mobile apps with JWT, server integrations with API keys) from the same API",
+    ],
+    bestPractices: [
+      "Order auth methods from most common to least common for faster authentication on average",
+      "Use multi-auth as a transitional tool — consolidate to a single auth method when possible",
+      "Ensure each auth plugin in the chain has 'hide_credentials' enabled to avoid leaking credentials upstream",
+      "Monitor which auth method succeeds most often to understand your consumer base",
+    ],
+    cautions: [
+      "Each failed auth attempt adds latency — minimize the number of methods in the chain",
+      "Error messages may be confusing since only the last failure is returned to the client",
+      "All auth methods must be configured on the consumer — multi-auth only tries them in order, it doesn't create new auth contexts",
+    ],
+    examples: [
+      {
+        title: "API Key + JWT Fallback",
+        description: "Try API key first, then JWT authentication",
+        config: {
+          auth_plugins: ["key-auth", "jwt-auth"],
+        },
+      },
+      {
+        title: "Three-Method Authentication",
+        description: "Support API key, JWT, and Basic Auth on the same route",
+        config: {
+          auth_plugins: ["key-auth", "jwt-auth", "basic-auth"],
+        },
+      },
+    ],
+    relatedPlugins: ["key-auth", "jwt-auth", "basic-auth", "openid-connect"],
+  },
+
   // ─── Security ─────────────────────────────────────────────────
 
   "ip-restriction": {
@@ -425,6 +757,160 @@ export const PLUGIN_DOCS: Record<string, PluginDoc> = {
       },
     ],
     relatedPlugins: ["key-auth", "jwt-auth", "ip-restriction"],
+  },
+
+  "request-validation": {
+    overview:
+      "Request Validation enforces JSON Schema validation on incoming request bodies and headers before they reach the upstream service. If the request does not conform to the defined schema, it is rejected with a detailed error message. This prevents malformed or malicious payloads from reaching your backend and serves as a first line of defense for data integrity.",
+    useCases: [
+      "Validate that POST/PUT request bodies conform to a strict JSON schema",
+      "Enforce required headers and their formats before forwarding requests",
+      "Reject oversized or structurally invalid payloads at the gateway level",
+      "Document and enforce API contracts directly in the gateway configuration",
+    ],
+    bestPractices: [
+      "Define schemas with explicit 'required' fields and 'additionalProperties: false' to reject unexpected data",
+      "Keep schemas focused — validate structure at the gateway and business rules in the backend",
+      "Use descriptive error messages in the schema so clients understand why validation failed",
+      "Version your schemas alongside your API definitions for traceability",
+    ],
+    cautions: [
+      "Complex JSON Schema validation adds processing time — avoid deeply nested schemas on high-throughput routes",
+      "The plugin only validates JSON payloads — form-encoded, XML, or binary bodies are not supported",
+      "Overly strict schemas can cause false rejections — test with real client payloads before deploying",
+      "Schema errors are returned to the client, which may leak internal structure details — review error messages carefully",
+    ],
+    examples: [
+      {
+        title: "Validate Request Body",
+        description: "Enforce a JSON schema on the request body for a user creation endpoint",
+        config: {
+          body_schema: {
+            type: "object",
+            required: ["username", "email"],
+            properties: {
+              username: { type: "string", minLength: 3, maxLength: 64 },
+              email: { type: "string", pattern: "^\\S+@\\S+\\.\\S+$" },
+              age: { type: "integer", minimum: 0, maximum: 150 },
+            },
+            additionalProperties: false,
+          },
+        },
+      },
+      {
+        title: "Validate Required Headers",
+        description: "Ensure required headers are present and match expected patterns",
+        config: {
+          header_schema: {
+            type: "object",
+            required: ["Content-Type"],
+            properties: {
+              "Content-Type": { type: "string", enum: ["application/json"] },
+            },
+          },
+        },
+      },
+    ],
+    relatedPlugins: ["uri-blocker", "cors", "fault-injection"],
+  },
+
+  "ua-restriction": {
+    overview:
+      "User-Agent Restriction filters incoming requests based on the User-Agent header value. You can define an allowlist of permitted User-Agent patterns or a denylist of blocked patterns using regular expressions. This is useful for blocking bots, scrapers, and outdated clients while allowing legitimate traffic through.",
+    useCases: [
+      "Block known web scrapers and malicious bots from accessing your API",
+      "Restrict API access to specific client applications by their User-Agent string",
+      "Deny access from outdated or vulnerable HTTP client versions",
+      "Allow only mobile app user agents to access mobile-specific API endpoints",
+    ],
+    bestPractices: [
+      "Use denylist mode to block known bad actors rather than allowlist mode, which is brittle against legitimate UA variations",
+      "Combine with rate limiting for defense-in-depth — UA headers can be easily spoofed",
+      "Use regex patterns to match UA families rather than exact strings (e.g., 'curl/.*' instead of 'curl/7.68.0')",
+      "Log blocked requests to identify false positives and refine your patterns",
+    ],
+    cautions: [
+      "User-Agent headers can be trivially spoofed — do not rely on UA restriction as the sole security measure",
+      "Overly broad regex patterns (e.g., '.*bot.*') may block legitimate clients like Googlebot or monitoring services",
+      "An empty or missing User-Agent header may bypass restrictions unless explicitly handled",
+      "Allowlist and denylist are mutually exclusive — you cannot use both in the same configuration",
+    ],
+    examples: [
+      {
+        title: "Block Known Bots and Scrapers",
+        description: "Deny access from common scraping tools and bad bots",
+        config: {
+          denylist: [
+            "Scrapy",
+            "HTTrack",
+            "python-requests/.*",
+            "Go-http-client/.*",
+          ],
+          message: "Access denied: client not allowed",
+        },
+      },
+      {
+        title: "Allow Only Specific Clients",
+        description: "Restrict access to approved mobile app user agents",
+        config: {
+          allowlist: [
+            "MyApp-iOS/.*",
+            "MyApp-Android/.*",
+          ],
+          message: "Access restricted to approved clients",
+        },
+      },
+    ],
+    relatedPlugins: ["ip-restriction", "referer-restriction", "consumer-restriction"],
+  },
+
+  "referer-restriction": {
+    overview:
+      "Referer Restriction filters requests based on the HTTP Referer header, allowing or denying access based on the referring domain. This plugin helps ensure that your API is only called from authorized web pages or applications. It is commonly used to prevent hotlinking and restrict API access to known frontend origins.",
+    useCases: [
+      "Prevent hotlinking of API resources from unauthorized websites",
+      "Restrict API calls to requests originating from your own web application",
+      "Add an extra layer of origin validation alongside CORS headers",
+      "Block requests from known phishing or scraping domains",
+    ],
+    bestPractices: [
+      "Use wildcard patterns (e.g., '*.example.com') to allow all subdomains of a trusted domain",
+      "Combine with CORS for comprehensive origin control — Referer restriction alone is not sufficient",
+      "Handle missing Referer headers explicitly with the 'bypass_missing' option for API clients that don't send Referer",
+      "Keep the allowlist short and specific to minimize pattern matching overhead",
+    ],
+    cautions: [
+      "The Referer header can be spoofed — do not rely on it as the sole access control mechanism",
+      "Many privacy-focused browsers and extensions strip or modify the Referer header, which may block legitimate users",
+      "Server-to-server API calls typically do not include a Referer header — use 'bypass_missing: true' to allow them",
+      "HTTPS-to-HTTP transitions cause browsers to omit the Referer header by default",
+    ],
+    examples: [
+      {
+        title: "Allow Specific Domains",
+        description: "Only allow requests referred from your own domains",
+        config: {
+          whitelist: [
+            "*.example.com",
+            "example.com",
+          ],
+          bypass_missing: true,
+          message: "Access denied: invalid referer",
+        },
+      },
+      {
+        title: "Block Specific Domains",
+        description: "Block requests from known unauthorized referrers",
+        config: {
+          blacklist: [
+            "*.competitor.com",
+            "scraper-site.net",
+          ],
+          message: "Access denied",
+        },
+      },
+    ],
+    relatedPlugins: ["cors", "ua-restriction", "ip-restriction"],
   },
 
   // ─── Traffic Control ──────────────────────────────────────────
@@ -666,6 +1152,216 @@ export const PLUGIN_DOCS: Record<string, PluginDoc> = {
     relatedPlugins: ["proxy-rewrite", "response-rewrite"],
   },
 
+  "api-breaker": {
+    overview:
+      "API Breaker implements the circuit breaker pattern to protect upstream services from cascading failures. It monitors upstream error rates and, when failures exceed a configurable threshold, 'opens' the circuit to return errors immediately without forwarding requests. After a cooldown period, the circuit enters a 'half-open' state where a limited number of test requests are allowed through to check if the upstream has recovered.",
+    useCases: [
+      "Prevent cascading failures when an upstream service becomes unhealthy or unresponsive",
+      "Provide fast failure responses instead of making clients wait for upstream timeouts",
+      "Automatically recover traffic flow once an upstream service stabilizes",
+      "Protect shared infrastructure from one degraded service consuming all available connections",
+    ],
+    bestPractices: [
+      "Set failure thresholds based on your upstream's normal error baseline — too sensitive triggers false positives",
+      "Configure an appropriate max_breaker_sec to balance between quick recovery and giving the upstream time to heal",
+      "Return meaningful break_response_body messages so clients understand the service is temporarily unavailable",
+      "Combine with health checks and retry mechanisms for a comprehensive resilience strategy",
+    ],
+    cautions: [
+      "If the failure threshold is too low, transient errors can trip the breaker unnecessarily",
+      "The circuit breaker state is per gateway node — in a cluster, each node tracks failures independently",
+      "Long max_breaker_sec values keep the circuit open too long, delaying recovery even after the upstream is healthy",
+    ],
+    examples: [
+      {
+        title: "Standard Circuit Breaker",
+        description: "Open the circuit after 3 consecutive 500/502/503 errors, require 2 successes to close",
+        config: {
+          unhealthy: { http_statuses: [500, 502, 503], failures: 3 },
+          healthy: { http_statuses: [200], successes: 2 },
+          break_response_code: 502,
+          break_response_body: "{\"error\": \"Service temporarily unavailable. The circuit breaker is open.\"}",
+          max_breaker_sec: 300,
+        },
+      },
+      {
+        title: "Aggressive Breaker for Critical Path",
+        description: "Trip the circuit quickly on any server error to protect downstream consumers",
+        config: {
+          unhealthy: { http_statuses: [500, 502, 503, 504], failures: 1 },
+          healthy: { http_statuses: [200, 201], successes: 3 },
+          break_response_code: 503,
+          break_response_body: "{\"error\": \"Upstream is temporarily down. Please retry later.\"}",
+          max_breaker_sec: 60,
+        },
+      },
+    ],
+    relatedPlugins: ["limit-conn", "limit-req", "traffic-split"],
+  },
+
+  "client-control": {
+    overview:
+      "Client Control restricts client request properties at the gateway level, most notably the maximum allowed request body size. This prevents oversized payloads from reaching your upstream services, protecting against memory exhaustion and denial-of-service attacks that use large request bodies.",
+    useCases: [
+      "Enforce a maximum upload size for file upload endpoints",
+      "Prevent abuse through excessively large JSON or XML payloads",
+      "Protect upstream services with limited memory from processing oversized requests",
+      "Apply different body size limits per route based on endpoint requirements",
+    ],
+    bestPractices: [
+      "Set max_body_size based on the largest legitimate payload your endpoint should accept",
+      "Apply stricter limits to endpoints that do not handle file uploads",
+      "Combine with rate limiting for a comprehensive abuse prevention strategy",
+      "Return clear error messages so clients know the exact size limit they exceeded",
+    ],
+    cautions: [
+      "Setting the limit too low will reject legitimate requests — analyze your actual payload sizes before configuring",
+      "This plugin only controls the request body size — it does not limit header sizes or query string lengths",
+      "Binary file uploads may need significantly higher limits than JSON API endpoints",
+    ],
+    examples: [
+      {
+        title: "Limit Request Body to 1 MB",
+        description: "Reject requests with bodies larger than 1 megabyte",
+        config: { max_body_size: 1048576 },
+      },
+      {
+        title: "Small Payload Limit for JSON APIs",
+        description: "Restrict JSON API endpoints to 100 KB payloads",
+        config: { max_body_size: 102400 },
+      },
+    ],
+    relatedPlugins: ["limit-req", "limit-count", "limit-conn"],
+  },
+
+  "proxy-control": {
+    overview:
+      "Proxy Control configures how the gateway proxies requests to upstream services, including connection timeouts, read/send timeouts, and request buffering behavior. This gives fine-grained control over the proxying behavior per route, overriding global gateway defaults for specific endpoints that need different timeout or buffering settings.",
+    useCases: [
+      "Increase timeouts for long-running API calls like report generation or file processing",
+      "Disable request buffering for streaming endpoints that need low-latency pass-through",
+      "Set aggressive timeouts for health check or lightweight endpoints to fail fast",
+      "Tune proxy behavior per route to match the upstream service's response characteristics",
+    ],
+    bestPractices: [
+      "Set timeouts based on the actual response time of your upstream service plus a reasonable margin",
+      "Use shorter timeouts for read-heavy endpoints and longer ones for write or processing endpoints",
+      "Monitor timeout errors to identify routes that need adjustment",
+      "Disable request buffering only when necessary, as buffering improves gateway throughput under load",
+    ],
+    cautions: [
+      "Very long timeouts can cause connection exhaustion under high load — balance between user experience and resource usage",
+      "Disabling request buffering means the upstream receives data as the client sends it, which can cause issues with retries",
+      "Timeout values are in seconds — ensure you do not accidentally set millisecond values",
+    ],
+    examples: [
+      {
+        title: "Extended Timeouts for Long Requests",
+        description: "Allow up to 5 minutes for report generation endpoints",
+        config: { request_buffering: true, connection_timeout: 5, send_timeout: 300, read_timeout: 300 },
+      },
+      {
+        title: "Fast-Fail for Health Checks",
+        description: "Short timeouts for lightweight health check endpoints",
+        config: { connection_timeout: 2, send_timeout: 5, read_timeout: 5 },
+      },
+    ],
+    relatedPlugins: ["client-control", "proxy-rewrite", "proxy-cache"],
+  },
+
+  mocking: {
+    overview:
+      "Mocking returns predefined responses directly from the gateway without forwarding the request to any upstream service. This is ideal for API prototyping, contract-first development, and testing scenarios where the backend is not yet available. You can define the response status code, content type, body, and even simulate network delay.",
+    useCases: [
+      "Prototype new API endpoints before the backend implementation is ready",
+      "Enable frontend development teams to work in parallel with backend teams using mock responses",
+      "Simulate specific response scenarios for integration testing (error states, edge cases)",
+      "Provide placeholder responses for deprecated endpoints during migration periods",
+    ],
+    bestPractices: [
+      "Use response_schema with JSON Schema for dynamic mock generation that closely resembles real data",
+      "Set a small delay value to simulate realistic network latency during development",
+      "Document which routes are mocked so teams know when to switch to real upstream services",
+      "Use response_example for static, predictable responses and response_schema for varied test data",
+    ],
+    cautions: [
+      "Mocked routes will never reach the upstream — ensure you remove or disable mocking before deploying to production",
+      "Mock responses do not validate request payloads, so clients may develop incorrect assumptions about the real API",
+      "High delay values can cause client timeouts during testing — keep delays realistic",
+    ],
+    examples: [
+      {
+        title: "Static JSON Mock",
+        description: "Return a fixed JSON response for a user endpoint",
+        config: {
+          response_status: 200,
+          content_type: "application/json",
+          response_example: "{\"id\": 1, \"name\": \"John Doe\", \"email\": \"john@example.com\"}",
+        },
+      },
+      {
+        title: "Mock with Delay and Schema",
+        description: "Return a schema-generated response with simulated latency",
+        config: {
+          delay: 500,
+          response_status: 200,
+          content_type: "application/json",
+          response_schema: {
+            type: "object",
+            properties: {
+              id: { type: "integer" },
+              name: { type: "string" },
+              status: { type: "string", enum: ["active", "inactive"] },
+            },
+          },
+        },
+      },
+    ],
+    relatedPlugins: ["fault-injection", "proxy-rewrite"],
+  },
+
+  workflow: {
+    overview:
+      "Workflow enables conditional plugin execution based on request attributes using match rules. It evaluates conditions against request variables (URI, headers, query parameters, IP) and applies corresponding plugin actions only when the conditions are met. This allows you to create sophisticated routing logic without duplicating route definitions.",
+    useCases: [
+      "Apply different rate limits based on the request path (e.g., stricter limits for write endpoints)",
+      "Route requests to different upstreams based on header values or query parameters",
+      "Apply authentication plugins selectively based on request characteristics",
+      "Implement complex business logic like applying different policies for internal vs. external clients",
+    ],
+    bestPractices: [
+      "Order rules from most specific to most general — the first matching rule is applied",
+      "Use clear, well-documented conditions in vars to make rule logic easy to understand and maintain",
+      "Test each rule independently before combining them into a workflow",
+      "Keep the number of rules manageable — excessive rules increase evaluation overhead and complexity",
+    ],
+    cautions: [
+      "Only the first matching rule is executed — overlapping conditions may cause unexpected behavior",
+      "Complex rule sets are difficult to debug — use logging to verify which rules are triggering",
+      "Incorrect vars syntax can silently fail, causing no rules to match",
+      "Performance degrades slightly with a large number of rules due to sequential evaluation",
+    ],
+    examples: [
+      {
+        title: "Path-Based Rate Limiting",
+        description: "Apply stricter rate limits to write endpoints and relaxed limits to read endpoints",
+        config: {
+          rules: [
+            {
+              case: [["uri", "~~", "^/api/v1/(create|update|delete)"]],
+              actions: [["limit-count", { count: 100, time_window: 60, rejected_code: 429 }]],
+            },
+            {
+              case: [["uri", "~~", "^/api/v1/(list|get)"]],
+              actions: [["limit-count", { count: 1000, time_window: 60, rejected_code: 429 }]],
+            },
+          ],
+        },
+      },
+    ],
+    relatedPlugins: ["traffic-split", "limit-count", "limit-req"],
+  },
+
   // ─── Transformation ───────────────────────────────────────────
 
   "proxy-rewrite": {
@@ -846,6 +1542,254 @@ export const PLUGIN_DOCS: Record<string, PluginDoc> = {
       },
     ],
     relatedPlugins: ["proxy-rewrite", "response-rewrite"],
+  },
+
+  "body-transformer": {
+    overview:
+      "Body Transformer converts request and response bodies between different formats such as JSON to XML, XML to JSON, or custom template-based transformations. It uses configurable templates to define how the body should be restructured, enabling seamless integration between services that speak different data formats without modifying either the client or the upstream.",
+    useCases: [
+      "Convert JSON requests to XML for legacy SOAP/XML-based upstream services",
+      "Transform XML responses from legacy backends into JSON for modern frontend clients",
+      "Restructure request or response payloads to match differing API contracts between consumers and producers",
+      "Normalize data formats across a heterogeneous microservices architecture",
+    ],
+    bestPractices: [
+      "Keep transformation templates simple and well-documented to ease maintenance",
+      "Test templates thoroughly with edge cases such as empty arrays, null values, and deeply nested objects",
+      "Use request transformations to adapt client payloads and response transformations to normalize upstream outputs",
+      "Monitor transformation errors and set up fallback responses for malformed input",
+    ],
+    cautions: [
+      "Complex templates increase processing time and memory usage — benchmark under realistic load",
+      "Transformation errors can produce malformed output that breaks downstream consumers",
+      "Large request or response bodies are fully buffered in memory during transformation",
+      "Template syntax errors are only caught at runtime, so validate templates before deploying",
+    ],
+    examples: [
+      {
+        title: "JSON to XML Request Transformation",
+        description: "Convert incoming JSON payloads to XML before forwarding to a SOAP upstream",
+        config: {
+          request: {
+            input_format: "json",
+            template: "<?xml version=\"1.0\"?><root><name>{{name}}</name><value>{{value}}</value></root>",
+          },
+        },
+      },
+      {
+        title: "XML to JSON Response Transformation",
+        description: "Convert XML responses from the upstream into JSON for modern API clients",
+        config: {
+          response: {
+            input_format: "xml",
+            template: "{\"result\": \"{{root.result}}\", \"status\": \"{{root.status}}\"}",
+          },
+        },
+      },
+    ],
+    relatedPlugins: ["proxy-rewrite", "response-rewrite", "grpc-transcode"],
+  },
+
+  "grpc-web": {
+    overview:
+      "gRPC-Web enables browser-based clients to communicate with gRPC upstream services through the API gateway. Since browsers cannot use native gRPC due to HTTP/2 framing limitations, gRPC-Web acts as a translation layer that accepts gRPC-Web protocol requests from the browser and converts them into standard gRPC calls to the upstream. This eliminates the need for a separate Envoy proxy or gRPC-Web proxy sidecar.",
+    useCases: [
+      "Allow web applications built with React, Angular, or Vue to call gRPC backend services directly",
+      "Eliminate the need for a separate gRPC-Web proxy (like Envoy) in front of gRPC services",
+      "Provide a unified gateway for both REST and gRPC-Web traffic",
+      "Enable progressive migration from REST to gRPC without breaking browser-based clients",
+    ],
+    bestPractices: [
+      "Ensure your upstream gRPC service is accessible via HTTP/2 from the gateway",
+      "Use the gRPC-Web text format (application/grpc-web-text) for better compatibility with browser debugging tools",
+      "Combine with CORS plugin to allow cross-origin gRPC-Web requests from browser applications",
+    ],
+    cautions: [
+      "Server-side streaming works, but bidirectional streaming is not supported by the gRPC-Web protocol",
+      "Large binary payloads over gRPC-Web are less efficient than native gRPC due to Base64 encoding in text mode",
+      "Ensure CORS headers are properly configured — browsers enforce strict cross-origin policies for gRPC-Web",
+    ],
+    examples: [
+      {
+        title: "Enable gRPC-Web Support",
+        description: "Enable gRPC-Web protocol translation with default settings",
+        config: {},
+      },
+    ],
+    relatedPlugins: ["grpc-transcode", "cors", "proxy-rewrite"],
+  },
+
+  gzip: {
+    overview:
+      "Gzip compresses HTTP response bodies before sending them to clients, significantly reducing bandwidth usage and improving transfer times for text-based content. The plugin selectively compresses responses based on MIME type and minimum size thresholds, and automatically sets the appropriate Content-Encoding headers. Most modern browsers and HTTP clients support gzip decompression transparently.",
+    useCases: [
+      "Reduce bandwidth costs for APIs that return large JSON or XML responses",
+      "Improve response times for clients on slow or metered network connections",
+      "Compress HTML, CSS, and JavaScript responses served through the gateway",
+      "Optimize API performance for mobile clients with limited bandwidth",
+    ],
+    bestPractices: [
+      "Only compress text-based MIME types (JSON, XML, HTML, CSS, JS) — binary formats like images and video are already compressed",
+      "Set min_length to avoid compressing tiny responses where the overhead exceeds the savings (1024 bytes is a good starting point)",
+      "Use a moderate compression level (4-6) for the best balance between CPU usage and compression ratio",
+      "Enable the Vary: Accept-Encoding header to ensure caches store compressed and uncompressed versions separately",
+    ],
+    cautions: [
+      "Compression adds CPU overhead — under very high throughput, it can become a bottleneck if the compression level is too high",
+      "Do not compress already-compressed formats (images, video, gzip archives) — it wastes CPU and may increase response size",
+      "Streaming responses cannot be compressed efficiently since the full body must be buffered",
+    ],
+    examples: [
+      {
+        title: "Compress JSON and XML Responses",
+        description: "Enable gzip for common API response types with balanced compression",
+        config: {
+          types: ["application/json", "application/xml", "text/plain", "text/html"],
+          min_length: 1024,
+          comp_level: 6,
+          http_version: 1.1,
+          vary: true,
+        },
+      },
+    ],
+    relatedPlugins: ["response-rewrite", "proxy-cache"],
+  },
+
+  "real-ip": {
+    overview:
+      "Real IP extracts the true client IP address from proxy headers when the API gateway sits behind a load balancer, CDN, or reverse proxy. By default, the gateway sees the IP of the last proxy rather than the original client. This plugin parses headers like X-Forwarded-For or X-Real-IP and uses trusted address lists to determine the actual client IP, which is critical for accurate rate limiting, access control, and logging.",
+    useCases: [
+      "Obtain the real client IP for accurate per-IP rate limiting when behind a load balancer",
+      "Enable IP-based access control (allowlists/blocklists) with the correct client address",
+      "Ensure access logs record the true client IP instead of the proxy or CDN address",
+      "Support geolocation-based routing using the actual client IP",
+    ],
+    bestPractices: [
+      "Always configure trusted_addresses with the CIDR ranges of your known proxies and load balancers",
+      "Enable recursive mode when requests pass through multiple proxy layers to walk the X-Forwarded-For chain correctly",
+      "Use X-Forwarded-For as the source when behind standard load balancers (AWS ALB, nginx, HAProxy)",
+      "Verify the extracted IP by checking gateway access logs after configuration",
+    ],
+    cautions: [
+      "Without proper trusted_addresses, a malicious client can spoof the X-Forwarded-For header to bypass IP-based restrictions",
+      "Misconfigured trusted addresses may cause the gateway to use a proxy IP instead of the real client IP",
+      "If your CDN or load balancer uses a non-standard header for the real IP, configure the source parameter accordingly",
+    ],
+    examples: [
+      {
+        title: "Extract Real IP Behind a Load Balancer",
+        description: "Trust the local network and CDN ranges, extract real IP from X-Forwarded-For",
+        config: {
+          source: "http_x_forwarded_for",
+          trusted_addresses: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
+          recursive: true,
+        },
+      },
+    ],
+    relatedPlugins: ["ip-restriction", "limit-req", "limit-count"],
+  },
+
+  "proxy-mirror": {
+    overview:
+      "Proxy Mirror copies incoming traffic to a secondary upstream for shadow testing, analysis, or monitoring without affecting the primary request-response flow. The mirrored request is sent asynchronously and its response is discarded, ensuring zero impact on the client experience. This is invaluable for testing new service versions with real production traffic before switching over.",
+    useCases: [
+      "Test a new version of a service with real production traffic without risking client-facing impact",
+      "Send shadow traffic to a staging environment for performance benchmarking",
+      "Mirror requests to a logging or analytics service for deep traffic inspection",
+      "Validate data pipeline changes by comparing outputs from the primary and mirrored upstream",
+    ],
+    bestPractices: [
+      "Start with a low sample_ratio (0.01 to 0.1) and increase gradually to control load on the mirror target",
+      "Ensure the mirror upstream can handle the mirrored load — it receives the same traffic volume (multiplied by sample_ratio)",
+      "Monitor the mirror upstream independently — failures there should never affect primary traffic",
+      "Use path rewriting if the mirror upstream expects a different URL structure",
+    ],
+    cautions: [
+      "Mirrored requests include the full request body — sensitive data will be sent to the mirror target",
+      "The mirror upstream receives real production data — ensure it has appropriate security and access controls",
+      "A sample_ratio of 1.0 doubles your total outbound traffic, which can impact network bandwidth and costs",
+      "Mirror request failures are silently ignored — monitor the mirror upstream separately to detect issues",
+    ],
+    examples: [
+      {
+        title: "Mirror 10% of Traffic to Staging",
+        description: "Send 10% of production traffic to a staging environment for shadow testing",
+        config: {
+          host: "http://staging-api.internal:8080",
+          sample_ratio: 0.1,
+        },
+      },
+      {
+        title: "Full Traffic Mirror for Analytics",
+        description: "Mirror all traffic to an analytics service for deep inspection",
+        config: {
+          host: "http://analytics-collector.internal:9090",
+          path: "/mirror/ingest",
+          sample_ratio: 1.0,
+        },
+      },
+    ],
+    relatedPlugins: ["traffic-split", "proxy-rewrite", "fault-injection"],
+  },
+
+  "batch-requests": {
+    overview:
+      "Batch Requests allows clients to combine multiple API calls into a single HTTP request. The gateway splits the batch into individual sub-requests, executes them in parallel against the upstream, and returns all responses combined in a single response body. This reduces network round-trips and improves performance for clients that need to make many related API calls.",
+    useCases: [
+      "Reduce network round-trips for mobile applications on slow connections",
+      "Aggregate multiple data fetches (user profile, settings, notifications) into one call on page load",
+      "Optimize API calls from frontend applications that need data from several endpoints simultaneously",
+      "Reduce latency for dashboard pages that aggregate data from multiple services",
+    ],
+    bestPractices: [
+      "Set reasonable limits on the maximum number of sub-requests per batch to prevent abuse",
+      "Ensure individual sub-requests have their own authentication and authorization checks",
+      "Monitor batch request sizes to identify clients that could benefit from a dedicated aggregation endpoint",
+      "Use batch requests for read-heavy operations — avoid batching write operations that need transactional guarantees",
+    ],
+    cautions: [
+      "A single slow sub-request delays the entire batch response — consider timeouts per sub-request",
+      "Error handling is complex — clients must inspect each sub-response individually for failures",
+      "Large batches can cause high memory usage on the gateway as all sub-responses are buffered",
+      "Batch requests bypass connection-level rate limiting since multiple logical requests share one connection",
+    ],
+    examples: [
+      {
+        title: "Enable Batch Requests",
+        description: "Allow up to 10 sub-requests per batch",
+        config: {},
+      },
+    ],
+    relatedPlugins: ["proxy-cache", "limit-count"],
+  },
+
+  echo: {
+    overview:
+      "Echo returns the incoming request back to the client as the response, optionally including request headers, body, and other metadata. This is primarily a development and debugging tool that lets you inspect exactly what the gateway receives, including any transformations applied by other plugins in the pipeline.",
+    useCases: [
+      "Debug request transformations by seeing the exact request the gateway received after plugin processing",
+      "Verify that proxy-rewrite, headers, and body transformations are applied correctly",
+      "Create a simple health check endpoint that confirms the gateway is processing requests",
+      "Test authentication and authorization plugins by inspecting the request context after auth processing",
+    ],
+    bestPractices: [
+      "Only enable echo on development or debugging routes — never expose it in production",
+      "Use echo in combination with proxy-rewrite to verify URI and header transformations",
+      "Combine with auth plugins to inspect the consumer context attached to the request",
+    ],
+    cautions: [
+      "Echo exposes request details including headers and body — this can leak sensitive information like auth tokens",
+      "Never enable on production routes — it bypasses the upstream entirely",
+      "The echo plugin returns the request as seen by the gateway, not as sent by the client (post-plugin transformations)",
+    ],
+    examples: [
+      {
+        title: "Echo Full Request",
+        description: "Return all request details including headers and body",
+        config: { before_body: "--- Request Echo ---\n", after_body: "\n--- End Echo ---" },
+      },
+    ],
+    relatedPlugins: ["mocking", "proxy-rewrite", "fault-injection"],
   },
 
   // ─── Observability ────────────────────────────────────────────
@@ -1046,6 +1990,578 @@ export const PLUGIN_DOCS: Record<string, PluginDoc> = {
       },
     ],
     relatedPlugins: ["zipkin", "prometheus", "request-id"],
+  },
+
+  datadog: {
+    overview:
+      "Datadog sends API metrics and logs to Datadog's monitoring platform via the DogStatsD protocol. The plugin collects request counts, latency, status codes, and bandwidth metrics, then forwards them as StatsD-formatted datagrams to a local Datadog Agent. This provides seamless integration with Datadog's dashboards, alerting, and APM without requiring application-level instrumentation.",
+    useCases: [
+      "Monitor API gateway performance in Datadog alongside infrastructure and application metrics",
+      "Create unified Datadog dashboards combining gateway metrics with upstream service APM data",
+      "Set up Datadog monitors and alerts for API latency spikes, error rate increases, or traffic anomalies",
+      "Track per-route and per-consumer metrics using Datadog's tagging and filtering capabilities",
+    ],
+    bestPractices: [
+      "Run a Datadog Agent as a sidecar or DaemonSet so the gateway can send metrics to localhost with minimal latency",
+      "Use the 'namespace' option to prefix all gateway metrics (e.g., 'apisix.') for easy filtering in Datadog dashboards",
+      "Add constant_tags for environment, cluster, and region to enable multi-dimensional metric filtering",
+      "Enable prefer_name to use human-readable route names instead of numeric IDs in metric tags",
+    ],
+    cautions: [
+      "DogStatsD uses UDP by default — metrics can be lost under extreme network pressure or if the agent is down",
+      "High-cardinality tags (unique request IDs, user IDs) cause metric explosion and increase Datadog costs significantly",
+      "The Datadog Agent must be reachable from the gateway node — verify connectivity in containerized environments",
+    ],
+    examples: [
+      {
+        title: "Basic Datadog Integration",
+        description: "Send gateway metrics to a local Datadog Agent with environment tags",
+        config: {
+          prefer_name: true,
+          host: "127.0.0.1",
+          port: 8125,
+          namespace: "apisix",
+          constant_tags: ["env:production", "service:api-gateway", "region:us-east-1"],
+        },
+      },
+    ],
+    relatedPlugins: ["prometheus", "opentelemetry", "http-logger"],
+  },
+
+  "file-logger": {
+    overview:
+      "File Logger writes API access logs directly to a file on the gateway node's local filesystem. Each log entry contains request and response metadata in JSON format, making it suitable for local debugging, compliance archival, or feeding into file-based log collectors like Filebeat or Fluentd. The log format is fully customizable via a JSON template.",
+    useCases: [
+      "Write access logs to disk for local debugging or troubleshooting without external dependencies",
+      "Feed log files into Filebeat, Fluentd, or Logstash for centralized log aggregation",
+      "Maintain a local audit trail of API requests for compliance and forensics",
+      "Use as a fallback logging mechanism when network-based loggers are unavailable",
+    ],
+    bestPractices: [
+      "Configure log rotation (via logrotate or similar) to prevent disk space exhaustion on the gateway node",
+      "Use a custom log_format to include only the fields you need — reduces disk I/O and storage costs",
+      "Write logs to a dedicated partition or volume to isolate log I/O from gateway operations",
+      "Combine with a file shipper (Filebeat, Promtail) to forward logs to a central platform",
+    ],
+    cautions: [
+      "Logs are stored locally — if the gateway node fails, unshipped logs may be lost",
+      "High-traffic APIs can generate very large log files quickly — always configure log rotation",
+      "Enabling include_resp_body dramatically increases log volume and may capture sensitive response data",
+      "File I/O under heavy load can impact gateway performance — use async I/O or a RAM-backed filesystem for high-throughput scenarios",
+    ],
+    examples: [
+      {
+        title: "Local File Logging",
+        description: "Write access logs to a local file with a custom format",
+        config: {
+          path: "/var/log/apisix/access.log",
+          log_format: {
+            host: "$host",
+            client_ip: "$remote_addr",
+            timestamp: "$time_iso8601",
+            method: "$request_method",
+            uri: "$uri",
+            status: "$status",
+            latency: "$latency",
+          },
+          include_resp_body: false,
+        },
+      },
+    ],
+    relatedPlugins: ["http-logger", "tcp-logger", "udp-logger"],
+  },
+
+  "clickhouse-logger": {
+    overview:
+      "ClickHouse Logger sends API access logs to a ClickHouse database via its HTTP interface. ClickHouse is a columnar database optimized for real-time analytics on large datasets, making it ideal for storing and querying high-volume API logs. Logs are inserted as rows into a configurable table, enabling SQL-based analytics on request patterns, latency distributions, and error rates.",
+    useCases: [
+      "Store API access logs in ClickHouse for high-performance analytical queries on traffic patterns",
+      "Build real-time API analytics dashboards using ClickHouse's fast aggregation capabilities",
+      "Perform ad-hoc SQL analysis on API usage — top endpoints, slowest routes, error distributions",
+      "Maintain a long-term, cost-effective log archive with ClickHouse's efficient columnar compression",
+    ],
+    bestPractices: [
+      "Design your ClickHouse log table with appropriate partitioning (e.g., by day) and an ORDER BY key matching your most common queries",
+      "Use batch inserts (buffer_duration, batch_max_size) to reduce HTTP overhead and improve ClickHouse insert performance",
+      "Enable ssl_verify in production to protect log data in transit between the gateway and ClickHouse",
+      "Set reasonable timeouts to prevent gateway threads from blocking if ClickHouse is slow or unreachable",
+    ],
+    cautions: [
+      "ClickHouse HTTP interface must be accessible from the gateway — firewall rules and authentication must be configured",
+      "Very high insert rates without batching can degrade ClickHouse performance — always use buffered batch inserts",
+      "Ensure the log table schema matches the fields being sent — schema mismatches cause silent insert failures",
+    ],
+    examples: [
+      {
+        title: "Log to ClickHouse",
+        description: "Send access logs to a ClickHouse database with authentication",
+        config: {
+          endpoint_addr: "http://clickhouse-server:8123",
+          database: "api_logs",
+          logtable: "access_log",
+          user: "logger",
+          password: "secure-password",
+          timeout: 5,
+          ssl_verify: false,
+        },
+      },
+    ],
+    relatedPlugins: ["elasticsearch-logger", "kafka-logger", "http-logger"],
+  },
+
+  "elasticsearch-logger": {
+    overview:
+      "Elasticsearch Logger sends API access logs to an Elasticsearch or OpenSearch cluster via the bulk API. Each log entry is indexed as a document, enabling full-text search, complex aggregations, and Kibana/OpenSearch Dashboards visualizations. This is the standard choice for teams already using the ELK (Elasticsearch, Logstash, Kibana) stack for log management.",
+    useCases: [
+      "Index API access logs in Elasticsearch for full-text search and Kibana dashboard visualization",
+      "Integrate with an existing ELK/OpenSearch stack for unified log management across all services",
+      "Perform complex aggregations on API traffic — percentile latencies, geographic distributions, error patterns",
+      "Enable security teams to investigate API access patterns using Kibana's discovery and alerting features",
+    ],
+    bestPractices: [
+      "Use date-based index patterns (e.g., 'api-logs-2024.01.15') via index templates for efficient lifecycle management",
+      "Configure Index Lifecycle Management (ILM) policies to automatically roll over, shrink, and delete old log indices",
+      "Enable authentication and ssl_verify in production to protect log data in transit and at rest",
+      "Tune batch_max_size and buffer_duration to balance insert latency against bulk API efficiency",
+    ],
+    cautions: [
+      "Elasticsearch cluster must be properly sized — high-volume API logging can consume significant disk and memory",
+      "Mapping conflicts (e.g., a field sent as both string and number) cause indexing failures — use strict index templates",
+      "Network timeouts between the gateway and Elasticsearch can cause log buffering and potential data loss",
+      "High-cardinality fields (unique IDs) increase index size — avoid indexing fields that are never searched",
+    ],
+    examples: [
+      {
+        title: "Log to Elasticsearch",
+        description: "Send access logs to an Elasticsearch cluster with authentication",
+        config: {
+          endpoint_addr: "http://elasticsearch:9200",
+          field: { index: "api-gateway-logs", type: "logs" },
+          auth: { username: "elastic", password: "changeme" },
+          ssl_verify: false,
+          timeout: 10,
+        },
+      },
+    ],
+    relatedPlugins: ["clickhouse-logger", "http-logger", "kafka-logger"],
+  },
+
+  "google-cloud-logging": {
+    overview:
+      "Google Cloud Logging sends API access logs to Google Cloud's Logging service (formerly Stackdriver). Logs are written to a configurable log ID within a GCP project, enabling integration with Cloud Monitoring alerts, Log Router sinks, BigQuery exports, and the Logs Explorer. Authentication uses a GCP service account with appropriate IAM permissions.",
+    useCases: [
+      "Centralize API gateway logs in Google Cloud Logging alongside other GCP service logs",
+      "Route gateway logs to BigQuery via Log Router sinks for long-term analytics and reporting",
+      "Set up Cloud Monitoring alerts based on gateway log patterns (error spikes, unusual traffic)",
+      "Integrate with Google Cloud's operations suite for unified observability across GKE-hosted services",
+    ],
+    bestPractices: [
+      "Use a dedicated service account with the minimal 'roles/logging.logWriter' IAM role",
+      "Set a descriptive log_id (e.g., 'api-gateway-access') to distinguish gateway logs from other sources in Logs Explorer",
+      "Configure the resource.type to match your deployment (e.g., 'k8s_container' for GKE, 'gce_instance' for Compute Engine)",
+      "Use Log Router exclusion filters to drop verbose low-value logs and reduce Cloud Logging costs",
+    ],
+    cautions: [
+      "Service account credentials (private_key) are sensitive — store them securely and never commit to version control",
+      "Cloud Logging ingestion costs can be significant at high traffic volumes — configure exclusion filters for noisy routes",
+      "Network latency to the Cloud Logging API may vary — configure appropriate timeouts for non-GCP deployments",
+    ],
+    examples: [
+      {
+        title: "Log to Google Cloud Logging",
+        description: "Send access logs to a GCP project using service account authentication",
+        config: {
+          auth_config: {
+            project_id: "my-gcp-project-123",
+            private_key: "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----",
+            client_email: "api-gateway-logger@my-gcp-project-123.iam.gserviceaccount.com",
+          },
+          resource: { type: "global" },
+          log_id: "api-gateway-access",
+        },
+      },
+    ],
+    relatedPlugins: ["http-logger", "sls-logger", "tencent-cloud-cls"],
+  },
+
+  loggly: {
+    overview:
+      "Loggly sends API access logs to the Loggly SaaS logging platform via its HTTP Events API. Loggly provides real-time log search, dashboards, and alerting with minimal infrastructure management. The plugin authenticates using a customer token and supports custom log formatting, severity levels, and tagging for easy log categorization.",
+    useCases: [
+      "Send API access logs to Loggly for cloud-hosted log search and analysis without managing log infrastructure",
+      "Use Loggly's dynamic field explorer to analyze API traffic patterns and troubleshoot issues",
+      "Set up Loggly alerts for API error rate spikes, unusual traffic volumes, or specific error patterns",
+      "Tag logs by environment, service, or team for multi-dimensional log filtering in Loggly",
+    ],
+    bestPractices: [
+      "Use meaningful tags (environment, service name, version) to organize and filter logs in the Loggly dashboard",
+      "Set the severity level appropriately to enable severity-based filtering and alerting",
+      "Customize log_format to include only relevant fields — reduces ingestion volume and improves search performance",
+      "Configure retention policies in Loggly to manage storage costs for high-volume APIs",
+    ],
+    cautions: [
+      "The customer_token is a secret — store it securely and avoid exposing it in configuration management systems",
+      "Loggly has ingestion rate limits on lower-tier plans — verify your plan supports your API's traffic volume",
+      "Network connectivity to Loggly's HTTP endpoint is required — logs are lost if the gateway cannot reach Loggly",
+    ],
+    examples: [
+      {
+        title: "Log to Loggly",
+        description: "Send access logs to Loggly with custom tags and severity",
+        config: {
+          customer_token: "your-loggly-customer-token",
+          severity: "INFO",
+          tags: ["api-gateway", "production", "us-east"],
+        },
+      },
+    ],
+    relatedPlugins: ["http-logger", "splunk-hec-logging", "elasticsearch-logger"],
+  },
+
+  "rocketmq-logger": {
+    overview:
+      "RocketMQ Logger sends API access logs to Apache RocketMQ, a distributed messaging platform designed for high throughput and low latency. Logs are published as messages to a configurable topic, enabling real-time stream processing by downstream consumers. RocketMQ's built-in message ordering, retry mechanisms, and dead-letter queues make it a reliable transport for mission-critical log data.",
+    useCases: [
+      "Stream API access logs to RocketMQ for real-time processing by downstream analytics consumers",
+      "Integrate with existing RocketMQ-based event pipelines in organizations standardized on the Apache ecosystem",
+      "Decouple log collection from log storage — multiple consumer groups can independently process the same log stream",
+      "Leverage RocketMQ's message ordering to preserve request sequence for audit and replay scenarios",
+    ],
+    bestPractices: [
+      "Use a dedicated topic for gateway logs to isolate log traffic from application messages",
+      "Configure multiple nameservers for high availability in production deployments",
+      "Use message tags to categorize logs (e.g., by route, status code range, or consumer) for selective consumption",
+      "Enable TLS (use_tls) when sending logs across untrusted networks",
+    ],
+    cautions: [
+      "RocketMQ nameservers and brokers must be reachable from the gateway — verify network connectivity",
+      "Large message payloads (e.g., with request/response bodies) may exceed RocketMQ's default max message size",
+      "Timeout values that are too low can cause message send failures under brief network congestion",
+    ],
+    examples: [
+      {
+        title: "Log to RocketMQ",
+        description: "Send access logs to a RocketMQ cluster with TLS enabled",
+        config: {
+          nameserver_list: ["rocketmq-ns1:9876", "rocketmq-ns2:9876"],
+          topic: "api-gateway-logs",
+          key: "gateway",
+          tag: "access-log",
+          timeout: 3,
+          use_tls: true,
+        },
+      },
+    ],
+    relatedPlugins: ["kafka-logger", "http-logger", "tcp-logger"],
+  },
+
+  skywalking: {
+    overview:
+      "SkyWalking integrates the API gateway with Apache SkyWalking for distributed tracing and service topology analysis. The plugin generates trace segments for each request, correlating gateway processing with upstream service spans. SkyWalking's topology map, trace detail view, and service metrics provide deep visibility into request flows across microservice architectures.",
+    useCases: [
+      "Trace API requests end-to-end through the gateway and upstream services using SkyWalking's distributed tracing",
+      "Visualize service dependency topology and identify critical paths in the SkyWalking dashboard",
+      "Analyze request latency breakdowns to pinpoint whether delays occur at the gateway, network, or upstream level",
+      "Monitor gateway health and throughput using SkyWalking's built-in service metrics and alerting",
+    ],
+    bestPractices: [
+      "Use sample_ratio to control trace volume — start with 0.1 (10%) for high-traffic services and adjust based on analysis needs",
+      "Set a descriptive service_name that matches your SkyWalking service naming convention for consistent topology mapping",
+      "Use unique service_instance_name per gateway node to distinguish traffic distribution across instances",
+      "Ensure upstream services propagate SkyWalking trace context headers (sw8) for complete end-to-end traces",
+    ],
+    cautions: [
+      "High sample ratios (approaching 1.0) on high-traffic APIs generate enormous trace data and can overwhelm the SkyWalking OAP",
+      "The SkyWalking OAP server must be reachable via gRPC — network issues cause trace data loss",
+      "Tracing adds processing overhead to every sampled request — benchmark the performance impact before enabling in production",
+    ],
+    examples: [
+      {
+        title: "SkyWalking Distributed Tracing",
+        description: "Enable SkyWalking tracing with 10% sampling",
+        config: {
+          sample_ratio: 0.1,
+          endpoint_addr: "http://skywalking-oap:12800",
+          service_name: "api-gateway",
+          service_instance_name: "gateway-node-01",
+        },
+      },
+    ],
+    relatedPlugins: ["skywalking-logger", "zipkin", "opentelemetry"],
+  },
+
+  "skywalking-logger": {
+    overview:
+      "SkyWalking Logger sends API access logs to Apache SkyWalking's OAP (Observability Analysis Platform) server for centralized log analysis. Unlike the tracing plugin, this plugin focuses on structured access log collection, which SkyWalking correlates with trace data to provide unified log-trace views. This enables clicking from a trace span directly to the related log entries in the SkyWalking UI.",
+    useCases: [
+      "Correlate API access logs with distributed traces in SkyWalking's unified log-trace view",
+      "Centralize gateway logs in SkyWalking alongside application logs from instrumented services",
+      "Use SkyWalking's log analysis language (LAL) to parse, tag, and alert on gateway log patterns",
+      "Build log-based dashboards and alerts in SkyWalking for gateway operational monitoring",
+    ],
+    bestPractices: [
+      "Use the same service_name and service_instance_name as the SkyWalking tracing plugin for consistent correlation",
+      "Customize log_format to include fields relevant to your analysis — avoid logging unnecessary data",
+      "Configure appropriate timeouts to prevent gateway threads from blocking on OAP connectivity issues",
+      "Combine with the skywalking tracing plugin for full log-trace correlation in the SkyWalking UI",
+    ],
+    cautions: [
+      "The SkyWalking OAP server must be reachable from the gateway — connectivity issues cause log data loss",
+      "High-volume logging can strain the OAP server's storage backend — configure appropriate retention policies",
+      "Enabling log_format with response bodies can significantly increase log volume and OAP storage requirements",
+    ],
+    examples: [
+      {
+        title: "SkyWalking Log Collection",
+        description: "Send access logs to SkyWalking OAP for log-trace correlation",
+        config: {
+          endpoint_addr: "http://skywalking-oap:12800",
+          service_name: "api-gateway",
+          service_instance_name: "gateway-node-01",
+          log_format: {
+            host: "$host",
+            uri: "$uri",
+            status: "$status",
+            latency: "$latency",
+            client_ip: "$remote_addr",
+          },
+          timeout: 5,
+        },
+      },
+    ],
+    relatedPlugins: ["skywalking", "http-logger", "opentelemetry"],
+  },
+
+  "sls-logger": {
+    overview:
+      "SLS Logger sends API access logs to Alibaba Cloud Log Service (SLS), a fully managed log analysis platform. Logs are sent to a specified project and logstore using Alibaba Cloud access keys for authentication. SLS provides real-time log search, dashboards, alerting, and machine learning-based anomaly detection, making it the native choice for API gateways deployed on Alibaba Cloud.",
+    useCases: [
+      "Centralize API gateway logs in Alibaba Cloud SLS alongside other cloud service logs",
+      "Use SLS query and analysis capabilities to monitor API traffic patterns, errors, and performance",
+      "Set up SLS alerts for API anomalies — error spikes, latency degradation, or unusual access patterns",
+      "Feed gateway logs into SLS machine learning features for automated anomaly detection",
+    ],
+    bestPractices: [
+      "Use a dedicated logstore for gateway logs to isolate them from application logs and enable independent retention policies",
+      "Create SLS indices on frequently queried fields (status, URI, client_ip) for fast log search",
+      "Use RAM (Resource Access Management) roles instead of static access keys when running on Alibaba Cloud ECS or ACK",
+      "Configure appropriate timeout values to prevent blocking under network instability",
+    ],
+    cautions: [
+      "Access key credentials (access_key_id, access_key_secret) are sensitive — store them securely using secrets management",
+      "SLS ingestion costs scale with log volume — configure log format to exclude unnecessary fields and reduce data size",
+      "The SLS endpoint must be reachable from the gateway — internal endpoints are faster and cheaper for Alibaba Cloud deployments",
+    ],
+    examples: [
+      {
+        title: "Log to Alibaba Cloud SLS",
+        description: "Send access logs to an SLS logstore with access key authentication",
+        config: {
+          host: "us-east-1.log.aliyuncs.com",
+          port: 443,
+          project: "api-gateway-logs",
+          logstore: "access-log",
+          access_key_id: "your-access-key-id",
+          access_key_secret: "your-access-key-secret",
+          timeout: 5,
+        },
+      },
+    ],
+    relatedPlugins: ["google-cloud-logging", "tencent-cloud-cls", "http-logger"],
+  },
+
+  "splunk-hec-logging": {
+    overview:
+      "Splunk HEC Logging sends API access logs to Splunk via the HTTP Event Collector (HEC) endpoint. HEC is Splunk's recommended method for programmatic log ingestion, providing token-based authentication, TLS encryption, and acknowledgment-based delivery guarantees. Logs are indexed in Splunk where they can be searched, visualized, and correlated with other data sources using SPL (Search Processing Language).",
+    useCases: [
+      "Index API gateway logs in Splunk for enterprise-grade search, alerting, and compliance reporting",
+      "Integrate gateway logs with existing Splunk SIEM workflows for security monitoring and incident response",
+      "Create Splunk dashboards for API traffic analysis — request volumes, error trends, and latency distributions",
+      "Correlate gateway logs with application and infrastructure logs already in Splunk for end-to-end troubleshooting",
+    ],
+    bestPractices: [
+      "Use a dedicated HEC token for the API gateway to enable per-source access control and auditing in Splunk",
+      "Set source and sourcetype to descriptive values (e.g., source: 'api-gateway', sourcetype: 'apisix:access') for easy SPL filtering",
+      "Route gateway logs to a dedicated Splunk index with appropriate retention policies to manage storage costs",
+      "Enable ssl_verify in production to ensure log data is encrypted in transit to the HEC endpoint",
+    ],
+    cautions: [
+      "The HEC token is a secret — store it securely and rotate it periodically",
+      "Splunk license costs are based on daily ingestion volume — high-traffic APIs can generate significant log data",
+      "HEC endpoint availability is critical — configure retries and buffering to handle brief Splunk outages",
+      "Including request/response bodies in logs dramatically increases ingestion volume and license consumption",
+    ],
+    examples: [
+      {
+        title: "Log to Splunk HEC",
+        description: "Send access logs to Splunk via HTTP Event Collector",
+        config: {
+          endpoint: {
+            uri: "https://splunk-hec.internal:8088/services/collector",
+            token: "your-hec-token-here",
+          },
+          ssl_verify: true,
+          source: "api-gateway",
+          sourcetype: "apisix:access",
+          index: "api_logs",
+        },
+      },
+    ],
+    relatedPlugins: ["http-logger", "elasticsearch-logger", "kafka-logger"],
+  },
+
+  "tcp-logger": {
+    overview:
+      "TCP Logger sends API access logs to a TCP server as newline-delimited JSON messages. TCP provides reliable, ordered delivery with connection management and retry logic, making it suitable for feeding logs into systems that accept TCP input (Logstash TCP input, Fluentd TCP input, custom log aggregators). Logs can be batched for efficiency and the connection supports optional TLS encryption.",
+    useCases: [
+      "Send logs to Logstash via its TCP input plugin for processing and forwarding to Elasticsearch",
+      "Feed logs into Fluentd's TCP input for flexible log routing and transformation",
+      "Stream logs to a custom TCP-based log aggregator or analytics service",
+      "Deliver logs reliably to systems that don't support HTTP-based log ingestion",
+    ],
+    bestPractices: [
+      "Enable TLS for log transport across untrusted networks to protect sensitive request data",
+      "Configure batch_max_size and buffer_duration to balance delivery latency against connection efficiency",
+      "Use a custom log_format to include only the fields your downstream system needs",
+      "Set appropriate timeout values to prevent connection hangs from blocking the logging pipeline",
+    ],
+    cautions: [
+      "TCP connections are stateful — a receiving server restart causes temporary log delivery failures until reconnection",
+      "Large batch sizes can cause memory pressure if the TCP connection is slow or congested",
+      "TLS adds connection overhead — connection reuse (keep-alive) is important for high-throughput scenarios",
+    ],
+    examples: [
+      {
+        title: "TCP Logger to Logstash",
+        description: "Send batched access logs to a Logstash TCP input with TLS",
+        config: {
+          host: "logstash.internal",
+          port: 5044,
+          tls: true,
+          tls_options: { ssl_verify: true },
+          timeout: 5,
+          log_format: {
+            host: "$host",
+            uri: "$uri",
+            method: "$request_method",
+            status: "$status",
+            latency: "$latency",
+          },
+          batch_max_size: 100,
+        },
+      },
+    ],
+    relatedPlugins: ["udp-logger", "http-logger", "file-logger"],
+  },
+
+  "tencent-cloud-cls": {
+    overview:
+      "Tencent Cloud CLS sends API access logs to Tencent Cloud Log Service (CLS), a fully managed log platform for real-time collection, storage, search, and analysis. Logs are sent to a specified CLS topic using Tencent Cloud API credentials for authentication. CLS provides full-text and key-value search, dashboards, and alerting, making it the native logging solution for API gateways deployed on Tencent Cloud.",
+    useCases: [
+      "Centralize API gateway logs in Tencent Cloud CLS alongside other cloud service logs",
+      "Use CLS search and analysis to monitor API traffic, debug errors, and track performance trends",
+      "Configure CLS alarm policies for real-time alerting on API error rates, latency thresholds, or traffic anomalies",
+      "Feed gateway logs into CLS data processing pipelines for ETL and downstream analytics",
+    ],
+    bestPractices: [
+      "Use a dedicated CLS topic for gateway logs to isolate retention, indexing, and access policies",
+      "Enable index configuration on frequently queried fields (status, URI, client_ip) for fast search performance",
+      "Use CAM (Cloud Access Management) sub-accounts with minimal permissions instead of root account credentials",
+      "Configure sample_ratio to reduce log volume on extremely high-traffic routes while maintaining statistical significance",
+    ],
+    cautions: [
+      "API credentials (secret_id, secret_key) are sensitive — use Tencent Cloud's secrets manager or environment variables",
+      "CLS ingestion and storage costs scale with volume — configure log format and sampling to manage costs",
+      "Including request bodies (include_req_body) significantly increases log volume and may capture sensitive user data",
+    ],
+    examples: [
+      {
+        title: "Log to Tencent Cloud CLS",
+        description: "Send access logs to a CLS topic with request body sampling",
+        config: {
+          cls_host: "ap-guangzhou.cls.tencentcs.com",
+          cls_topic: "api-gateway-access-logs-topic-id",
+          secret_id: "your-tencent-secret-id",
+          secret_key: "your-tencent-secret-key",
+          sample_ratio: 1,
+          include_req_body: false,
+        },
+      },
+    ],
+    relatedPlugins: ["sls-logger", "google-cloud-logging", "http-logger"],
+  },
+
+  "udp-logger": {
+    overview:
+      "UDP Logger sends API access logs to a UDP server as newline-delimited JSON datagrams. UDP is a fire-and-forget protocol with minimal overhead, making it the fastest logging transport option. While UDP does not guarantee delivery, its simplicity and low latency make it suitable for high-throughput scenarios where occasional log loss is acceptable, such as metrics aggregation or development environments.",
+    useCases: [
+      "Send logs to a UDP-based log collector (Logstash UDP input, syslog-ng) for lightweight log aggregation",
+      "High-throughput logging where minimal latency impact on requests is the priority over guaranteed delivery",
+      "Stream logs to a local StatsD-compatible aggregator for real-time metrics extraction from log data",
+      "Development and testing environments where simple, fast log collection is preferred over reliability",
+    ],
+    bestPractices: [
+      "Use UDP logging only when occasional message loss is acceptable — prefer TCP or HTTP loggers for critical audit logs",
+      "Keep log messages small to avoid UDP fragmentation (stay under the network MTU, typically 1500 bytes)",
+      "Customize log_format to include only essential fields — smaller payloads reduce the chance of UDP fragmentation",
+      "Run the UDP receiver on the same network segment as the gateway to minimize packet loss",
+    ],
+    cautions: [
+      "UDP does not guarantee delivery — logs can be silently lost due to network congestion, buffer overflow, or receiver downtime",
+      "UDP datagrams exceeding the network MTU are fragmented, increasing the chance of data loss",
+      "No connection state means there is no backpressure — the gateway will continue sending even if the receiver is down",
+      "Including request bodies (include_req_body) can easily exceed UDP MTU limits and cause fragmentation",
+    ],
+    examples: [
+      {
+        title: "UDP Logger to Logstash",
+        description: "Send access logs to a Logstash UDP input for lightweight collection",
+        config: {
+          host: "logstash.internal",
+          port: 5045,
+          timeout: 3,
+          log_format: {
+            host: "$host",
+            uri: "$uri",
+            method: "$request_method",
+            status: "$status",
+            latency: "$latency",
+          },
+          include_req_body: false,
+        },
+      },
+    ],
+    relatedPlugins: ["tcp-logger", "syslog", "http-logger"],
+  },
+
+  "node-status": {
+    overview:
+      "Node Status exposes an internal endpoint that returns the current status of the gateway node, including active connections, total requests handled, and request processing statistics. This is useful for monitoring the health and load of individual gateway nodes in a cluster.",
+    useCases: [
+      "Monitor individual gateway node health in a multi-node cluster",
+      "Feed node metrics into custom monitoring dashboards",
+      "Implement load-balancer health checks based on gateway node status",
+      "Troubleshoot performance issues by comparing node-level statistics",
+    ],
+    bestPractices: [
+      "Restrict access to the node-status endpoint using IP restriction to internal monitoring systems only",
+      "Poll node status at regular intervals and alert on anomalies like high connection counts",
+      "Use in conjunction with Prometheus for comprehensive gateway monitoring",
+      "Compare statistics across nodes to identify uneven load distribution",
+    ],
+    cautions: [
+      "The status endpoint exposes internal server metrics — never make it publicly accessible",
+      "Node status shows per-node data, not cluster-wide aggregates — aggregate externally for global view",
+      "High-frequency polling of node-status can itself add load to the gateway",
+    ],
+    examples: [
+      {
+        title: "Enable Node Status",
+        description: "Expose node status on the default internal endpoint",
+        config: {},
+      },
+    ],
+    relatedPlugins: ["prometheus", "opentelemetry", "datadog"],
   },
 
   // ─── FuseOne Custom Plugins ─────────────────────────────────
@@ -1883,5 +3399,455 @@ export const PLUGIN_DOCS: Record<string, PluginDoc> = {
       },
     ],
     relatedPlugins: ["graphql-allowlist", "graphql-depth-limit", "graphql-complexity"],
+  },
+
+  // ─── Serverless & Functions ──────────────────────────────────
+
+  "aws-lambda": {
+    overview:
+      "Forwards incoming API requests to AWS Lambda functions, enabling a fully serverless backend architecture. The gateway invokes the specified Lambda function via the AWS API using IAM credentials and returns the function's response directly to the client. This plugin turns the API Gateway into a unified entry point for Lambda-based microservices without needing API Gateway (AWS) in front of them.",
+    useCases: [
+      "Expose AWS Lambda functions as REST API endpoints through a single gateway",
+      "Build a serverless backend where all business logic lives in Lambda and the gateway handles auth, rate limiting, and observability",
+      "Migrate monolithic APIs to serverless incrementally by routing specific paths to Lambda functions",
+      "Invoke cross-region Lambda functions from a centralized API Gateway",
+    ],
+    bestPractices: [
+      "Use IAM roles with least-privilege policies — grant only lambda:InvokeFunction on the specific function ARN",
+      "Set a reasonable timeout that accounts for Lambda cold starts (typically 3-10 seconds for cold, under 1 second for warm)",
+      "Enable keepalive to reuse connections to the AWS API endpoint and reduce latency on subsequent invocations",
+      "Always enable ssl_verify in production to prevent man-in-the-middle attacks on the AWS API calls",
+    ],
+    cautions: [
+      "AWS Lambda cold starts can add significant latency (100ms to several seconds) — factor this into your gateway timeout settings",
+      "IAM access keys stored in plugin configuration are sensitive — use environment-based secrets management where possible",
+      "Lambda has a 6 MB response payload limit for synchronous invocations — large responses will be truncated or fail",
+      "Cross-region invocations add network latency — deploy Lambda functions in the same region as your gateway when possible",
+    ],
+    examples: [
+      {
+        title: "Basic Lambda Invocation",
+        description: "Route requests to a Lambda function with IAM authentication",
+        config: {
+          function_uri: "arn:aws:lambda:us-east-1:123456789012:function:my-api-handler",
+          authorization: {
+            iam: {
+              accesskey: "AKIAIOSFODNN7EXAMPLE",
+              secretkey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+              aws_region: "us-east-1",
+            },
+          },
+          timeout: 10000,
+          keepalive: true,
+          ssl_verify: true,
+        },
+      },
+      {
+        title: "Cross-Region Lambda with Extended Timeout",
+        description: "Invoke a Lambda function in a different region with a longer timeout for heavy processing",
+        config: {
+          function_uri: "arn:aws:lambda:eu-west-1:123456789012:function:data-processor",
+          authorization: {
+            iam: {
+              accesskey: "AKIAIOSFODNN7EXAMPLE",
+              secretkey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+              aws_region: "eu-west-1",
+            },
+          },
+          timeout: 30000,
+          keepalive: true,
+          ssl_verify: true,
+        },
+      },
+    ],
+    relatedPlugins: ["azure-functions", "openwhisk", "serverless-pre-function"],
+  },
+
+  "azure-functions": {
+    overview:
+      "Routes incoming API requests to Azure Functions, providing a serverless compute backend managed by Microsoft Azure. The gateway forwards the request to the specified function URI, authenticating via an API key, and streams the function's response back to the client. This allows teams using Azure infrastructure to expose their serverless functions through a centralized API Gateway with full policy enforcement.",
+    useCases: [
+      "Expose Azure Functions as managed API endpoints with authentication, rate limiting, and monitoring",
+      "Build event-driven microservices on Azure while keeping a unified API surface through the gateway",
+      "Migrate legacy APIs to Azure Functions incrementally by routing individual endpoints",
+      "Combine Azure Functions with on-premise upstreams in a hybrid architecture managed by a single gateway",
+    ],
+    bestPractices: [
+      "Store the Azure Functions API key securely — rotate it regularly and avoid committing it to version control",
+      "Set the timeout higher than your function's expected execution time to account for cold starts on Consumption plans",
+      "Enable keepalive to maintain persistent connections to the Azure Functions host, reducing connection setup overhead",
+      "Use ssl_verify in production to ensure secure communication with the Azure Functions endpoint",
+    ],
+    cautions: [
+      "Azure Functions on the Consumption plan have cold start latency (several seconds for .NET, less for Node.js) — set timeouts accordingly",
+      "The API key provides full access to the function — if compromised, an attacker can invoke the function directly bypassing the gateway",
+      "Azure Functions have execution time limits (5 minutes default on Consumption plan) — long-running operations should use Durable Functions instead",
+    ],
+    examples: [
+      {
+        title: "Basic Azure Function",
+        description: "Route API requests to an Azure Function with API key authentication",
+        config: {
+          function_uri: "https://my-function-app.azurewebsites.net/api/process-order",
+          authorization: {
+            apikey: "aGVsbG8td29ybGQtZnVuY3Rpb24ta2V5LWV4YW1wbGU=",
+          },
+          timeout: 10000,
+          keepalive: true,
+          ssl_verify: true,
+        },
+      },
+      {
+        title: "Azure Function with Extended Timeout",
+        description: "Invoke a data-processing function that requires more time to complete",
+        config: {
+          function_uri: "https://analytics-functions.azurewebsites.net/api/generate-report",
+          authorization: {
+            apikey: "cmVwb3J0LWdlbmVyYXRvci1rZXktZXhhbXBsZQ==",
+          },
+          timeout: 60000,
+          keepalive: true,
+          ssl_verify: true,
+        },
+      },
+    ],
+    relatedPlugins: ["aws-lambda", "openwhisk", "serverless-pre-function"],
+  },
+
+  openwhisk: {
+    overview:
+      "Invokes Apache OpenWhisk serverless actions as the backend for API routes. OpenWhisk is an open-source, distributed serverless platform that executes functions in response to events. This plugin allows the gateway to trigger OpenWhisk actions by name, passing the request payload and returning the action result to the client, making it ideal for teams running self-hosted or IBM Cloud Functions-based serverless infrastructure.",
+    useCases: [
+      "Expose OpenWhisk actions as RESTful API endpoints through a centralized gateway",
+      "Build serverless APIs on IBM Cloud Functions with enterprise-grade traffic management at the gateway layer",
+      "Run a self-hosted serverless platform with OpenWhisk and manage all API access through the gateway",
+      "Orchestrate multi-action workflows by chaining gateway routes to different OpenWhisk actions",
+    ],
+    bestPractices: [
+      "Use the 'result' option set to true to return only the action result (not the full activation record) for cleaner API responses",
+      "Keep service tokens secure and rotate them periodically — they grant invocation access to your OpenWhisk namespace",
+      "Set appropriate timeouts based on your action's expected execution time — OpenWhisk actions have a default 60-second limit",
+      "Enable ssl_verify when communicating with remote OpenWhisk deployments to ensure encrypted and authenticated connections",
+    ],
+    cautions: [
+      "OpenWhisk cold starts can be significant depending on the runtime — Java and .NET runtimes are slower to initialize than Node.js or Python",
+      "The service_token grants access to all actions in the namespace — use separate namespaces for different security domains",
+      "If 'result' is set to false, the response will include OpenWhisk activation metadata which may expose internal infrastructure details",
+    ],
+    examples: [
+      {
+        title: "Basic OpenWhisk Action",
+        description: "Invoke a serverless action and return only the result",
+        config: {
+          api_host: "https://openwhisk.example.com",
+          service_token: "3a9e2b1c-7d4f-4e8a-b5c6-1f2e3d4a5b6c:mySecretPassphrase",
+          namespace: "production",
+          action: "process-payment",
+          result: true,
+          timeout: 15000,
+          ssl_verify: true,
+        },
+      },
+      {
+        title: "IBM Cloud Functions",
+        description: "Route to an action hosted on IBM Cloud Functions",
+        config: {
+          api_host: "https://us-south.functions.cloud.ibm.com",
+          service_token: "iam-api-key:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          namespace: "my-org_my-space",
+          action: "data-enrichment",
+          result: true,
+          timeout: 30000,
+          ssl_verify: true,
+        },
+      },
+    ],
+    relatedPlugins: ["aws-lambda", "azure-functions", "serverless-pre-function"],
+  },
+
+  "serverless-pre-function": {
+    overview:
+      "Executes custom Lua code before the request is processed by other plugins in the pipeline. This gives you full programmatic control over request preprocessing — you can inspect and modify headers, rewrite URIs, implement custom authentication logic, make dynamic routing decisions, or inject metadata. The Lua functions run in the APISIX sandbox with access to the Nginx and APISIX APIs, making this one of the most powerful extensibility points available.",
+    useCases: [
+      "Implement custom authentication schemes that are not covered by built-in auth plugins",
+      "Dynamically rewrite request URIs or headers based on business logic before routing",
+      "Add request metadata or correlation IDs that downstream plugins and services depend on",
+      "Perform request validation or transformation that is too complex for declarative plugin configuration",
+    ],
+    bestPractices: [
+      "Keep Lua functions short and focused — complex logic should live in dedicated custom plugins, not inline code",
+      "Use the 'rewrite' or 'access' phase for request modifications; use 'header_filter' or 'body_filter' only when you must modify the response",
+      "Always handle errors gracefully with pcall() to prevent unhandled Lua errors from crashing the request pipeline",
+      "Log sparingly in hot-path functions — excessive logging in the 'rewrite' phase can significantly impact throughput",
+    ],
+    cautions: [
+      "Lua code runs with elevated privileges inside the gateway — a bug or infinite loop can block the entire worker process",
+      "There is no syntax validation at configuration time — a Lua syntax error will only surface at request time and may cause 500 errors",
+      "Inline Lua code is harder to version-control, test, and review than dedicated plugins — use this for quick fixes and prototyping, not permanent logic",
+      "The 'body_filter' phase may be called multiple times for chunked responses — ensure your function handles partial data correctly",
+    ],
+    examples: [
+      {
+        title: "Add Correlation ID",
+        description: "Inject a unique request ID header before processing if one is not already present",
+        config: {
+          phase: "rewrite",
+          functions: [
+            "return function(conf, ctx) local headers = ngx.req.get_headers(); if not headers['X-Correlation-ID'] then ngx.req.set_header('X-Correlation-ID', ngx.var.request_id) end end",
+          ],
+        },
+      },
+      {
+        title: "Custom IP Allowlist with Dynamic Rules",
+        description: "Check the client IP against a dynamically loaded allowlist before allowing access",
+        config: {
+          phase: "access",
+          functions: [
+            "return function(conf, ctx) local blocked_cidrs = {'10.0.0.0/8', '172.16.0.0/12'}; local ip = ngx.var.remote_addr; for _, cidr in ipairs(blocked_cidrs) do if ngx.re.match(ip, cidr) then ngx.exit(403) end end end",
+          ],
+        },
+      },
+    ],
+    relatedPlugins: ["serverless-post-function", "ext-plugin-pre-req", "ext-plugin-post-resp"],
+  },
+
+  "serverless-post-function": {
+    overview:
+      "Executes custom Lua code after the request has been processed by other plugins and/or the upstream response has been received. This plugin is the counterpart to serverless-pre-function and is ideal for response modification, custom logging, cleanup tasks, or injecting response headers. Like its counterpart, the Lua functions run in the APISIX sandbox with full access to the Nginx and APISIX APIs.",
+    useCases: [
+      "Add custom response headers (e.g., cache status, processing time, server version) after upstream processing",
+      "Implement custom access logging with business-specific fields that the built-in logging plugins don't support",
+      "Perform cleanup or notification tasks after a response has been sent to the client",
+      "Modify or redact sensitive data from upstream responses before they reach the client",
+    ],
+    bestPractices: [
+      "Use the 'header_filter' phase to modify response headers and the 'body_filter' phase for response body changes",
+      "For logging-only logic, use the 'log' phase to avoid adding latency to the response path",
+      "Keep body_filter functions idempotent — they may be invoked multiple times for chunked transfer encoding",
+      "Test your Lua code thoroughly in a staging environment before deploying to production — runtime errors can break responses",
+    ],
+    cautions: [
+      "Modifying the response body in the 'body_filter' phase requires careful handling of chunked responses — the function is called for each chunk",
+      "Errors in post-functions can corrupt responses that have already started streaming to the client",
+      "The 'log' phase runs after the response is sent — you cannot modify the response in this phase, only perform side effects",
+      "Inline Lua code is not covered by standard CI/CD pipelines — establish a review process for any production Lua snippets",
+    ],
+    examples: [
+      {
+        title: "Add Processing Time Header",
+        description: "Inject a header with the total gateway processing time into every response",
+        config: {
+          phase: "header_filter",
+          functions: [
+            "return function(conf, ctx) local start = ctx.var.request_time or 0; ngx.header['X-Gateway-Time'] = tostring(ngx.now() - ngx.req.start_time()) .. 's' end",
+          ],
+        },
+      },
+      {
+        title: "Custom Access Log",
+        description: "Log request metadata to a custom destination after the response is sent",
+        config: {
+          phase: "log",
+          functions: [
+            "return function(conf, ctx) local log_data = {method = ngx.req.get_method(), uri = ngx.var.uri, status = ngx.status, latency = ngx.var.request_time}; ngx.log(ngx.NOTICE, require('cjson').encode(log_data)) end",
+          ],
+        },
+      },
+    ],
+    relatedPlugins: ["serverless-pre-function", "ext-plugin-pre-req", "ext-plugin-post-resp"],
+  },
+
+  // ─── External Plugins (Runner) ────────────────────────────────
+
+  "ext-plugin-pre-req": {
+    overview:
+      "External Plugin Pre-Request sends the request to an external plugin runner process (written in Python, Java, Go, or any language) before it reaches the upstream. The runner can inspect and modify the request, implement custom logic, and return the modified request back to the gateway. This enables writing gateway plugins in languages other than Lua.",
+    useCases: [
+      "Implement complex request processing logic in Python, Java, or Go instead of Lua",
+      "Integrate ML models or AI services for request classification or content analysis before routing",
+      "Reuse existing business logic libraries that are available in your team's primary language",
+      "Build custom authentication or authorization that requires calling external services or databases",
+    ],
+    bestPractices: [
+      "Deploy the plugin runner as a sidecar on the same host to minimize network latency",
+      "Use Unix domain sockets instead of TCP for runner communication to reduce overhead",
+      "Implement timeouts in your runner to prevent slow processing from blocking the gateway",
+      "Keep the runner stateless for horizontal scaling — store state in external stores like Redis",
+    ],
+    cautions: [
+      "Every request incurs IPC overhead to communicate with the runner process — this adds latency compared to native Lua plugins",
+      "The runner must be highly available — if it crashes, requests will fail or timeout",
+      "Debugging is harder since the plugin logic runs in a separate process from the gateway",
+      "The runner protocol has serialization overhead for request/response data transfer",
+    ],
+    examples: [
+      {
+        title: "Python Plugin Runner",
+        description: "Send requests to a Python-based plugin runner for custom processing",
+        config: {
+          conf: [{ name: "my-python-plugin", value: "{\"threshold\": 100}" }],
+        },
+      },
+    ],
+    relatedPlugins: ["ext-plugin-post-req", "ext-plugin-post-resp", "serverless-pre-function"],
+  },
+
+  "ext-plugin-post-req": {
+    overview:
+      "External Plugin Post-Request sends the request to an external plugin runner after the request phase plugins have executed but before the request is forwarded to the upstream. This allows external plugins to make final modifications based on the context established by earlier plugins (e.g., after authentication has identified the consumer).",
+    useCases: [
+      "Apply custom transformation logic after authentication has identified the consumer",
+      "Enrich the request with data from external services based on the authenticated user",
+      "Implement custom routing decisions that depend on the full plugin pipeline context",
+      "Run post-auth business rules that need access to consumer metadata set by auth plugins",
+    ],
+    bestPractices: [
+      "Use this instead of ext-plugin-pre-req when your logic depends on auth plugin results",
+      "Keep processing lightweight to avoid adding excessive latency after the auth phase",
+      "Log runner errors and set up alerting to detect runner process failures quickly",
+    ],
+    cautions: [
+      "Same IPC overhead as ext-plugin-pre-req — adds latency to every request",
+      "Runs after auth but before upstream — errors here will prevent the request from reaching upstream",
+      "Runner must handle concurrent requests efficiently as the gateway processes requests in parallel",
+    ],
+    examples: [
+      {
+        title: "Post-Auth Enrichment",
+        description: "Enrich requests with consumer-specific data after authentication",
+        config: {
+          conf: [{ name: "request-enricher", value: "{\"add_consumer_metadata\": true}" }],
+        },
+      },
+    ],
+    relatedPlugins: ["ext-plugin-pre-req", "ext-plugin-post-resp", "serverless-post-function"],
+  },
+
+  "ext-plugin-post-resp": {
+    overview:
+      "External Plugin Post-Response sends the upstream response to an external plugin runner before returning it to the client. The runner can inspect and modify the response headers, body, and status code. This is useful for response transformation, content filtering, or custom logging that requires processing in a language other than Lua.",
+    useCases: [
+      "Filter or redact sensitive data from upstream responses using a Python or Java library",
+      "Transform response formats (e.g., XML to JSON) using mature libraries in your preferred language",
+      "Implement custom response caching logic that integrates with your existing cache infrastructure",
+      "Enrich responses with additional data from external services before returning to the client",
+    ],
+    bestPractices: [
+      "Process responses in streaming mode when possible to avoid buffering large response bodies in memory",
+      "Set strict timeouts for runner processing to prevent slow responses from hanging client connections",
+      "Use this sparingly — response modification adds latency that directly impacts user experience",
+    ],
+    cautions: [
+      "The entire response body may need to be buffered in memory for the runner to process it — watch for memory issues with large responses",
+      "Adds latency to every response — the client waits while the runner processes the response",
+      "If the runner fails, the gateway must decide whether to return the original response or an error — plan your error strategy",
+      "Streaming responses cannot be modified after they start being sent to the client",
+    ],
+    examples: [
+      {
+        title: "Response Content Filter",
+        description: "Send responses through an external content filter for PII redaction",
+        config: {
+          conf: [{ name: "pii-filter", value: "{\"scan_fields\": [\"email\", \"phone\", \"ssn\"]}" }],
+        },
+      },
+    ],
+    relatedPlugins: ["ext-plugin-pre-req", "ext-plugin-post-req", "serverless-post-function"],
+  },
+
+  // ─── Utility ──────────────────────────────────────────────────
+
+  inspect: {
+    overview:
+      "Inspect is a debugging plugin that dumps the full request and response context at a specific phase in the plugin pipeline. It outputs detailed information about headers, body, URI, upstream selection, and plugin chain state to the gateway error log. This is invaluable for troubleshooting complex plugin interactions.",
+    useCases: [
+      "Debug unexpected behavior in a plugin chain by inspecting the request state at each phase",
+      "Verify that authentication plugins correctly set consumer metadata before downstream plugins execute",
+      "Troubleshoot proxy-rewrite or body-transformer by checking intermediate request state",
+      "Diagnose routing issues by examining the selected upstream and route context",
+    ],
+    bestPractices: [
+      "Only enable on specific routes during active debugging — never leave it enabled in production",
+      "Check the gateway error log (not access log) for the inspect output",
+      "Use in combination with a specific route filter to limit log volume",
+      "Remove the plugin as soon as debugging is complete to avoid log pollution",
+    ],
+    cautions: [
+      "Outputs sensitive data (headers, tokens, request bodies) to the error log — ensure logs are secured",
+      "Generates significant log volume under traffic — enable only on low-traffic routes or specific requests",
+      "May slightly increase latency as it serializes the full request/response context",
+    ],
+    examples: [
+      {
+        title: "Inspect Request Phase",
+        description: "Dump request context to error log for debugging",
+        config: {},
+      },
+    ],
+    relatedPlugins: ["echo", "serverless-pre-function", "node-status"],
+  },
+
+  "example-plugin": {
+    overview:
+      "Example Plugin is a reference implementation included with the API Gateway that demonstrates the plugin development pattern. It serves as a template and learning tool for developers who want to create custom plugins. In practice, it simply passes requests through without modification.",
+    useCases: [
+      "Use as a starting template when developing a new custom Lua plugin",
+      "Study the plugin lifecycle phases (rewrite, access, header_filter, body_filter, log)",
+      "Test plugin configuration mechanics without any side effects",
+      "Verify that the plugin loading infrastructure is working correctly",
+    ],
+    bestPractices: [
+      "Do not enable in production — it serves no functional purpose beyond being a reference",
+      "Copy and rename it as the starting point for your custom plugin development",
+      "Read its source code alongside the plugin development documentation",
+    ],
+    cautions: [
+      "This plugin has no functional behavior — enabling it has no effect on traffic",
+      "Do not modify the original example-plugin — copy it to create new plugins",
+    ],
+    examples: [
+      {
+        title: "Enable Example Plugin",
+        description: "Load the example plugin (no-op, for reference only)",
+        config: {},
+      },
+    ],
+    relatedPlugins: ["serverless-pre-function", "serverless-post-function"],
+  },
+
+  "public-api": {
+    overview:
+      "Public API exposes an internal plugin's API endpoint as a public route on the gateway. Some plugins (like batch-requests or jwt-auth) have internal endpoints that are not accessible by default. This plugin allows you to create a route that forwards to those internal plugin APIs, making them available to external clients.",
+    useCases: [
+      "Expose the batch-requests endpoint so clients can send batch API calls",
+      "Make the jwt-auth token signing endpoint available for clients to obtain tokens",
+      "Expose plugin health check or status endpoints to external monitoring systems",
+      "Create public access to internal plugin APIs that need to be called directly by clients",
+    ],
+    bestPractices: [
+      "Always protect public-api routes with authentication — exposing internal APIs without auth is a security risk",
+      "Only expose the specific plugin APIs that clients genuinely need access to",
+      "Use IP restriction in addition to authentication to limit access to known clients",
+      "Document which internal APIs you expose so other teams know they are available",
+    ],
+    cautions: [
+      "Exposing internal plugin APIs increases your attack surface — carefully evaluate what you make public",
+      "Some internal APIs may return sensitive information about gateway configuration or state",
+      "The plugin URI must match exactly the internal API path — mismatches will return 404",
+      "Without proper auth, anyone can call the exposed internal API",
+    ],
+    examples: [
+      {
+        title: "Expose Batch Requests API",
+        description: "Make the batch-requests pipeline endpoint publicly accessible",
+        config: { uri: "/apisix/batch-requests" },
+      },
+      {
+        title: "Expose JWT Sign Endpoint",
+        description: "Allow clients to request JWT tokens via a public route",
+        config: { uri: "/apisix/plugin/jwt/sign" },
+      },
+    ],
+    relatedPlugins: ["batch-requests", "jwt-auth"],
   },
 }

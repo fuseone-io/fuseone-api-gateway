@@ -12,6 +12,7 @@ import {
   FlaskConical,
   Loader2,
   Play,
+  Plus,
   Save,
   Settings,
   Tag,
@@ -51,6 +52,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { PageHeader } from "@/components/page-header"
+import { TagInput } from "@/components/tag-input"
 import { TestStepEditor } from "@/components/test-step-editor"
 import { useTestingStore } from "@/stores/testing-store"
 import { api } from "@/lib/api-client"
@@ -292,7 +294,7 @@ export default function TestSuiteDetailPage() {
   // Editable fields
   const [editName, setEditName] = useState("")
   const [editDescription, setEditDescription] = useState("")
-  const [editTags, setEditTags] = useState("")
+  const [editTags, setEditTags] = useState<string[]>([])
   const [editSteps, setEditSteps] = useState<TestStep[]>([])
 
   const loadSuite = useCallback(async () => {
@@ -301,8 +303,9 @@ export default function TestSuiteDetailPage() {
       setSuite(data)
       setEditName(data.name)
       setEditDescription(data.description)
-      setEditTags(data.tags.join(", "))
+      setEditTags(data.tags || [])
       setEditSteps(data.steps || [])
+      if (data.name) sessionStorage.setItem(`breadcrumb:${suiteId}`, data.name)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao carregar suite")
       router.push("/testing/suites")
@@ -324,10 +327,7 @@ export default function TestSuiteDetailPage() {
         name: editName.trim(),
         description: editDescription.trim(),
         steps: editSteps,
-        tags: editTags
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean),
+        tags: editTags,
       })
       setSuite(updated)
       toast.success("Suite salva com sucesso")
@@ -349,6 +349,7 @@ export default function TestSuiteDetailPage() {
             ? "Teste falhou"
             : "Teste executado"
       )
+      await fetchRuns(suiteId)
       setActiveTab("runs")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao executar suite")
@@ -384,41 +385,65 @@ export default function TestSuiteDetailPage() {
   const hasChanges =
     editName !== suite.name ||
     editDescription !== suite.description ||
-    editTags !== suite.tags.join(", ") ||
+    JSON.stringify(editTags) !== JSON.stringify(suite.tags) ||
     JSON.stringify(editSteps) !== JSON.stringify(suite.steps)
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push("/testing/suites")}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <PageHeader
-          title={suite.name}
-          description={suite.description || "Suite de teste"}
-          actions={
-            <div className="flex items-center gap-2">
-              {hasChanges && (
-                <Button variant="outline" onClick={handleSave} disabled={saving}>
-                  <Save className="mr-2 h-4 w-4" />
-                  {saving ? "Salvando..." : "Salvar"}
-                </Button>
-              )}
-              <Button
-                onClick={handleRun}
-                disabled={running || editSteps.length === 0}
-              >
-                {running ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Play className="mr-2 h-4 w-4" />
-                )}
-                {running ? "Executando..." : "Executar"}
+      <PageHeader
+        icon={<FlaskConical className="h-5 w-5" />}
+        title={suite.name}
+        description={suite.description || "Suite de teste"}
+        actions={
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push("/testing/suites")}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setEditSteps([
+                  ...editSteps,
+                  {
+                    name: "",
+                    method: "GET",
+                    url: "",
+                    headers: {},
+                    body: "",
+                    assertions: [{ type: "status_code", target: "", operator: "eq", expected: "200" }],
+                    extract_vars: {},
+                    delay_ms: 0,
+                  },
+                ])
+              }
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Adicionar Step
+            </Button>
+            {hasChanges && (
+              <Button variant="outline" onClick={handleSave} disabled={saving}>
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? "Salvando..." : "Salvar"}
               </Button>
-            </div>
-          }
-        />
-      </div>
+            )}
+            <Button
+              onClick={handleRun}
+              disabled={running || editSteps.length === 0}
+            >
+              {running ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="mr-2 h-4 w-4" />
+              )}
+              {running ? "Executando..." : "Executar"}
+            </Button>
+          </div>
+        }
+      />
 
       {/* Tags display */}
       {suite.tags.length > 0 && (
@@ -500,11 +525,11 @@ export default function TestSuiteDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Tags (separadas por virgula)</Label>
-                <Input
+                <Label>Tags</Label>
+                <TagInput
                   value={editTags}
-                  onChange={(e) => setEditTags(e.target.value)}
-                  placeholder="api, integracao, smoke"
+                  onChange={setEditTags}
+                  placeholder="Digite e pressione Enter"
                 />
               </div>
 

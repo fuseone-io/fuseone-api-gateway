@@ -25,6 +25,49 @@ export interface SecretManager {
   updated_at: string
 }
 
+// --- JSON Schema & Contract types (Design Studio) ---
+
+export type JsonSchemaType = "string" | "number" | "integer" | "boolean" | "array" | "object" | "null"
+
+export interface JsonSchemaDefinition {
+  type: JsonSchemaType
+  properties?: Record<string, JsonSchemaDefinition>
+  items?: JsonSchemaDefinition
+  required?: string[]
+  description?: string
+  enum?: unknown[]
+  format?: string       // "date-time", "email", "uri", "uuid", etc.
+  default?: unknown
+  example?: unknown
+  minLength?: number
+  maxLength?: number
+  minimum?: number
+  maximum?: number
+  pattern?: string
+}
+
+export interface ContractParameter {
+  name: string
+  in: "query" | "path" | "header" | "cookie"
+  required: boolean
+  schema?: JsonSchemaDefinition
+  description?: string
+  example?: unknown
+}
+
+export interface ContractResponse {
+  schema?: JsonSchemaDefinition
+  example?: unknown
+  description?: string
+}
+
+export interface FlowContract {
+  request_schema?: JsonSchemaDefinition
+  request_example?: unknown
+  response_schemas?: Record<string, ContractResponse>  // keyed by status code: "200", "400", "500"
+  parameters?: ContractParameter[]
+}
+
 // A single flow within an API — maps to 1 APISIX Route
 export interface ApiFlow {
   id: string // client-side UUID for tracking
@@ -52,6 +95,9 @@ export interface ApiFlow {
   // Policy Template (APISIX plugin_config reference)
   policyTemplateId?: string   // APISIX plugin_config ID
   policyTemplateName?: string // Cached display name (from desc)
+
+  // Design-first contract (schemas, examples, parameters)
+  contract?: FlowContract
 }
 
 // An API is a collection of flows sharing a common endpoint (upstream)

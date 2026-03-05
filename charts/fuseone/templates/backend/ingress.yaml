@@ -1,0 +1,31 @@
+{{- if and .Values.backend.enabled .Values.backend.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "fuseone.fullname" . }}-backend
+  labels:
+    {{- include "fuseone.backend.labels" . | nindent 4 }}
+  {{- with .Values.backend.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.backend.ingress.className }}
+  ingressClassName: {{ .Values.backend.ingress.className }}
+  {{- end }}
+  {{- if .Values.backend.ingress.tls }}
+  tls:
+    {{- toYaml .Values.backend.ingress.tls | nindent 4 }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.backend.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "fuseone.fullname" . }}-backend
+                port:
+                  name: http
+{{- end }}

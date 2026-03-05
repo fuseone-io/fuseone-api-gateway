@@ -40,6 +40,8 @@ export function LoginForm({
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const [totpRequired, setTotpRequired] = useState(false)
+  const [totpCode, setTotpCode] = useState("")
   const [oauthProviders, setOauthProviders] = useState<PublicOAuthProvider[]>([])
   const [oauthLoading, setOauthLoading] = useState<string | null>(null)
 
@@ -52,10 +54,15 @@ export function LoginForm({
     setLoading(true)
 
     try {
-      await api.login(username, password)
+      await api.login(username, password, totpRequired ? totpCode : undefined)
       router.push("/dashboard")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Login failed")
+      const message = err instanceof Error ? err.message : "Login failed"
+      if (message.includes("totp_required")) {
+        setTotpRequired(true)
+      } else {
+        toast.error(message)
+      }
     } finally {
       setLoading(false)
     }
@@ -112,6 +119,26 @@ export function LoginForm({
                   required
                 />
               </Field>
+              {totpRequired && (
+                <Field>
+                  <FieldLabel htmlFor="totp_code">Authentication Code</FieldLabel>
+                  <Input
+                    id="totp_code"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="000000"
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    required
+                    autoFocus
+                    maxLength={6}
+                    className="font-mono text-center text-lg tracking-widest"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter the 6-digit code from your authenticator app
+                  </p>
+                </Field>
+              )}
               <Field>
                 <Button type="submit" disabled={loading} className="w-full">
                   {loading ? "Entrando..." : "Entrar"}

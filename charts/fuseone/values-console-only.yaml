@@ -1,0 +1,36 @@
+# =============================================================================
+# Console Only Mode
+# Deploy management console (backend + frontend) without gateway
+# Use this to manage one or more remote APISIX gateways
+# =============================================================================
+
+apisix:
+  enabled: false
+
+backend:
+  enabled: true
+  replicas: 2
+  config:
+    # Point to remote APISIX gateway(s)
+    apisixAdminURL: "http://remote-apisix:9180"
+    apisixControlURL: "http://remote-apisix:9090"
+  secrets:
+    apisixApiKey: "your-remote-gateway-api-key"
+  ingress:
+    enabled: true
+    className: nginx
+    host: api.fuseone.example.com
+
+frontend:
+  enabled: true
+  replicas: 2
+  ingress:
+    enabled: true
+    className: nginx
+    host: console.fuseone.example.com
+
+postgresql:
+  enabled: true
+
+clickhouse:
+  enabled: false

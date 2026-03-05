@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   ArrowDown,
   ArrowUp,
@@ -77,16 +77,35 @@ function StepForm({
   step: TestStep
   onChange: (step: TestStep) => void
 }) {
-  const headers: HeaderRow[] = Object.entries(step.headers || {}).map(([key, value]) => ({
-    key,
-    value,
-  }))
-
-  const extractVars: ExtractVarRow[] = Object.entries(step.extract_vars || {}).map(
-    ([key, value]) => ({ key, value })
+  // Local state to track rows including empty ones (for new entries)
+  const [headerRows, setHeaderRows] = useState<HeaderRow[]>(() =>
+    Object.entries(step.headers || {}).map(([key, value]) => ({ key, value }))
+  )
+  const [extractVarRows, setExtractVarRows] = useState<ExtractVarRow[]>(() =>
+    Object.entries(step.extract_vars || {}).map(([key, value]) => ({ key, value }))
   )
 
+  // Sync local state when step changes externally (e.g. reorder)
+  const prevStepRef = useRef(step)
+  useEffect(() => {
+    if (prevStepRef.current !== step) {
+      const newHeaders = Object.entries(step.headers || {}).map(([key, value]) => ({ key, value }))
+      const newVars = Object.entries(step.extract_vars || {}).map(([key, value]) => ({ key, value }))
+      // Only sync if the actual data changed (ignore local empty rows)
+      const currentFiltered = headerRows.filter((r) => r.key.trim())
+      if (JSON.stringify(currentFiltered.map((r) => [r.key, r.value])) !== JSON.stringify(newHeaders.map((r) => [r.key, r.value]))) {
+        setHeaderRows(newHeaders)
+      }
+      const currentVarsFiltered = extractVarRows.filter((r) => r.key.trim())
+      if (JSON.stringify(currentVarsFiltered.map((r) => [r.key, r.value])) !== JSON.stringify(newVars.map((r) => [r.key, r.value]))) {
+        setExtractVarRows(newVars)
+      }
+      prevStepRef.current = step
+    }
+  }, [step])
+
   const updateHeaders = (rows: HeaderRow[]) => {
+    setHeaderRows(rows)
     const obj: Record<string, string> = {}
     rows.forEach((r) => {
       if (r.key.trim()) obj[r.key.trim()] = r.value
@@ -95,6 +114,7 @@ function StepForm({
   }
 
   const updateExtractVars = (rows: ExtractVarRow[]) => {
+    setExtractVarRows(rows)
     const obj: Record<string, string> = {}
     rows.forEach((r) => {
       if (r.key.trim()) obj[r.key.trim()] = r.value
@@ -157,20 +177,20 @@ function StepForm({
             variant="ghost"
             size="sm"
             className="h-6 text-xs"
-            onClick={() => updateHeaders([...headers, { key: "", value: "" }])}
+            onClick={() => updateHeaders([...headerRows, { key: "", value: "" }])}
           >
             <Plus className="h-3 w-3 mr-1" />
             Adicionar
           </Button>
         </div>
-        {headers.map((h, i) => (
+        {headerRows.map((h, i) => (
           <div key={i} className="flex gap-2 items-center">
             <Input
               className="h-7 text-xs flex-1"
               placeholder="Header name"
               value={h.key}
               onChange={(e) => {
-                const updated = [...headers]
+                const updated = [...headerRows]
                 updated[i] = { ...updated[i], key: e.target.value }
                 updateHeaders(updated)
               }}
@@ -180,7 +200,7 @@ function StepForm({
               placeholder="Value"
               value={h.value}
               onChange={(e) => {
-                const updated = [...headers]
+                const updated = [...headerRows]
                 updated[i] = { ...updated[i], value: e.target.value }
                 updateHeaders(updated)
               }}
@@ -191,7 +211,7 @@ function StepForm({
               size="icon"
               className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
               onClick={() => {
-                const updated = headers.filter((_, idx) => idx !== i)
+                const updated = headerRows.filter((_, idx) => idx !== i)
                 updateHeaders(updated)
               }}
             >
@@ -278,7 +298,7 @@ function StepForm({
             variant="ghost"
             size="sm"
             className="h-6 text-xs"
-            onClick={() => updateExtractVars([...extractVars, { key: "", value: "" }])}
+            onClick={() => updateExtractVars([...extractVarRows, { key: "", value: "" }])}
           >
             <Plus className="h-3 w-3 mr-1" />
             Adicionar
@@ -287,14 +307,14 @@ function StepForm({
         <p className="text-[10px] text-muted-foreground">
           Extraia valores do response para usar em steps seguintes. Use JSONPath no valor.
         </p>
-        {extractVars.map((v, i) => (
+        {extractVarRows.map((v, i) => (
           <div key={i} className="flex gap-2 items-center">
             <Input
               className="h-7 text-xs flex-1"
               placeholder="Nome da variavel (ex: token)"
               value={v.key}
               onChange={(e) => {
-                const updated = [...extractVars]
+                const updated = [...extractVarRows]
                 updated[i] = { ...updated[i], key: e.target.value }
                 updateExtractVars(updated)
               }}
@@ -304,7 +324,7 @@ function StepForm({
               placeholder="JSONPath (ex: $.data.token)"
               value={v.value}
               onChange={(e) => {
-                const updated = [...extractVars]
+                const updated = [...extractVarRows]
                 updated[i] = { ...updated[i], value: e.target.value }
                 updateExtractVars(updated)
               }}
@@ -315,7 +335,7 @@ function StepForm({
               size="icon"
               className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
               onClick={() => {
-                const updated = extractVars.filter((_, idx) => idx !== i)
+                const updated = extractVarRows.filter((_, idx) => idx !== i)
                 updateExtractVars(updated)
               }}
             >
@@ -338,6 +358,15 @@ export function TestStepEditor({ steps, onChange }: TestStepEditorProps) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(
     steps.length > 0 ? 0 : null
   )
+
+  // Auto-expand last step when a new one is added externally
+  const prevLengthRef = useRef(steps.length)
+  useEffect(() => {
+    if (steps.length > prevLengthRef.current) {
+      setExpandedIndex(steps.length - 1)
+    }
+    prevLengthRef.current = steps.length
+  }, [steps.length])
 
   const addStep = () => {
     const updated = [...steps, createEmptyStep()]
@@ -445,10 +474,6 @@ export function TestStepEditor({ steps, onChange }: TestStepEditorProps) {
         )
       })}
 
-      <Button type="button" variant="outline" className="w-full" onClick={addStep}>
-        <Plus className="h-4 w-4 mr-2" />
-        Adicionar Step
-      </Button>
     </div>
   )
 }

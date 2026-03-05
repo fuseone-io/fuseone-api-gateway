@@ -45,8 +45,8 @@ export function NavUser({ user }: { user: UserType | null }) {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarFallback className="rounded-lg bg-sidebar-primary text-sidebar-primary-foreground text-xs">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs">
                   {initials}
                 </AvatarFallback>
               </Avatar>
@@ -65,8 +65,8 @@ export function NavUser({ user }: { user: UserType | null }) {
           >
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user?.display_name}</span>
@@ -75,7 +75,7 @@ export function NavUser({ user }: { user: UserType | null }) {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push("/settings")}>
+            <DropdownMenuItem onClick={() => router.push("/settings?tab=profile")}>
               <User className="mr-2 h-4 w-4" />
               Perfil
             </DropdownMenuItem>

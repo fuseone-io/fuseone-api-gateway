@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
+  Activity,
   BarChart3,
   Bug,
   Plus,
@@ -442,6 +443,9 @@ export default function ApisPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}/health`)}>
                             <Heart className="mr-2 h-3.5 w-3.5" /> Health Check
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}/traces`)}>
+                            <Activity className="mr-2 h-3.5 w-3.5" /> Traces
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}/debug`)}>
                             <Bug className="mr-2 h-3.5 w-3.5" /> Debug

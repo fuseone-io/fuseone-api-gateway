@@ -32,6 +32,13 @@ const LABELS: Record<string, string> = {
   debug: "Debug",
   analytics: "Analytics",
   health: "Health",
+  testing: "Testes",
+  suites: "Suites",
+  monitors: "Monitores",
+  sla: "SLA",
+  traces: "Traces",
+  design: "Design Studio",
+  tracing: "Tracing",
 }
 
 export function BreadcrumbNav() {

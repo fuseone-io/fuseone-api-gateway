@@ -1,0 +1,28 @@
+apiVersion: v2
+name: fuseone
+description: FuseOne API Gateway Platform - Complete deployment solution
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+icon: https://fuseone.io/icon.png
+
+keywords:
+  - api-gateway
+  - apisix
+  - management
+  - clickhouse
+  - analytics
+
+home: https://github.com/klinux/fuseone-api-gateway
+
+maintainers:
+  - name: klinux
+    url: https://github.com/klinux
+
+dependencies:
+  - name: apisix
+    version: "2.13.0"
+    repository: "file://../apisix"
+    condition: apisix.enabled
+    tags:
+      - gateway

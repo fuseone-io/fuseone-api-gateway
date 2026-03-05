@@ -18,7 +18,7 @@ import type { CustomEditorProps } from "../flow/plugin-config-panel"
 const INPUT_FORMATS = [
   { value: "json", label: "JSON" },
   { value: "xml", label: "XML" },
-  { value: "", label: "Auto-detect" },
+  { value: "__none__", label: "Auto-detect" },
 ]
 
 export default function SoapTemplateEditor({ config, onChange, readOnly }: CustomEditorProps) {
@@ -30,7 +30,7 @@ export default function SoapTemplateEditor({ config, onChange, readOnly }: Custo
 
   const requestTemplate = (config.request as string) || ""
   const responseTemplate = (config.response as string) || ""
-  const inputFormat = (config.input_format as string) || ""
+  const inputFormat = (config.input_format as string) || "__none__"
 
   const updateConfig = useCallback(
     (updates: Partial<Record<string, unknown>>) => {
@@ -83,7 +83,7 @@ export default function SoapTemplateEditor({ config, onChange, readOnly }: Custo
         <div className="flex-1" />
         <Select
           value={inputFormat}
-          onValueChange={(v) => updateConfig({ input_format: v })}
+          onValueChange={(v) => updateConfig({ input_format: v === "__none__" ? "" : v })}
           disabled={readOnly}
         >
           <SelectTrigger className="h-7 w-[120px] text-xs">
