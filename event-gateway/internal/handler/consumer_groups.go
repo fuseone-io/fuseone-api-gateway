@@ -2,24 +2,23 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
-	"github.com/fuseone/event-gateway/internal/kafka"
 	"github.com/fuseone/event-gateway/internal/service"
+	"github.com/fuseone/event-gateway/internal/stream"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
 type ConsumerGroupsHandler struct {
-	admin     *kafka.AdminClient
 	configMgr *service.ConfigManager
 	logger    *zap.Logger
 }
 
-func NewConsumerGroupsHandler(admin *kafka.AdminClient, configMgr *service.ConfigManager, logger *zap.Logger) *ConsumerGroupsHandler {
+func NewConsumerGroupsHandler(configMgr *service.ConfigManager, logger *zap.Logger) *ConsumerGroupsHandler {
 	return &ConsumerGroupsHandler{
-		admin:     admin,
 		configMgr: configMgr,
 		logger:    logger,
 	}
@@ -39,8 +38,12 @@ func (h *ConsumerGroupsHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	groups, err := h.admin.ListConsumerGroups(r.Context(), api.Connection, api.ConsumerGroupPrefix)
+	groups, err := api.Provider.ListGroups(r.Context(), api.TopicName, api.ConsumerGroupPrefix)
 	if err != nil {
+		if errors.Is(err, stream.ErrNotSupported) {
+			http.Error(w, `{"error":"consumer groups not supported for this provider"}`, http.StatusNotImplemented)
+			return
+		}
 		h.logger.Error("list consumer groups", zap.Error(err))
 		http.Error(w, `{"error":"failed to list consumer groups"}`, http.StatusBadGateway)
 		return
@@ -70,8 +73,12 @@ func (h *ConsumerGroupsHandler) Describe(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	info, err := h.admin.DescribeConsumerGroup(r.Context(), api.Connection, api.TopicName, groupID)
+	info, err := api.Provider.DescribeGroup(r.Context(), api.TopicName, groupID)
 	if err != nil {
+		if errors.Is(err, stream.ErrNotSupported) {
+			http.Error(w, `{"error":"consumer group describe not supported for this provider"}`, http.StatusNotImplemented)
+			return
+		}
 		h.logger.Error("describe consumer group", zap.Error(err))
 		http.Error(w, `{"error":"failed to describe consumer group"}`, http.StatusBadGateway)
 		return
@@ -112,7 +119,11 @@ func (h *ConsumerGroupsHandler) ResetOffsets(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := h.admin.ResetOffsets(r.Context(), api.Connection, api.TopicName, groupID, req.Strategy); err != nil {
+	if err := api.Provider.ResetGroup(r.Context(), api.TopicName, groupID, req.Strategy); err != nil {
+		if errors.Is(err, stream.ErrNotSupported) {
+			http.Error(w, `{"error":"group reset not supported for this provider"}`, http.StatusNotImplemented)
+			return
+		}
 		h.logger.Error("reset offsets", zap.Error(err))
 		http.Error(w, `{"error":"failed to reset offsets: `+err.Error()+`"}`, http.StatusBadGateway)
 		return

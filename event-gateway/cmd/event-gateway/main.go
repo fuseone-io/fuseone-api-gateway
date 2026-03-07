@@ -11,12 +11,12 @@ import (
 
 	"github.com/fuseone/event-gateway/internal/config"
 	"github.com/fuseone/event-gateway/internal/handler"
-	"github.com/fuseone/event-gateway/internal/kafka"
 	"github.com/fuseone/event-gateway/internal/metrics"
 	egmw "github.com/fuseone/event-gateway/internal/middleware"
 	"github.com/fuseone/event-gateway/internal/repository"
 	"github.com/fuseone/event-gateway/internal/schema"
 	"github.com/fuseone/event-gateway/internal/service"
+	"github.com/fuseone/event-gateway/internal/stream"
 	"github.com/fuseone/event-gateway/internal/webhook"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -55,8 +55,8 @@ func main() {
 
 	// Initialize components
 	repo := repository.NewEventApiRepository(pool, logger)
-	kafkaPool := kafka.NewClientPool(logger)
-	configMgr := service.NewConfigManager(repo, kafkaPool, logger)
+	providerPool := stream.NewProviderPool(logger)
+	configMgr := service.NewConfigManager(repo, providerPool, logger)
 
 	// Load all active event APIs
 	if err := configMgr.LoadAll(context.Background()); err != nil {
@@ -81,7 +81,7 @@ func main() {
 
 	// Webhook engine
 	webhookRepo := repository.NewWebhookRepository(pool, logger)
-	webhookEngine := webhook.NewEngine(configMgr, webhookRepo, kafkaPool, collector, logger)
+	webhookEngine := webhook.NewEngine(configMgr, webhookRepo, collector, logger)
 
 	// Start PostgreSQL LISTEN for config changes
 	pgListener := repository.NewPGListener(pool, logger)
@@ -116,21 +116,16 @@ func main() {
 	// Start webhook delivery engine
 	go webhookEngine.Start(ctx)
 
-	// Kafka producer
-	producer := kafka.NewProducer(kafkaPool)
-
 	// HTTP Router
 	r := chi.NewRouter()
 	r.Use(chimw.RealIP)
 	r.Use(chimw.Recoverer)
 	r.Use(egmw.RequestID)
 
-	// Admin client for consumer group operations
-	adminClient := kafka.NewAdminClient(kafkaPool)
-	cgHandler := handler.NewConsumerGroupsHandler(adminClient, configMgr, logger)
+	cgHandler := handler.NewConsumerGroupsHandler(configMgr, logger)
 
 	// Internal endpoints (not exposed via APISIX)
-	r.Get("/health", handler.NewHealthHandler(pool, kafkaPool, configMgr).Handle)
+	r.Get("/health", handler.NewHealthHandler(pool, providerPool, configMgr).Handle)
 	r.Post("/internal/reload", handler.NewReloadHandler(configMgr).Handle)
 	r.Get("/internal/metrics", handler.NewMetricsHandler(collector).Handle)
 	r.Route("/internal/event-apis/{id}/consumer-groups", func(r chi.Router) {
@@ -142,10 +137,10 @@ func main() {
 	// Topic endpoints (exposed via APISIX with auth)
 	r.Route("/topics/{topic}", func(r chi.Router) {
 		r.Use(egmw.TopicResolver(configMgr))
-		r.With(topicAuth.RequireProduce()).Post("/produce", handler.NewProduceHandler(producer, collector, schemaValidator).Handle)
-		r.With(topicAuth.RequireConsume()).Post("/consume", handler.NewConsumeHandler(kafkaPool, collector, logger).Handle)
-		r.With(topicAuth.RequireStream()).Get("/stream", handler.NewStreamHandler(kafkaPool, cfg.Kafka.SSEKeepAliveMs, collector, logger).Handle)
-		r.With(topicAuth.RequireStream()).Get("/ws", handler.NewWebSocketHandler(kafkaPool, collector, logger).Handle)
+		r.With(topicAuth.RequireProduce()).Post("/produce", handler.NewProduceHandler(collector, schemaValidator).Handle)
+		r.With(topicAuth.RequireConsume()).Post("/consume", handler.NewConsumeHandler(collector).Handle)
+		r.With(topicAuth.RequireStream()).Get("/stream", handler.NewStreamHandler(cfg.Kafka.SSEKeepAliveMs, collector, logger).Handle)
+		r.With(topicAuth.RequireStream()).Get("/ws", handler.NewWebSocketHandler(collector, logger).Handle)
 	})
 
 	// HTTP Server
@@ -179,6 +174,6 @@ func main() {
 		logger.Error("server shutdown", zap.Error(err))
 	}
 
-	kafkaPool.Close()
+	providerPool.Close()
 	logger.Info("event gateway stopped")
 }

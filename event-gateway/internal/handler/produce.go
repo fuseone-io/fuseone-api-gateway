@@ -5,20 +5,25 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/fuseone/event-gateway/internal/kafka"
 	"github.com/fuseone/event-gateway/internal/metrics"
 	egmw "github.com/fuseone/event-gateway/internal/middleware"
 	"github.com/fuseone/event-gateway/internal/schema"
+	"github.com/fuseone/event-gateway/internal/stream"
 )
 
 type ProduceHandler struct {
-	producer  *kafka.Producer
 	collector *metrics.Collector
 	validator *schema.Validator
 }
 
-func NewProduceHandler(producer *kafka.Producer, collector *metrics.Collector, validator *schema.Validator) *ProduceHandler {
-	return &ProduceHandler{producer: producer, collector: collector, validator: validator}
+func NewProduceHandler(collector *metrics.Collector, validator *schema.Validator) *ProduceHandler {
+	return &ProduceHandler{collector: collector, validator: validator}
+}
+
+type produceRequest struct {
+	Key     *string           `json:"key,omitempty"`
+	Value   json.RawMessage   `json:"value"`
+	Headers map[string]string `json:"headers,omitempty"`
 }
 
 func (h *ProduceHandler) Handle(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +38,7 @@ func (h *ProduceHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req kafka.ProduceRequest
+	var req produceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request body: `+err.Error()+`"}`, http.StatusBadRequest)
 		return
@@ -55,7 +60,11 @@ func (h *ProduceHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	ctr := h.collector.For(eventAPI.ID)
 	start := time.Now()
 
-	resp, err := h.producer.Produce(r.Context(), eventAPI.Connection, eventAPI.TopicName, req)
+	resp, err := eventAPI.Provider.Publish(r.Context(), eventAPI.TopicName, stream.PublishRequest{
+		Key:     req.Key,
+		Value:   req.Value,
+		Headers: req.Headers,
+	})
 	elapsed := time.Since(start).Microseconds()
 	ctr.ProduceTotal.Add(1)
 	ctr.ProduceLatencyUs.Add(elapsed)
@@ -69,6 +78,10 @@ func (h *ProduceHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"data": resp,
+		"data": map[string]interface{}{
+			"partition": resp.Partition,
+			"offset":    resp.Offset,
+			"timestamp": resp.Timestamp.UTC().Format(time.RFC3339),
+		},
 	})
 }

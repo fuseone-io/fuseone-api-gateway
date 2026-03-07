@@ -5,40 +5,36 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/fuseone/event-gateway/internal/kafka"
 	"github.com/fuseone/event-gateway/internal/metrics"
 	"github.com/fuseone/event-gateway/internal/repository"
 	"github.com/fuseone/event-gateway/internal/service"
+	"github.com/fuseone/event-gateway/internal/stream"
 	"github.com/google/uuid"
-	"github.com/twmb/franz-go/pkg/kgo"
 	"go.uber.org/zap"
 )
 
 // Engine manages webhook delivery for all active Event APIs.
-// It runs one Kafka consumer per webhook-enabled Event API and dispatches
+// It runs one stream consumer per webhook-enabled Event API and dispatches
 // messages to all active webhook subscriptions.
 type Engine struct {
 	configMgr   *service.ConfigManager
 	webhookRepo *repository.WebhookRepository
-	kafkaPool   *kafka.ClientPool
 	dispatcher  *Dispatcher
 	logger      *zap.Logger
 
-	mu       sync.Mutex
-	workers  map[uuid.UUID]context.CancelFunc // event_api_id → cancel func
+	mu      sync.Mutex
+	workers map[uuid.UUID]context.CancelFunc // event_api_id → cancel func
 }
 
 func NewEngine(
 	configMgr *service.ConfigManager,
 	webhookRepo *repository.WebhookRepository,
-	kafkaPool *kafka.ClientPool,
 	collector *metrics.Collector,
 	logger *zap.Logger,
 ) *Engine {
 	return &Engine{
 		configMgr:   configMgr,
 		webhookRepo: webhookRepo,
-		kafkaPool:   kafkaPool,
 		dispatcher:  NewDispatcher(webhookRepo, collector, logger),
 		logger:      logger,
 		workers:     make(map[uuid.UUID]context.CancelFunc),
@@ -140,22 +136,17 @@ func (e *Engine) reconcile(ctx context.Context) {
 func (e *Engine) startWorker(parentCtx context.Context, api *repository.EventApiWithConnection) {
 	groupID := fmt.Sprintf("%s-webhook-%s", api.ConsumerGroupPrefix, api.ID.String()[:8])
 
-	consumer, err := kafka.NewStreamConsumer(
-		api.Connection,
-		api.TopicName,
-		groupID,
-		api.AutoOffsetReset,
-		e.logger,
-	)
+	ctx, cancel := context.WithCancel(parentCtx)
+
+	msgCh, closer, err := api.Provider.Subscribe(ctx, api.TopicName, groupID, api.AutoOffsetReset)
 	if err != nil {
+		cancel()
 		e.logger.Error("create webhook consumer", zap.Error(err), zap.String("slug", api.Slug))
 		return
 	}
 
-	ctx, cancel := context.WithCancel(parentCtx)
-
 	e.mu.Lock()
-	e.workers[api.ID] = cancel
+	e.workers[api.ID] = func() { cancel(); closer.Close() }
 	e.mu.Unlock()
 
 	e.logger.Info("started webhook worker",
@@ -171,24 +162,22 @@ func (e *Engine) startWorker(parentCtx context.Context, api *repository.EventApi
 			e.mu.Unlock()
 		}()
 
-		go consumer.Start(ctx)
-
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case record, ok := <-consumer.Messages():
+			case msg, ok := <-msgCh:
 				if !ok {
 					return
 				}
-				e.dispatchToSubscribers(ctx, api.ID, api.Slug, record)
+				e.dispatchToSubscribers(ctx, api.ID, api.Slug, msg)
 			}
 		}
 	}()
 }
 
-// dispatchToSubscribers sends a record to all active webhook subscribers for the Event API.
-func (e *Engine) dispatchToSubscribers(ctx context.Context, eventApiID uuid.UUID, slug string, record *kgo.Record) {
+// dispatchToSubscribers sends a message to all active webhook subscribers for the Event API.
+func (e *Engine) dispatchToSubscribers(ctx context.Context, eventApiID uuid.UUID, slug string, msg stream.Message) {
 	subs, err := e.webhookRepo.ListActiveByEventApiID(ctx, eventApiID)
 	if err != nil {
 		e.logger.Error("list subscribers for dispatch", zap.Error(err))
@@ -197,7 +186,7 @@ func (e *Engine) dispatchToSubscribers(ctx context.Context, eventApiID uuid.UUID
 
 	for _, sub := range subs {
 		// Apply event filter if configured
-		if sub.FilterExpression != "" && !MatchesFilter(sub.FilterExpression, record.Value) {
+		if sub.FilterExpression != "" && !MatchesFilter(sub.FilterExpression, msg.Value) {
 			e.logger.Debug("event filtered out",
 				zap.String("subscription_id", sub.ID.String()),
 				zap.String("filter", sub.FilterExpression),
@@ -206,7 +195,7 @@ func (e *Engine) dispatchToSubscribers(ctx context.Context, eventApiID uuid.UUID
 		}
 		// Dispatch each subscriber in its own goroutine for parallelism
 		sub := sub
-		go e.dispatcher.Deliver(ctx, sub, record, slug)
+		go e.dispatcher.Deliver(ctx, sub, msg, slug)
 	}
 }
 

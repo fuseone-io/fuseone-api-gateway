@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/fuseone/event-gateway/internal/kafka"
 	"github.com/fuseone/event-gateway/internal/repository"
+	"github.com/fuseone/event-gateway/internal/stream"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -13,22 +13,22 @@ import (
 // ConfigManager loads event API configurations from the database
 // and maintains an in-memory map for fast lookups.
 type ConfigManager struct {
-	repo      *repository.EventApiRepository
-	kafkaPool *kafka.ClientPool
-	logger    *zap.Logger
+	repo         *repository.EventApiRepository
+	providerPool *stream.ProviderPool
+	logger       *zap.Logger
 
-	mu      sync.RWMutex
-	bySlug  map[string]*repository.EventApiWithConnection
-	byID    map[uuid.UUID]*repository.EventApiWithConnection
+	mu     sync.RWMutex
+	bySlug map[string]*repository.EventApiWithConnection
+	byID   map[uuid.UUID]*repository.EventApiWithConnection
 }
 
-func NewConfigManager(repo *repository.EventApiRepository, kafkaPool *kafka.ClientPool, logger *zap.Logger) *ConfigManager {
+func NewConfigManager(repo *repository.EventApiRepository, providerPool *stream.ProviderPool, logger *zap.Logger) *ConfigManager {
 	return &ConfigManager{
-		repo:      repo,
-		kafkaPool: kafkaPool,
-		logger:    logger,
-		bySlug:    make(map[string]*repository.EventApiWithConnection),
-		byID:      make(map[uuid.UUID]*repository.EventApiWithConnection),
+		repo:         repo,
+		providerPool: providerPool,
+		logger:       logger,
+		bySlug:       make(map[string]*repository.EventApiWithConnection),
+		byID:         make(map[uuid.UUID]*repository.EventApiWithConnection),
 	}
 }
 
@@ -47,19 +47,21 @@ func (cm *ConfigManager) LoadAll(ctx context.Context) error {
 
 	for i := range apis {
 		api := &apis[i]
-		cm.bySlug[api.Slug] = api
-		cm.byID[api.ID] = api
-
-		// Pre-create Kafka client for this connection
-		if _, err := cm.kafkaPool.GetOrCreate(api.Connection); err != nil {
-			cm.logger.Error("failed to create kafka client for event api",
+		provider, err := cm.providerPool.GetOrCreate(api.Connection)
+		if err != nil {
+			cm.logger.Error("failed to create stream provider for event api",
 				zap.String("slug", api.Slug),
+				zap.String("type", api.Connection.ConnectionType),
 				zap.Error(err),
 			)
+			continue
 		}
+		api.Provider = provider
+		cm.bySlug[api.Slug] = api
+		cm.byID[api.ID] = api
 	}
 
-	cm.logger.Info("loaded event api configs", zap.Int("count", len(apis)))
+	cm.logger.Info("loaded event api configs", zap.Int("count", len(cm.byID)))
 	return nil
 }
 
@@ -108,6 +110,13 @@ func (cm *ConfigManager) OnConfigChanged(payload string) {
 		return
 	}
 
+	provider, err := cm.providerPool.GetOrCreate(api.Connection)
+	if err != nil {
+		cm.logger.Error("failed to create stream provider on config change", zap.Error(err))
+	} else {
+		api.Provider = provider
+	}
+
 	cm.mu.Lock()
 	// Remove old slug mapping if slug changed
 	for slug, existing := range cm.bySlug {
@@ -119,11 +128,6 @@ func (cm *ConfigManager) OnConfigChanged(payload string) {
 	cm.bySlug[api.Slug] = api
 	cm.byID[api.ID] = api
 	cm.mu.Unlock()
-
-	// Ensure Kafka client exists
-	if _, err := cm.kafkaPool.GetOrCreate(api.Connection); err != nil {
-		cm.logger.Error("failed to create kafka client on config change", zap.Error(err))
-	}
 
 	cm.logger.Info("event api config updated",
 		zap.String("slug", api.Slug),

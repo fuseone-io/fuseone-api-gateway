@@ -6,26 +6,23 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/fuseone/event-gateway/internal/kafka"
 	"github.com/fuseone/event-gateway/internal/metrics"
 	egmw "github.com/fuseone/event-gateway/internal/middleware"
-	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/fuseone/event-gateway/internal/stream"
 	"go.uber.org/zap"
 )
 
 type StreamHandler struct {
-	kafkaPool *kafka.ClientPool
 	collector *metrics.Collector
 	logger    *zap.Logger
 	keepAlive time.Duration
 }
 
-func NewStreamHandler(kafkaPool *kafka.ClientPool, keepAliveMs int, collector *metrics.Collector, logger *zap.Logger) *StreamHandler {
+func NewStreamHandler(keepAliveMs int, collector *metrics.Collector, logger *zap.Logger) *StreamHandler {
 	if keepAliveMs <= 0 {
 		keepAliveMs = 15000
 	}
 	return &StreamHandler{
-		kafkaPool: kafkaPool,
 		collector: collector,
 		logger:    logger,
 		keepAlive: time.Duration(keepAliveMs) * time.Millisecond,
@@ -52,7 +49,7 @@ func (h *StreamHandler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	// Determine consumer group
 	group := r.URL.Query().Get("group")
-	sessionID := kafka.GenerateSessionID()
+	sessionID := stream.GenerateSessionID()
 	groupID := fmt.Sprintf("%s-sse-%s", eventAPI.ConsumerGroupPrefix, sessionID)
 	if group != "" {
 		groupID = fmt.Sprintf("%s-sse-%s", eventAPI.ConsumerGroupPrefix, group)
@@ -63,19 +60,12 @@ func (h *StreamHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		offsetReset = eventAPI.AutoOffsetReset
 	}
 
-	consumer, err := kafka.NewStreamConsumer(
-		eventAPI.Connection,
-		eventAPI.TopicName,
-		groupID,
-		offsetReset,
-		h.logger,
-	)
+	msgCh, closer, err := eventAPI.Provider.Subscribe(r.Context(), eventAPI.TopicName, groupID, offsetReset)
 	if err != nil {
 		http.Error(w, `{"error":"create consumer: `+err.Error()+`"}`, http.StatusBadGateway)
 		return
 	}
-
-	go consumer.Start(r.Context())
+	defer closer.Close()
 
 	// Set SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -106,7 +96,7 @@ func (h *StreamHandler) Handle(w http.ResponseWriter, r *http.Request) {
 			)
 			return
 
-		case msg, ok := <-consumer.Messages():
+		case msg, ok := <-msgCh:
 			if !ok {
 				return
 			}
@@ -122,21 +112,17 @@ func (h *StreamHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func formatSSEMessage(r *kgo.Record) string {
+func formatSSEMessage(m stream.Message) string {
 	msg := map[string]interface{}{
-		"key":       string(r.Key),
-		"value":     json.RawMessage(r.Value),
-		"partition": r.Partition,
-		"offset":    r.Offset,
-		"timestamp": r.Timestamp.UTC().Format(time.RFC3339),
+		"key":       string(m.Key),
+		"value":     json.RawMessage(m.Value),
+		"partition": m.Partition,
+		"offset":    m.Offset,
+		"timestamp": m.Timestamp.UTC().Format(time.RFC3339),
 	}
 
-	if len(r.Headers) > 0 {
-		headers := make(map[string]string, len(r.Headers))
-		for _, h := range r.Headers {
-			headers[h.Key] = string(h.Value)
-		}
-		msg["headers"] = headers
+	if len(m.Headers) > 0 {
+		msg["headers"] = m.Headers
 	}
 
 	data, _ := json.Marshal(msg)

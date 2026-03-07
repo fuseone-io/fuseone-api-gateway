@@ -15,8 +15,8 @@ import (
 	"github.com/fuseone/event-gateway/internal/metrics"
 	"github.com/fuseone/event-gateway/internal/model"
 	"github.com/fuseone/event-gateway/internal/repository"
+	"github.com/fuseone/event-gateway/internal/stream"
 	"github.com/google/uuid"
-	"github.com/twmb/franz-go/pkg/kgo"
 	"go.uber.org/zap"
 )
 
@@ -51,8 +51,8 @@ func NewDispatcher(repo *repository.WebhookRepository, collector *metrics.Collec
 	}
 }
 
-// Deliver sends a Kafka record to a webhook subscription, handling retries inline.
-func (d *Dispatcher) Deliver(ctx context.Context, sub model.WebhookSubscription, record *kgo.Record, slug string) {
+// Deliver sends a stream message to a webhook subscription, handling retries inline.
+func (d *Dispatcher) Deliver(ctx context.Context, sub model.WebhookSubscription, record stream.Message, slug string) {
 	// Circuit breaker check
 	if sub.CircuitStatus == "open" {
 		if sub.CircuitOpenedAt == nil || time.Since(*sub.CircuitOpenedAt) < circuitBreakerCooldown {
@@ -82,10 +82,7 @@ func (d *Dispatcher) Deliver(ctx context.Context, sub model.WebhookSubscription,
 		Slug:      slug,
 	}
 	if len(record.Headers) > 0 {
-		payload.Headers = make(map[string]string, len(record.Headers))
-		for _, h := range record.Headers {
-			payload.Headers[h.Key] = string(h.Value)
-		}
+		payload.Headers = record.Headers
 	}
 
 	body, err := json.Marshal(payload)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/fuseone/event-gateway/internal/model"
+	"github.com/fuseone/event-gateway/internal/stream"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
@@ -19,11 +20,13 @@ func NewEventApiRepository(pool *pgxpool.Pool, logger *zap.Logger) *EventApiRepo
 	return &EventApiRepository{pool: pool, logger: logger}
 }
 
-// EventApiWithConnection joins event_api with its kafka_connection for the gateway to use.
+// EventApiWithConnection joins event_api with its stream connection for the gateway to use.
+// Provider is populated by ConfigManager after DB load — not scanned from DB.
 type EventApiWithConnection struct {
 	model.EventApi
-	Connection    model.KafkaConnection
-	ActiveSchema  json.RawMessage // Active schema content (loaded from event_schemas), nil if none
+	Connection   model.StreamConnection // underlying connection config
+	Provider     stream.StreamProvider  // live provider, set by ConfigManager
+	ActiveSchema json.RawMessage        // Active schema content (loaded from event_schemas), nil if none
 }
 
 const eventApiSelectCols = `
@@ -34,8 +37,14 @@ const eventApiSelectCols = `
 	ea.consumer_group_prefix, ea.auto_offset_reset,
 	ea.schema_validation,
 	ea.status, ea.created_at, ea.updated_at,
-	kc.id, kc.brokers, kc.security_protocol,
-	kc.sasl_mechanism, kc.sasl_username, kc.sasl_password
+	kc.id,
+	COALESCE(kc.connection_type, 'kafka'),
+	kc.brokers, kc.security_protocol,
+	kc.sasl_mechanism, kc.sasl_username, kc.sasl_password,
+	kc.nats_urls, kc.nats_token, kc.nats_nkey_seed,
+	kc.nats_credentials,
+	COALESCE(kc.nats_jetstream, false),
+	COALESCE(kc.nats_tls, false)
 `
 
 func scanEventApiWithConnection(scan func(dest ...any) error) (EventApiWithConnection, error) {
@@ -48,8 +57,14 @@ func scanEventApiWithConnection(scan func(dest ...any) error) (EventApiWithConne
 		&eac.ConsumerGroupPrefix, &eac.AutoOffsetReset,
 		&eac.SchemaValidation,
 		&eac.Status, &eac.CreatedAt, &eac.UpdatedAt,
-		&eac.Connection.ID, &eac.Connection.Brokers, &eac.Connection.SecurityProtocol,
+		&eac.Connection.ID,
+		&eac.Connection.ConnectionType,
+		&eac.Connection.Brokers, &eac.Connection.SecurityProtocol,
 		&eac.Connection.SASLMechanism, &eac.Connection.SASLUsername, &eac.Connection.SASLPassword,
+		&eac.Connection.NATSURLs, &eac.Connection.NATSToken, &eac.Connection.NATSNKeySeed,
+		&eac.Connection.NATSCredentials,
+		&eac.Connection.NATSJetStream,
+		&eac.Connection.NATSTLS,
 	)
 	return eac, err
 }
