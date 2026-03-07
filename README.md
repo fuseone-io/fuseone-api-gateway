@@ -37,7 +37,7 @@ FuseOne API Gateway is a full-featured, enterprise-grade API management platform
 | **Observability** | OpenTelemetry traces, Prometheus metrics, per-phase timing waterfall |
 | **AI Gateway** | LLM proxy, prompt injection protection, semantic caching |
 | **GraphQL** | Depth limit, complexity control, introspection guard, allowlist |
-| **Kafka / Event Gateway** | HTTP→Kafka bridge, topic management |
+| **Event Gateway** | Expose Kafka topics and NATS subjects as managed REST/SSE/WebSocket/Webhook APIs |
 | **Service Mesh** | mTLS, traffic policies, topology view |
 | **Developer Portal** | Self-service API subscription, docs, API key management |
 | **Multi-environment** | Promote configs across dev/staging/prod environments |
@@ -77,7 +77,7 @@ FuseOne API Gateway is a full-featured, enterprise-grade API management platform
 - **Frontend (Next.js)** — Management dashboard. All API resources, monitoring, traces, alerts, settings.
 - **Developer Portal (Next.js)** — Self-service portal for API consumers: subscription, API key generation, documentation.
 - **Custom APISIX** — Apache APISIX 3.15 with FuseOne Lua plugins pre-baked in: `http-callout`, `data-masking`, `threat-protection`, `api-composition`, `fuseone-timing`, and a patched `opentelemetry` plugin.
-- **Event Gateway (Go)** — Kafka protocol mediator for HTTP→Kafka bridging.
+- **Event Gateway (Go)** — Multi-protocol event mediator supporting Kafka (PLAINTEXT, SASL_SSL, SCRAM) and NATS (Core, JetStream, TLS, NKey). Exposes topics/subjects as REST, SSE, WebSocket, and Webhook APIs.
 - **etcd** — State store for APISIX (routes, upstreams, plugins, consumers).
 - **PostgreSQL** — Auth, users, roles, audit log, dashboard settings.
 
@@ -93,7 +93,7 @@ All images are published to Docker Hub under `devopsfuseone/`:
 | `devopsfuseone/fuseone-api-gateway-frontend` | Next.js management console |
 | `devopsfuseone/apisix` | Apache APISIX + FuseOne custom plugins |
 | `devopsfuseone/fuseone-developer-portal` | Next.js developer portal |
-| `devopsfuseone/fuseone-event-gateway` | Kafka event gateway |
+| `devopsfuseone/fuseone-event-gateway` | Event gateway (Kafka + NATS) |
 
 ---
 
@@ -170,7 +170,7 @@ fuseone-api-gateway/
 │       ├── stores/       # Zustand state stores
 │       └── types/        # TypeScript types
 ├── developer-portal/     # Next.js developer portal
-├── event-gateway/        # Go Kafka gateway
+├── event-gateway/        # Go event gateway (Kafka + NATS)
 ├── custom-plugins/
 │   └── apisix/
 │       ├── Dockerfile    # Custom APISIX image
@@ -252,6 +252,39 @@ FuseOne ships four dedicated GraphQL guard plugins, applied at the route or glob
 | `graphql-introspection-guard` | Disable or restrict `__schema` / `__type` introspection in production |
 
 In addition, `degraphql` allows exposing a GraphQL API as REST endpoints — clients send plain HTTP requests and the gateway translates them to GraphQL queries upstream.
+
+---
+
+## Event Gateway
+
+FuseOne bridges event streaming platforms with HTTP APIs, enabling any client to produce and consume events without native Kafka or NATS libraries.
+
+### Supported Backends
+
+| Backend | Auth Methods | Delivery |
+|---|---|---|
+| **Apache Kafka** | PLAINTEXT, SASL_SSL (SCRAM-SHA-256/512) | Persistent (log-based) |
+| **NATS Core** | Plain, TLS, NKey | Fire-and-forget (at-most-once) |
+| **NATS JetStream** | Plain, TLS, NKey | Persistent (at-least-once) |
+
+### Event APIs
+
+Each Event API maps a topic or subject to one or more HTTP protocols:
+
+| Protocol | Description |
+|---|---|
+| **REST Produce** | `POST /events/{api}/produce` — publish messages |
+| **REST Consume** | `GET /events/{api}/consume` — poll messages |
+| **SSE** | `GET /events/{api}/sse` — real-time streaming via Server-Sent Events |
+| **WebSocket** | `WS /events/{api}/ws` — bidirectional messaging |
+| **Webhook** | Push events to external URLs with retries and delivery tracking |
+
+### Use Cases
+
+- **Fintech audit** — fire-and-forget logging with Kafka persistence for regulatory compliance
+- **IoT telemetry** — devices publish sensor data via REST, backends consume via SSE
+- **E-commerce notifications** — order events trigger webhooks to shipping/payment services
+- **Cache invalidation** — NATS pub/sub for real-time cache purge across microservices
 
 ---
 
