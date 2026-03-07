@@ -236,7 +236,22 @@ FuseOne extends APISIX with the following custom Lua plugins:
 | `fuseone-timing` | all phases | Per-phase timing collection for trace waterfall |
 | `opentelemetry` | log | Patched OTel plugin with FuseOne phase attributes |
 
-Custom plugins are baked into `devopsfuseone/apisix` and also available as ConfigMaps in the Helm chart.
+Custom plugins are baked into `devopsfuseone/apisix` — no ConfigMap mounts required.
+
+---
+
+## GraphQL Gateway
+
+FuseOne ships four dedicated GraphQL guard plugins, applied at the route or global level:
+
+| Plugin | Description |
+|---|---|
+| `graphql-depth-limit` | Reject queries that exceed a configured nesting depth — prevents exponential query attacks |
+| `graphql-complexity` | Assign cost weights to fields and block queries above a complexity budget |
+| `graphql-allowlist` | Whitelist specific operation hashes; block any query not on the list (persisted queries) |
+| `graphql-introspection-guard` | Disable or restrict `__schema` / `__type` introspection in production |
+
+In addition, `degraphql` allows exposing a GraphQL API as REST endpoints — clients send plain HTTP requests and the gateway translates them to GraphQL queries upstream.
 
 ---
 
