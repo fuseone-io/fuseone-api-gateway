@@ -17,36 +17,91 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { useAIChatStore } from "@/stores/ai-chat-store"
 import { cn } from "@/lib/utils"
+import { DOC_CATEGORIES } from "@/lib/docs"
+import type { DocSection, DocArticle, DocCategory } from "@/lib/docs"
 
+const MAX_CONTEXT_CHARS = 6000
+
+/** Tokenize a string into lowercase words (min 2 chars). */
+function tokenize(text: string): string[] {
+  return text.toLowerCase().match(/[\p{L}\d]{2,}/gu) ?? []
+}
+
+/**
+ * Search documentation and return the most relevant sections as context.
+ * Scores every section (and subsection) against user query tokens,
+ * returns the highest-scoring content up to MAX_CONTEXT_CHARS.
+ */
 function buildContext(message: string): string {
-  // Simple keyword matching against known doc topics — returns up to 2000 chars
-  const keywords = message.toLowerCase()
-  const contexts: string[] = []
+  const queryTokens = tokenize(message)
+  if (queryTokens.length === 0) return ""
 
-  if (keywords.includes("rate limit") || keywords.includes("throttl")) {
-    contexts.push("Rate limiting can be configured via the limit-req, limit-conn, or limit-count plugins. Set limits per route or globally.")
-  }
-  if (keywords.includes("auth") || keywords.includes("jwt") || keywords.includes("api key")) {
-    contexts.push("Authentication plugins available: jwt-auth, key-auth, basic-auth, hmac-auth, openid-connect. Configure per route or globally.")
-  }
-  if (keywords.includes("upstream") || keywords.includes("load balanc")) {
-    contexts.push("Upstreams support roundrobin, chash (consistent hash), ewma, and least_conn load balancing. Health checks can be active or passive.")
-  }
-  if (keywords.includes("plugin") || keywords.includes("policy")) {
-    contexts.push("Plugins are applied to routes or globally. Each plugin has its own schema. Use plugin-configs (templates) to reuse common configurations.")
-  }
-  if (keywords.includes("ssl") || keywords.includes("tls") || keywords.includes("certificate")) {
-    contexts.push("SSL certificates are managed in the SSL section. SNI matching routes HTTPS requests to the correct certificate.")
-  }
-  if (keywords.includes("monitor") || keywords.includes("metric") || keywords.includes("alert")) {
-    contexts.push("Monitoring includes real-time metrics, traces, alerts, and SLA reports. Integrates with Prometheus, ClickHouse, and Elasticsearch.")
-  }
-  if (keywords.includes("kafka") || keywords.includes("stream")) {
-    contexts.push("Kafka Gateway allows producing and consuming messages via API routes. Configure connections and topic-level stream routes.")
+  type Scored = { cat: string; article: string; section: string; body: string; score: number }
+  const scored: Scored[] = []
+
+  for (const cat of DOC_CATEGORIES) {
+    for (const article of cat.articles) {
+      // Score at article level (title, description, tags)
+      const articleHaystack = [article.title, article.description, ...article.tags].join(" ").toLowerCase()
+      const articleBonus = queryTokens.filter((t) => articleHaystack.includes(t)).length
+
+      for (const section of article.content) {
+        const sectionText = [section.title, section.body].join(" ").toLowerCase()
+        let sectionScore = queryTokens.filter((t) => sectionText.includes(t)).length
+        sectionScore += articleBonus * 0.5 // boost sections from relevant articles
+
+        if (sectionScore > 0) {
+          scored.push({
+            cat: cat.title,
+            article: article.title,
+            section: section.title,
+            body: section.body,
+            score: sectionScore,
+          })
+        }
+
+        // Also score subsections
+        for (const sub of section.subsections ?? []) {
+          const subText = [sub.title, sub.body].join(" ").toLowerCase()
+          let subScore = queryTokens.filter((t) => subText.includes(t)).length
+          subScore += articleBonus * 0.3
+          if (subScore > 0) {
+            scored.push({
+              cat: cat.title,
+              article: article.title,
+              section: `${section.title} > ${sub.title}`,
+              body: sub.body,
+              score: subScore,
+            })
+          }
+        }
+      }
+    }
   }
 
-  const joined = contexts.join("\n")
-  return joined.length > 2000 ? joined.slice(0, 2000) : joined
+  if (scored.length === 0) return ""
+
+  // Sort by score descending
+  scored.sort((a, b) => b.score - a.score)
+
+  // Build context string up to limit
+  const parts: string[] = []
+  let totalLen = 0
+  for (const item of scored) {
+    const entry = `## ${item.cat} > ${item.article} > ${item.section}\n${item.body}`
+    if (totalLen + entry.length > MAX_CONTEXT_CHARS) {
+      // Try to fit a truncated version
+      const remaining = MAX_CONTEXT_CHARS - totalLen
+      if (remaining > 200) {
+        parts.push(entry.slice(0, remaining) + "\n[...]")
+      }
+      break
+    }
+    parts.push(entry)
+    totalLen += entry.length
+  }
+
+  return parts.join("\n\n")
 }
 
 export function AIChatPanel() {

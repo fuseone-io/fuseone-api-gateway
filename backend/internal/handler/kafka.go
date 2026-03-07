@@ -65,17 +65,26 @@ func (h *KafkaHandler) GetConnection(c *gin.Context) {
 }
 
 type createKafkaConnectionRequest struct {
-	Name             string   `json:"name" binding:"required"`
-	Description      string   `json:"description"`
-	Brokers          []string `json:"brokers" binding:"required"`
+	Name           string   `json:"name" binding:"required"`
+	Description    string   `json:"description"`
+	ConnectionType string   `json:"connection_type"`
+	IsActive       *bool    `json:"is_active"`
+	// Kafka fields
+	Brokers          []string `json:"brokers"`
 	SecurityProtocol string   `json:"security_protocol"`
 	SASLMechanism    *string  `json:"sasl_mechanism"`
 	SASLUsername     *string  `json:"sasl_username"`
 	SASLPassword     *string  `json:"sasl_password"`
-	IsActive         *bool    `json:"is_active"`
+	// NATS fields
+	NATSURLs        []string `json:"nats_urls"`
+	NATSToken       *string  `json:"nats_token"`
+	NATSNKeySeed    *string  `json:"nats_nkey_seed"`
+	NATSCredentials *string  `json:"nats_credentials"`
+	NATSJetStream   bool     `json:"nats_jetstream"`
+	NATSTLS         bool     `json:"nats_tls"`
 }
 
-// CreateConnection creates a new Kafka connection.
+// CreateConnection creates a new stream connection (Kafka or NATS).
 func (h *KafkaHandler) CreateConnection(c *gin.Context) {
 	var req createKafkaConnectionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -83,23 +92,38 @@ func (h *KafkaHandler) CreateConnection(c *gin.Context) {
 		return
 	}
 
-	if len(req.Brokers) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "brokers must not be empty"}})
+	connType := req.ConnectionType
+	if connType == "" {
+		connType = "kafka"
+	}
+	if !model.ValidConnectionTypes[connType] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "invalid connection_type; must be kafka or nats"}})
 		return
 	}
 
-	securityProtocol := req.SecurityProtocol
-	if securityProtocol == "" {
-		securityProtocol = "PLAINTEXT"
-	}
-	if !model.ValidSecurityProtocols[securityProtocol] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "invalid security_protocol; must be PLAINTEXT, SSL, SASL_PLAINTEXT, or SASL_SSL"}})
-		return
-	}
-
-	if req.SASLMechanism != nil && !model.ValidSASLMechanisms[*req.SASLMechanism] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "invalid sasl_mechanism; must be PLAIN, SCRAM-SHA-256, or SCRAM-SHA-512"}})
-		return
+	if connType == "kafka" {
+		if len(req.Brokers) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "brokers must not be empty for Kafka connections"}})
+			return
+		}
+		securityProtocol := req.SecurityProtocol
+		if securityProtocol == "" {
+			securityProtocol = "PLAINTEXT"
+		}
+		if !model.ValidSecurityProtocols[securityProtocol] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "invalid security_protocol"}})
+			return
+		}
+		if req.SASLMechanism != nil && !model.ValidSASLMechanisms[*req.SASLMechanism] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "invalid sasl_mechanism"}})
+			return
+		}
+		req.SecurityProtocol = securityProtocol
+	} else {
+		if len(req.NATSURLs) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "nats_urls must not be empty for NATS connections"}})
+			return
+		}
 	}
 
 	isActive := true
@@ -117,13 +141,20 @@ func (h *KafkaHandler) CreateConnection(c *gin.Context) {
 	conn := &model.KafkaConnection{
 		Name:             req.Name,
 		Description:      req.Description,
+		ConnectionType:   connType,
+		IsActive:         isActive,
+		CreatedBy:        createdBy,
 		Brokers:          req.Brokers,
-		SecurityProtocol: securityProtocol,
+		SecurityProtocol: req.SecurityProtocol,
 		SASLMechanism:    req.SASLMechanism,
 		SASLUsername:     req.SASLUsername,
 		SASLPassword:     req.SASLPassword,
-		IsActive:         isActive,
-		CreatedBy:        createdBy,
+		NATSURLs:         req.NATSURLs,
+		NATSToken:        req.NATSToken,
+		NATSNKeySeed:     req.NATSNKeySeed,
+		NATSCredentials:  req.NATSCredentials,
+		NATSJetStream:    req.NATSJetStream,
+		NATSTLS:          req.NATSTLS,
 	}
 
 	if err := h.repo.Create(c.Request.Context(), conn); err != nil {
@@ -138,14 +169,22 @@ func (h *KafkaHandler) CreateConnection(c *gin.Context) {
 }
 
 type updateKafkaConnectionRequest struct {
-	Name             *string  `json:"name"`
-	Description      *string  `json:"description"`
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	IsActive    *bool   `json:"is_active"`
+	// Kafka fields
 	Brokers          []string `json:"brokers"`
 	SecurityProtocol *string  `json:"security_protocol"`
 	SASLMechanism    *string  `json:"sasl_mechanism"`
 	SASLUsername     *string  `json:"sasl_username"`
 	SASLPassword     *string  `json:"sasl_password"`
-	IsActive         *bool    `json:"is_active"`
+	// NATS fields
+	NATSURLs        []string `json:"nats_urls"`
+	NATSToken       *string  `json:"nats_token"`
+	NATSNKeySeed    *string  `json:"nats_nkey_seed"`
+	NATSCredentials *string  `json:"nats_credentials"`
+	NATSJetStream   *bool    `json:"nats_jetstream"`
+	NATSTLS         *bool    `json:"nats_tls"`
 }
 
 // UpdateConnection updates an existing Kafka connection.
@@ -182,23 +221,20 @@ func (h *KafkaHandler) UpdateConnection(c *gin.Context) {
 	if req.Description != nil {
 		existing.Description = *req.Description
 	}
+	// Kafka fields
 	if req.Brokers != nil {
-		if len(req.Brokers) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "brokers must not be empty"}})
-			return
-		}
 		existing.Brokers = req.Brokers
 	}
 	if req.SecurityProtocol != nil {
 		if !model.ValidSecurityProtocols[*req.SecurityProtocol] {
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "invalid security_protocol; must be PLAINTEXT, SSL, SASL_PLAINTEXT, or SASL_SSL"}})
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "invalid security_protocol"}})
 			return
 		}
 		existing.SecurityProtocol = *req.SecurityProtocol
 	}
 	if req.SASLMechanism != nil {
 		if !model.ValidSASLMechanisms[*req.SASLMechanism] {
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "invalid sasl_mechanism; must be PLAIN, SCRAM-SHA-256, or SCRAM-SHA-512"}})
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "invalid sasl_mechanism"}})
 			return
 		}
 		existing.SASLMechanism = req.SASLMechanism
@@ -208,6 +244,25 @@ func (h *KafkaHandler) UpdateConnection(c *gin.Context) {
 	}
 	if req.SASLPassword != nil {
 		existing.SASLPassword = req.SASLPassword
+	}
+	// NATS fields
+	if req.NATSURLs != nil {
+		existing.NATSURLs = req.NATSURLs
+	}
+	if req.NATSToken != nil {
+		existing.NATSToken = req.NATSToken
+	}
+	if req.NATSNKeySeed != nil {
+		existing.NATSNKeySeed = req.NATSNKeySeed
+	}
+	if req.NATSCredentials != nil {
+		existing.NATSCredentials = req.NATSCredentials
+	}
+	if req.NATSJetStream != nil {
+		existing.NATSJetStream = *req.NATSJetStream
+	}
+	if req.NATSTLS != nil {
+		existing.NATSTLS = *req.NATSTLS
 	}
 	if req.IsActive != nil {
 		existing.IsActive = *req.IsActive

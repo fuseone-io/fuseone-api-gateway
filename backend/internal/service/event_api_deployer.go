@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/google/uuid"
@@ -15,14 +16,21 @@ import (
 
 // EventApiDeployer manages APISIX route creation for Event APIs.
 type EventApiDeployer struct {
-	repo     *repository.EventApiRepository
-	registry *APISIXClientRegistry
-	logger   *zap.Logger
+	repo         *repository.EventApiRepository
+	registry     *APISIXClientRegistry
+	upstreamNode string // host:port for APISIX upstream (e.g. "event-gateway:8090")
+	logger       *zap.Logger
 }
 
 // NewEventApiDeployer creates a new EventApiDeployer.
-func NewEventApiDeployer(repo *repository.EventApiRepository, registry *APISIXClientRegistry, logger *zap.Logger) *EventApiDeployer {
-	return &EventApiDeployer{repo: repo, registry: registry, logger: logger}
+// eventGatewayURL is the full URL (e.g. "http://event-gateway:8090"); the host:port
+// is extracted for use as the APISIX upstream node.
+func NewEventApiDeployer(repo *repository.EventApiRepository, registry *APISIXClientRegistry, eventGatewayURL string, logger *zap.Logger) *EventApiDeployer {
+	node := "event-gateway:8090" // fallback
+	if u, err := url.Parse(eventGatewayURL); err == nil && u.Host != "" {
+		node = u.Host
+	}
+	return &EventApiDeployer{repo: repo, registry: registry, upstreamNode: node, logger: logger}
 }
 
 // Deploy creates APISIX routes for the Event API, pointing to the Event Gateway upstream.
@@ -68,7 +76,7 @@ func (d *EventApiDeployer) Deploy(ctx context.Context, id uuid.UUID, envID uuid.
 	upstream := map[string]interface{}{
 		"type": "roundrobin",
 		"nodes": map[string]int{
-			"event-gateway:8090": 1,
+			d.upstreamNode: 1,
 		},
 	}
 
@@ -118,7 +126,7 @@ func (d *EventApiDeployer) Deploy(ctx context.Context, id uuid.UUID, envID uuid.
 		sseUpstream := map[string]interface{}{
 			"type": "roundrobin",
 			"nodes": map[string]int{
-				"event-gateway:8090": 1,
+				d.upstreamNode: 1,
 			},
 			"timeout": map[string]int{
 				"connect": 6,
@@ -148,7 +156,7 @@ func (d *EventApiDeployer) Deploy(ctx context.Context, id uuid.UUID, envID uuid.
 		wsUpstream := map[string]interface{}{
 			"type": "roundrobin",
 			"nodes": map[string]int{
-				"event-gateway:8090": 1,
+				d.upstreamNode: 1,
 			},
 			"timeout": map[string]int{
 				"connect": 6,

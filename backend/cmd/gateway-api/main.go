@@ -158,7 +158,7 @@ func main() {
 
 	// Event APIs
 	eventApiRepo := repository.NewEventApiRepository(pool)
-	eventApiDeployer := service.NewEventApiDeployer(eventApiRepo, registry, logger)
+	eventApiDeployer := service.NewEventApiDeployer(eventApiRepo, registry, cfg.Kafka.EventGatewayURL, logger)
 	eventApiHandler := handler.NewEventApiHandler(eventApiRepo, eventApiDeployer, auditLogger)
 
 	// Webhooks
@@ -720,7 +720,7 @@ func main() {
 		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
 		Handler:      r,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 5 * time.Minute, // SSE/streaming endpoints need longer writes
 		IdleTimeout:  60 * time.Second,
 	}
 

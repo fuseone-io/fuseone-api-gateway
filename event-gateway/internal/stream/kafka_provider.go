@@ -9,8 +9,6 @@ import (
 	"github.com/fuseone/event-gateway/internal/kafka"
 	"github.com/fuseone/event-gateway/internal/model"
 	"github.com/twmb/franz-go/pkg/kgo"
-	"github.com/twmb/franz-go/pkg/sasl/plain"
-	"github.com/twmb/franz-go/pkg/sasl/scram"
 	"go.uber.org/zap"
 )
 
@@ -185,22 +183,4 @@ func kafkaGroupsToStream(gs []kafka.ConsumerGroupInfo) []GroupInfo {
 		out[i] = kafkaGroupToStream(g)
 	}
 	return out
-}
-
-// buildKafkaOpts builds kgo.Opt slice from a StreamConnection.
-func buildKafkaOpts(conn model.StreamConnection) ([]kgo.Opt, error) {
-	opts := []kgo.Opt{kgo.SeedBrokers(conn.Brokers...)}
-	if conn.SASLMechanism != nil && conn.SASLUsername != nil && conn.SASLPassword != nil {
-		switch *conn.SASLMechanism {
-		case "PLAIN":
-			opts = append(opts, kgo.SASL(plain.Auth{User: *conn.SASLUsername, Pass: *conn.SASLPassword}.AsMechanism()))
-		case "SCRAM-SHA-256":
-			opts = append(opts, kgo.SASL(scram.Auth{User: *conn.SASLUsername, Pass: *conn.SASLPassword}.AsSha256Mechanism()))
-		case "SCRAM-SHA-512":
-			opts = append(opts, kgo.SASL(scram.Auth{User: *conn.SASLUsername, Pass: *conn.SASLPassword}.AsSha512Mechanism()))
-		default:
-			return nil, fmt.Errorf("unsupported SASL mechanism: %s", *conn.SASLMechanism)
-		}
-	}
-	return opts, nil
 }

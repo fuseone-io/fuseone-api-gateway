@@ -19,4 +19,7 @@ data:
   DEBUG_ENABLED: {{ .Values.backend.config.debugEnabled | quote }}
   DEBUG_RETENTION_HOURS: {{ .Values.backend.config.debugRetentionHours | quote }}
   DEBUG_MAX_ROWS: {{ .Values.backend.config.debugMaxRows | quote }}
+  {{- if .Values.eventGateway.enabled }}
+  KAFKA_EVENT_GATEWAY_URL: {{ include "fuseone.eventGateway.url" . | quote }}
+  {{- end }}
 {{- end }}

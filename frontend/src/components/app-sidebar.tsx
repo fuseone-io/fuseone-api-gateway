@@ -103,8 +103,8 @@ const navGroups: NavGroup[] = [
     items: [
       { path: "/ai", labelKey: "aiDashboard", icon: Bot },
       { path: "/ai/settings", labelKey: "aiCostModels", icon: SlidersHorizontal },
-      { path: "/kafka", labelKey: "kafka", icon: Radio },
-      { path: "/kafka/event-apis", labelKey: "eventApis", icon: Zap },
+      { path: "/events", labelKey: "eventGateway", icon: Radio },
+      { path: "/events/event-apis", labelKey: "eventApis", icon: Zap },
       { path: "/mesh", labelKey: "serviceMesh", icon: Network },
     ],
   },
@@ -222,7 +222,7 @@ function FlatNavGroup({
 }) {
   return (
     <SidebarGroup>
-      <SidebarGroupLabel className="uppercase">{t(group.labelKey)}</SidebarGroupLabel>
+      <SidebarGroupLabel className="uppercase text-[11px] tracking-wider text-sidebar-foreground/50">{t(group.labelKey)}</SidebarGroupLabel>
       <SidebarMenu>
         {group.items.map((item) => (
           <NavItemButton key={item.path} item={item} pathname={pathname} firingCount={firingCount} allPaths={group.items.map(i => i.path)} t={t} />
@@ -272,7 +272,7 @@ function CollapsibleNavGroup({
                   <DropdownMenuItem key={item.path} asChild className={isNavItemActive(item.path, pathname, group.items.map(i => i.path)) ? "bg-accent" : ""}>
                     <Link href={item.path} className="flex items-center gap-2">
                       <item.icon className="h-4 w-4" />
-                      <span>{t(item.labelKey)}</span>
+                      <span className="font-medium">{t(item.labelKey)}</span>
                       {item.badge === "firing" && firingCount > 0 && (
                         <Badge variant="destructive" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px]">
                           {firingCount}
@@ -294,7 +294,7 @@ function CollapsibleNavGroup({
     <Collapsible defaultOpen={isActive} className="group/collapsible">
       <SidebarGroup>
         <SidebarGroupLabel asChild>
-          <CollapsibleTrigger className="flex w-full items-center uppercase">
+          <CollapsibleTrigger className="flex w-full items-center uppercase text-[11px] tracking-wider text-sidebar-foreground/50">
             {groupLabel}
             <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform group-data-[state=open]/collapsible:rotate-90" />
           </CollapsibleTrigger>
@@ -341,7 +341,7 @@ function NavItemButton({
       <SidebarMenuButton asChild isActive={isNavItemActive(item.path, pathname, allPaths)}>
         <Link href={item.path}>
           <item.icon />
-          <span>{t(item.labelKey)}</span>
+          <span className="font-medium">{t(item.labelKey)}</span>
           {item.badge === "firing" && firingCount > 0 && (
             <Badge variant="destructive" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px]">
               {firingCount}

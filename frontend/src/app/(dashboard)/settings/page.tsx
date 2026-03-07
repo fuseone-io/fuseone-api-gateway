@@ -85,18 +85,17 @@ export default function SettingsPage() {
       <Separator />
 
       <Tabs value={activeTab} onValueChange={handleTabChange} orientation="vertical" className="min-h-[600px] gap-8">
-        <TabsList className="w-52 shrink-0 items-start sticky top-4 self-start">
+        <TabsList className="w-52 shrink-0 items-start sticky top-4 self-start bg-transparent p-0 gap-0.5 rounded-none">
           {settingsSections.map((section) => (
             <TabsTrigger
               key={section.id}
               value={section.id}
-              className="w-full justify-start gap-2.5 px-3 py-2 text-sm"
+              className="w-full justify-start gap-2.5 px-3 py-2 text-sm font-normal text-muted-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:font-semibold !shadow-none rounded-md"
             >
               <section.icon className="h-4 w-4 shrink-0" />
               <span className="truncate text-left">{t("tabs." + section.titleKey)}</span>
             </TabsTrigger>
           ))}
-
         </TabsList>
 
         <div className="flex-1 min-w-0">

@@ -84,7 +84,7 @@ func (r *WebhookRepository) CreateDelivery(ctx context.Context, d *model.Webhook
 		(id, subscription_id, event_api_id, kafka_partition, kafka_offset, status, attempts)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`
 	_, err := r.pool.Exec(ctx, query,
-		d.ID, d.SubscriptionID, d.EventApiID, d.KafkaPartition, d.KafkaOffset, d.Status, d.Attempts,
+		d.ID, d.SubscriptionID, d.EventApiID, d.Partition, d.Offset, d.Status, d.Attempts,
 	)
 	return err
 }
@@ -146,7 +146,7 @@ func (r *WebhookRepository) ListPendingRetries(ctx context.Context, limit int) (
 	for rows.Next() {
 		var d model.WebhookDelivery
 		err := rows.Scan(
-			&d.ID, &d.SubscriptionID, &d.EventApiID, &d.KafkaPartition, &d.KafkaOffset,
+			&d.ID, &d.SubscriptionID, &d.EventApiID, &d.Partition, &d.Offset,
 			&d.Status, &d.Attempts, &d.LastStatusCode, &d.LastError,
 			&d.NextRetryAt, &d.CompletedAt, &d.CreatedAt,
 		)

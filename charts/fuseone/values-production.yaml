@@ -193,6 +193,35 @@ apisix:
     #   cloud.google.com/load-balancer-type: External
 
 # =============================================================================
+# Event Gateway
+# =============================================================================
+eventGateway:
+  enabled: true
+
+  image:
+    pullPolicy: Always
+
+  replicas: 3
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 1
+      memory: 512Mi
+
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: event-gateway
+            topologyKey: kubernetes.io/hostname
+
+# =============================================================================
 # ClickHouse (Analytics)
 # =============================================================================
 clickhouse:

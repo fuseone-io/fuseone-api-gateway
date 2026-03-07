@@ -399,7 +399,7 @@ export default function EventApiDetailPage({ params }: { params: Promise<{ id: s
     try {
       await deleteEventApi(id)
       toast.success(t("deleted"))
-      router.push("/kafka/event-apis")
+      router.push("/events/event-apis")
     } catch {
       toast.error(t("deleteFailed"))
     }
@@ -485,7 +485,7 @@ export default function EventApiDetailPage({ params }: { params: Promise<{ id: s
         actions={
           <div className="flex gap-2">
             <Button variant="outline" asChild>
-              <Link href="/kafka/event-apis">
+              <Link href="/events/event-apis">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 {tc("back")}
               </Link>

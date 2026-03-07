@@ -70,7 +70,7 @@ export default function KafkaTopicsPage() {
         description={t("topics.description")}
         actions={
           <Button variant="outline" asChild>
-            <Link href="/kafka">
+            <Link href="/events">
               <ArrowLeft className="mr-2 h-4 w-4" />
               {tc("back")}
             </Link>
@@ -121,7 +121,7 @@ export default function KafkaTopicsPage() {
                   </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/kafka/${connectionId}/topics/${encodeURIComponent(topic)}`}>
+                      <Link href={`/events/${connectionId}/topics/${encodeURIComponent(topic)}`}>
                         {tc("view")}
                       </Link>
                     </Button>

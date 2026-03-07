@@ -9,7 +9,7 @@ import (
 type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
 	Database DatabaseConfig `mapstructure:"database"`
-	Kafka    KafkaDefaults  `mapstructure:"kafka"`
+	Kafka    StreamDefaults `mapstructure:"kafka"` // key kept as "kafka" for backward compat with existing config files
 }
 
 type ServerConfig struct {
@@ -32,7 +32,7 @@ func (d DatabaseConfig) DSN() string {
 		d.User, d.Password, d.Host, d.Port, d.Name, d.SSLMode)
 }
 
-type KafkaDefaults struct {
+type StreamDefaults struct {
 	MaxPollRecords   int `mapstructure:"max_poll_records"`
 	SessionTimeoutMs int `mapstructure:"session_timeout_ms"`
 	HeartbeatMs      int `mapstructure:"heartbeat_ms"`

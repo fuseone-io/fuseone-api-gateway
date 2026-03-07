@@ -9,7 +9,7 @@ import { DocCategoryCard } from "@/components/docs/doc-category-card"
 export default function DocsPage() {
   const t = useTranslations("docs")
   return (
-    <div className="max-w-5xl">
+    <div className="w-full">
       <div className="mb-8">
         <PageHeader
           title={t("title")}

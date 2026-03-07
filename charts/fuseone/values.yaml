@@ -150,7 +150,7 @@ postgresql:
   affinity: {}
 
 # =============================================================================
-# Event Gateway (Go) - Kafka protocol mediator
+# Event Gateway (Go) - Kafka & NATS protocol mediator
 # =============================================================================
 eventGateway:
   enabled: false

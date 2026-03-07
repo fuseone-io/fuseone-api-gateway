@@ -10,6 +10,7 @@ import (
 
 	"github.com/fuseone/event-gateway/internal/model"
 	nats "github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 	"go.uber.org/zap"
 )
 
@@ -32,10 +33,16 @@ func newNATSProvider(conn model.StreamConnection, logger *zap.Logger) (*natsProv
 		opts = append(opts, nats.Token(*conn.NATSToken))
 	}
 	if conn.NATSNKeySeed != nil && *conn.NATSNKeySeed != "" {
-		opts = append(opts, nats.Nkey(*conn.NATSNKeySeed, func(b []byte) ([]byte, error) {
-			// NKey signing — simplified: return raw seed bytes for signing
-			// In production replace with proper nkeys.Sign()
-			return b, nil
+		kp, err := nkeys.FromSeed([]byte(*conn.NATSNKeySeed))
+		if err != nil {
+			return nil, err
+		}
+		pubKey, err := kp.PublicKey()
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, nats.Nkey(pubKey, func(nonce []byte) ([]byte, error) {
+			return kp.Sign(nonce)
 		}))
 	}
 	if conn.NATSCredentials != nil && *conn.NATSCredentials != "" {
@@ -225,6 +232,7 @@ func (p *natsProvider) jsSubscribe(ctx context.Context, topic, groupID, offsetRe
 	if err := p.ensureStream(topic); err != nil {
 		return nil, err
 	}
+	streamName := subjectToStream(topic)
 	durableName := sanitizeName(groupID)
 
 	deliverOpt := nats.DeliverLast()
@@ -232,27 +240,49 @@ func (p *natsProvider) jsSubscribe(ctx context.Context, topic, groupID, offsetRe
 		deliverOpt = nats.DeliverAll()
 	}
 
-	sub, err := p.js.QueueSubscribe(topic, durableName,
-		func(m *nats.Msg) {
-			_ = m.Ack()
-			select {
-			case outCh <- natsMsgToMessage(m, topic):
-			case <-ctx.Done():
-			}
-		},
-		nats.Durable(durableName),
+	sub, err := p.js.PullSubscribe(topic, durableName,
+		nats.BindStream(streamName),
 		deliverOpt,
 		nats.AckExplicit(),
-		nats.ReplayInstant(),
 	)
 	if err != nil {
-		return nil, err
+		// Consumer may already exist with different deliver policy — just bind
+		sub, err = p.js.PullSubscribe(topic, durableName, nats.BindStream(streamName))
+		if err != nil {
+			return nil, err
+		}
 	}
 
+	// Poll loop: fetch batches and push to outCh
 	go func() {
-		<-ctx.Done()
-		_ = sub.Drain()
-		close(outCh)
+		defer close(outCh)
+		for {
+			msgs, err := sub.Fetch(10, nats.MaxWait(2*time.Second))
+			if err != nil {
+				if errors.Is(err, nats.ErrTimeout) || errors.Is(err, nats.ErrConnectionClosed) {
+					select {
+					case <-ctx.Done():
+						return
+					default:
+						continue
+					}
+				}
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					continue
+				}
+			}
+			for _, m := range msgs {
+				_ = m.Ack()
+				select {
+				case outCh <- natsMsgToMessage(m, topic):
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
 	}()
 
 	return sub, nil
@@ -392,10 +422,16 @@ func natsConsumerToGroupInfo(info *nats.ConsumerInfo) GroupInfo {
 	if info.NumPending > 0 {
 		lag = int64(info.NumPending)
 	}
+	// NumWaiting is the number of pull requests waiting (pull consumers).
+	// Use it as a proxy for active members; minimum 1 when the consumer exists.
+	members := info.NumWaiting
+	if members == 0 {
+		members = 1
+	}
 	return GroupInfo{
 		GroupID:  info.Name,
 		State:    "active",
-		Members:  info.NumAckPending,
+		Members:  members,
 		TotalLag: lag,
 	}
 }

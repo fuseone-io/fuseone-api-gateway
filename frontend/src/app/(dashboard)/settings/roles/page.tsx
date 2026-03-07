@@ -39,7 +39,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { api } from "@/lib/api-client"
-import { PERMISSION_GROUPS } from "@/lib/permissions"
+import { PERMISSION_GROUPS, expandPermissions, collapsePermissions } from "@/lib/permissions"
 import type { Role } from "@/types/auth"
 import { toast } from "sonner"
 
@@ -259,7 +259,7 @@ function RoleDialog({
     if (editingRole) {
       setName(editingRole.name)
       setDescription(editingRole.description)
-      setPermissions([...editingRole.permissions])
+      setPermissions(collapsePermissions([...editingRole.permissions]))
     } else {
       setName("")
       setDescription("")
@@ -309,18 +309,19 @@ function RoleDialog({
 
     setSaving(true)
     try {
+      const expandedPerms = expandPermissions(permissions)
       if (editingRole) {
         await api.updateRole(editingRole.id, {
           name: name.trim(),
           description: description.trim(),
-          permissions,
+          permissions: expandedPerms,
         })
         toast.success(t("roleUpdated"))
       } else {
         await api.createRole({
           name: name.trim(),
           description: description.trim(),
-          permissions,
+          permissions: expandedPerms,
         })
         toast.success(t("roleCreated"))
       }
@@ -334,7 +335,7 @@ function RoleDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
+      <SheetContent side="right" className="w-full sm:!max-w-3xl flex flex-col">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4" />
@@ -373,7 +374,7 @@ function RoleDialog({
                 </Button>
               </div>
             </div>
-            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+            <div className="space-y-3">
               {PERMISSION_GROUPS.map((group) => {
                 const allSelected = group.permissions.every((p) => permissions.includes(p))
                 const someSelected = group.permissions.some((p) => permissions.includes(p))

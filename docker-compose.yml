@@ -93,11 +93,9 @@ services:
 
   event-gateway:
     build: ./event-gateway
-    profiles: [kafka]
+    profiles: [kafka, nats]
     depends_on:
       postgres:
-        condition: service_healthy
-      kafka:
         condition: service_healthy
     ports:
       - "8090:8090"
@@ -111,6 +109,27 @@ services:
       DB_SSLMODE: disable
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- NATS (optional, start with: docker compose --profile nats up) ---
+
+  nats:
+    image: nats:2.10-alpine
+    profiles: [nats]
+    ports:
+      - "4222:4222"   # Client
+      - "8222:8222"   # Monitoring
+    command: >
+      --jetstream
+      --store_dir /data
+      --http_port 8222
+      --max_payload 1048576
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -184,6 +203,7 @@ volumes:
   pg_data:
   zk_data:
   kafka_data:
+  nats_data:
   clickhouse_data:
   clickhouse_logs:
   es_data:

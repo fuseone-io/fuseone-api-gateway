@@ -353,7 +353,7 @@ export default function KafkaTopicDetailPage() {
         description={t("topicDetail.description", { connection: connection?.name || connectionId })}
         actions={
           <Button variant="outline" asChild>
-            <Link href={`/kafka/${connectionId}/topics`}>
+            <Link href={`/events/${connectionId}/topics`}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               {tc("back")}
             </Link>

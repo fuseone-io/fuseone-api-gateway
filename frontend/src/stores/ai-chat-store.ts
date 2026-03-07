@@ -94,12 +94,19 @@ export const useAIChatStore = create<AIChatState>((set, get) => ({
         ),
       }))
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "An error occurred."
       set((s) => ({
-        messages: s.messages.map((m) =>
-          m.id === assistantId
-            ? { ...m, content: err instanceof Error ? err.message : "An error occurred." }
-            : m
-        ),
+        messages: s.messages.map((m) => {
+          if (m.id !== assistantId) return m
+          // Preserve partial content if stream was interrupted mid-response
+          const hasContent = m.content.trim().length > 0
+          return {
+            ...m,
+            content: hasContent
+              ? m.content + "\n\n---\n*[Stream interrupted]*"
+              : errMsg,
+          }
+        }),
       }))
     } finally {
       set({ isSending: false })

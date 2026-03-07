@@ -6,24 +6,19 @@ import { DocsSidebar } from "@/components/docs/docs-sidebar"
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
 
-  // Prevent parent <main> from scrolling — docs manages its own scroll
+  // Remove padding from parent <main> so docs fills the full area
   useEffect(() => {
     const main = ref.current?.closest("main")
     if (!main) return
-    const prevOverflow = main.style.overflow
-    const prevPadding = main.style.padding
-    main.style.overflow = "hidden"
+    const prev = main.style.padding
     main.style.padding = "0"
-    return () => {
-      main.style.overflow = prevOverflow
-      main.style.padding = prevPadding
-    }
+    return () => { main.style.padding = prev }
   }, [])
 
   return (
-    <div ref={ref} className="flex h-full overflow-hidden">
+    <div ref={ref} className="flex h-[calc(100dvh-4rem)] overflow-hidden">
       <DocsSidebar />
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 min-w-0 overflow-y-auto p-8">
         {children}
       </div>
     </div>

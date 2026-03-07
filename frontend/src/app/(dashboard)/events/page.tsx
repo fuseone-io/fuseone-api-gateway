@@ -66,7 +66,7 @@ export default function KafkaPage() {
         icon={<Radio className="h-6 w-6" />}
         actions={
           <Button asChild>
-            <Link href="/kafka/connections">
+            <Link href="/events/connections">
               <Plus className="mr-2 h-4 w-4" />
               {t("manageConnections")}
             </Link>
@@ -116,7 +116,7 @@ export default function KafkaPage() {
               {t("noConnectionsDescription")}
             </p>
             <Button asChild>
-              <Link href="/kafka/connections">
+              <Link href="/events/connections">
                 <Plus className="mr-2 h-4 w-4" />
                 {t("createConnection")}
               </Link>
@@ -129,8 +129,8 @@ export default function KafkaPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>{tc("name")}</TableHead>
-                <TableHead>{t("brokers")}</TableHead>
-                <TableHead>{t("protocol")}</TableHead>
+                <TableHead>{t("connections.endpoints")}</TableHead>
+                <TableHead>{t("connections.provider")}</TableHead>
                 <TableHead className="w-[100px] text-center">{tc("status")}</TableHead>
                 <TableHead className="w-[80px]">{tc("actions")}</TableHead>
               </TableRow>
@@ -150,13 +150,26 @@ export default function KafkaPage() {
                   </TableCell>
                   <TableCell>
                     <code className="text-xs font-mono text-muted-foreground">
-                      {conn.brokers.join(", ")}
+                      {conn.connection_type === "nats"
+                        ? (conn.nats_urls || []).join(", ")
+                        : (conn.brokers || []).join(", ")}
                     </code>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="text-xs">
-                      {conn.security_protocol}
-                    </Badge>
+                    {conn.connection_type === "nats" ? (
+                      <div className="flex items-center gap-1">
+                        <Badge variant="outline" className="text-xs bg-purple-50 border-purple-300 text-purple-700">
+                          NATS
+                        </Badge>
+                        {conn.nats_jetstream && (
+                          <Badge variant="outline" className="text-xs">JetStream</Badge>
+                        )}
+                      </div>
+                    ) : (
+                      <Badge variant="outline" className="text-xs">
+                        {conn.security_protocol}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-center">
                     {conn.is_active ? (
@@ -169,7 +182,7 @@ export default function KafkaPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => router.push(`/kafka/${conn.id}/topics`)}
+                      onClick={() => router.push(`/events/${conn.id}/topics`)}
                     >
                       <Eye className="h-4 w-4 mr-1" />
                       {tc("view")}

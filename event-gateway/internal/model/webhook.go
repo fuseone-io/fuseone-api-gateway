@@ -34,8 +34,8 @@ type WebhookDelivery struct {
 	ID             uuid.UUID  `json:"id"`
 	SubscriptionID uuid.UUID  `json:"subscription_id"`
 	EventApiID     uuid.UUID  `json:"event_api_id"`
-	KafkaPartition int32      `json:"kafka_partition"`
-	KafkaOffset    int64      `json:"kafka_offset"`
+	Partition int32 `json:"partition"`
+	Offset    int64 `json:"offset"`
 	Status         string     `json:"status"` // pending, success, failed
 	Attempts       int        `json:"attempts"`
 	LastStatusCode *int       `json:"last_status_code,omitempty"`

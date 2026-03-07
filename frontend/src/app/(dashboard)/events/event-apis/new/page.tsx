@@ -93,7 +93,7 @@ export default function NewEventApiPage() {
         webhook_enabled: webhookEnabled,
       })
       toast.success(tf("created"))
-      router.push(`/kafka/event-apis/${ea.id}`)
+      router.push(`/events/event-apis/${ea.id}`)
     } catch {
       toast.error(tf("saveFailed"))
     } finally {
@@ -109,7 +109,7 @@ export default function NewEventApiPage() {
         icon={<Zap className="h-6 w-6" />}
         actions={
           <Button variant="outline" asChild>
-            <Link href="/kafka/event-apis">
+            <Link href="/events/event-apis">
               <ArrowLeft className="mr-2 h-4 w-4" />
               {tc("back")}
             </Link>

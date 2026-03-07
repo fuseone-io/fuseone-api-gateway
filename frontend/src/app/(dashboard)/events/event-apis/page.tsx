@@ -76,7 +76,7 @@ export default function EventApisPage() {
         icon={<Zap className="h-6 w-6" />}
         actions={
           <Button asChild>
-            <Link href="/kafka/event-apis/new">
+            <Link href="/events/event-apis/new">
               <Plus className="mr-2 h-4 w-4" />
               {t("createEventApi")}
             </Link>
@@ -126,7 +126,7 @@ export default function EventApisPage() {
               {t("noEventApisDescription")}
             </p>
             <Button asChild>
-              <Link href="/kafka/event-apis/new">
+              <Link href="/events/event-apis/new">
                 <Plus className="mr-2 h-4 w-4" />
                 {t("createEventApi")}
               </Link>
@@ -191,7 +191,7 @@ export default function EventApisPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => router.push(`/kafka/event-apis/${ea.id}`)}
+                      onClick={() => router.push(`/events/event-apis/${ea.id}`)}
                     >
                       <Eye className="h-4 w-4 mr-1" />
                       {tc("view")}
