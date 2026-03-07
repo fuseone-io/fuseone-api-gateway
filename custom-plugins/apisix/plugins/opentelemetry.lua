@@ -316,13 +316,24 @@ end
 -- phase but are now available (e.g. upstream_response_time, upstream_connect_time).
 -- Values are converted to string to avoid OTLP exporter type errors.
 local function inject_late_attributes(span, conf, api_ctx)
-    if not conf.additional_attributes then
-        return
+    if conf.additional_attributes then
+        for _, key in ipairs(conf.additional_attributes) do
+            local val = api_ctx.var[key]
+            if val then
+                span:set_attributes(attr.string(key, tostring(val)))
+            end
+        end
     end
-    for _, key in ipairs(conf.additional_attributes) do
-        local val = api_ctx.var[key]
-        if val then
-            span:set_attributes(attr.string(key, tostring(val)))
+    -- [FuseOne patch v2] inject per-phase and per-plugin timing from fuseone-timing plugin.
+    -- fuseone-timing runs at priority 15000 (first), so ctx.fuseone_timing is ready here.
+    local ft = api_ctx.fuseone_timing
+    if ft then
+        span:set_attributes(attr.string("fuseone.rewrite_ms",               tostring(ft.rewrite_ms)))
+        span:set_attributes(attr.string("fuseone.access_plus_upstream_ms",  tostring(ft.access_plus_upstream_ms)))
+        span:set_attributes(attr.string("fuseone.header_filter_ms",         tostring(ft.header_filter_ms)))
+        -- Per-plugin timing: JSON array [{"n":"key-auth","o":5,"d":8}, ...]
+        if ft.plugin_timing_json then
+            span:set_attributes(attr.string("fuseone.plugin_timing", ft.plugin_timing_json))
         end
     end
 end

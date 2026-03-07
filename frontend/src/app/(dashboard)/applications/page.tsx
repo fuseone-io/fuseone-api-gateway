@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useTranslations } from "next-intl"
 import Link from "next/link"
 import { toast } from "sonner"
 import {
@@ -63,6 +64,8 @@ function getAuthMethod(plugins?: Record<string, unknown>): AuthMethod | null {
 }
 
 export default function ApplicationsPage() {
+  const t = useTranslations("applications")
+  const tc = useTranslations("common")
   const [apps, setApps] = useState<APISIXConsumer[]>([])
   const [planMap, setPlanMap] = useState<Map<string, APISIXConsumerGroup>>(new Map())
   const [loading, setLoading] = useState(true)
@@ -81,7 +84,7 @@ export default function ApplicationsPage() {
       setApps(consumers)
       setPlanMap(new Map(groups.map((g) => [g.id || "", g])))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load applications")
+      toast.error(err instanceof Error ? err.message : tc("failedToLoad", { resource: t("title") }))
     } finally {
       setLoading(false)
     }
@@ -95,10 +98,10 @@ export default function ApplicationsPage() {
     if (!deleteUsername) return
     try {
       await api.deleteResource("consumers", deleteUsername)
-      toast.success("Application deleted")
+      toast.success(t("toasts.deleted"))
       fetchData()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete failed")
+      toast.error(err instanceof Error ? err.message : t("toasts.failedDelete"))
     } finally {
       setDeleteUsername(null)
     }
@@ -117,13 +120,14 @@ export default function ApplicationsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Applications"
-        description="Manage client application identities and credentials"
+        title={t("title")}
+        description={t("description")}
+        icon={<AppWindow className="h-6 w-6" />}
         actions={
           <Button asChild>
             <Link href="/applications/new">
               <Plus className="mr-2 h-4 w-4" />
-              New Application
+              {t("newApplication")}
             </Link>
           </Button>
         }
@@ -132,7 +136,7 @@ export default function ApplicationsPage() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search applications..."
+          placeholder={t("searchPlaceholder")}
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -143,10 +147,10 @@ export default function ApplicationsPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead>Name</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Plan</TableHead>
-              <TableHead>Auth Method</TableHead>
+              <TableHead>{tc("name")}</TableHead>
+              <TableHead>{tc("description")}</TableHead>
+              <TableHead>{t("tableHeaders.plan")}</TableHead>
+              <TableHead>{t("tableHeaders.authMethod")}</TableHead>
               <TableHead className="w-[70px]" />
             </TableRow>
           </TableHeader>
@@ -167,11 +171,11 @@ export default function ApplicationsPage() {
                   <div className="flex flex-col items-center gap-2">
                     <AppWindow className="h-8 w-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
-                      {search ? "No applications match your search" : "No applications configured"}
+                      {search ? t("noMatchSearch") : t("noConfigured")}
                     </p>
                     {!search && (
                       <Button asChild variant="outline" size="sm">
-                        <Link href="/applications/new">Create your first application</Link>
+                        <Link href="/applications/new">{t("createFirst")}</Link>
                       </Button>
                     )}
                   </div>
@@ -219,7 +223,7 @@ export default function ApplicationsPage() {
                           <DropdownMenuItem asChild>
                             <Link href={`/applications/${app.username}`}>
                               <Pencil className="mr-2 h-4 w-4" />
-                              Edit
+                              {tc("edit")}
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem
@@ -227,7 +231,7 @@ export default function ApplicationsPage() {
                             onClick={() => setDeleteUsername(app.username)}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
+                            {tc("delete")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -243,15 +247,14 @@ export default function ApplicationsPage() {
       <AlertDialog open={!!deleteUsername} onOpenChange={() => setDeleteUsername(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Application</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete application &quot;{deleteUsername}&quot;? All
-              associated credentials will be permanently removed.
+              {t("deleteDialog.description", { name: deleteUsername || "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{tc("delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

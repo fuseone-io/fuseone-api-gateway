@@ -76,6 +76,7 @@ interface ApiFlowEditorProps {
   onChange: (api: ApiDefinition) => void
   readOnly?: boolean
   version?: string // e.g. "v1" — for resolved URI preview
+  openContractOnMount?: boolean
 }
 
 type RightPanel =
@@ -99,7 +100,7 @@ function setPanelState(apiId: string | undefined, key: string, open: boolean) {
   } catch { /* ignore */ }
 }
 
-export function ApiFlowEditor({ api: apiDef, onChange, readOnly = false, version = "v1" }: ApiFlowEditorProps) {
+export function ApiFlowEditor({ api: apiDef, onChange, readOnly = false, version = "v1", openContractOnMount = false }: ApiFlowEditorProps) {
   const [selectedFlowId, setSelectedFlowId] = useState<string>(apiDef.flows[0]?.id || "")
   const [rightPanel, setRightPanel] = useState<RightPanel>({ type: "gallery" })
   const [addFlowDialogOpen, setAddFlowDialogOpen] = useState(false)
@@ -122,7 +123,7 @@ export function ApiFlowEditor({ api: apiDef, onChange, readOnly = false, version
     })
   }, [apiDef.id])
 
-  const [contractPanelOpen, setContractPanelOpen] = useState(false)
+  const [contractPanelOpen, setContractPanelOpen] = useState(openContractOnMount)
 
   const selectedFlow = apiDef.flows.find((f) => f.id === selectedFlowId) || apiDef.flows[0]
 
@@ -1209,7 +1210,9 @@ function EndpointSheet({
                           active: {
                             type: "http",
                             http_path: "/health",
-                            healthy: { interval: 5, successes: 2 },
+                            timeout: 2,
+                            concurrency: 1,
+                            healthy: { interval: 15, successes: 2 },
                             unhealthy: { interval: 5, http_failures: 3 },
                           },
                         },
@@ -1970,20 +1973,27 @@ function FlowRouteHeader({
           </Badge>
         )}
 
-        {/* Contract toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0 relative"
-          onClick={onOpenContract}
-        >
-          <ScrollText className={`h-3.5 w-3.5 transition-colors ${contractResponseCount > 0 ? "text-blue-500" : ""}`} />
-          {contractResponseCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-500 text-[8px] font-bold text-white">
-              {contractResponseCount}
-            </span>
-          )}
-        </Button>
+        {/* API Spec / Contract toggle */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0 relative"
+              onClick={onOpenContract}
+            >
+              <ScrollText className={`h-3.5 w-3.5 transition-colors ${contractResponseCount > 0 ? "text-blue-500" : ""}`} />
+              {contractResponseCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-500 text-[8px] font-bold text-white">
+                  {contractResponseCount}
+                </span>
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">
+            API Spec
+          </TooltipContent>
+        </Tooltip>
 
         {/* Endpoint toggle */}
         <Button

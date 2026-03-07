@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -54,6 +55,8 @@ function generateApiKey(): string {
 }
 
 export default function NewApplicationPage() {
+  const t = useTranslations("applications")
+  const tc = useTranslations("common")
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState("")
@@ -90,13 +93,11 @@ export default function NewApplicationPage() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error("Application name is required")
+      toast.error(t("validation.nameRequired"))
       return
     }
     if (!/^[a-zA-Z0-9_-]+$/.test(name.trim())) {
-      toast.error(
-        "Name must contain only letters, numbers, hyphens and underscores"
-      )
+      toast.error(t("validation.nameFormat"))
       return
     }
 
@@ -111,7 +112,7 @@ export default function NewApplicationPage() {
 
       // Show credentials toast
       const credentialInfo = getCredentialSummary(authMethod, authConfig)
-      toast.success("Application created", {
+      toast.success(t("toasts.created"), {
         description: credentialInfo,
         duration: 10000,
       })
@@ -119,7 +120,7 @@ export default function NewApplicationPage() {
       router.push(`/applications/${name.trim()}`)
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to create application"
+        err instanceof Error ? err.message : t("toasts.failedCreate")
       )
     } finally {
       setSaving(false)
@@ -129,8 +130,8 @@ export default function NewApplicationPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Create Application"
-        description="Register a new client application with credentials"
+        title={t("createTitle")}
+        description={t("createDescription")}
         actions={
           <div className="flex gap-2">
             <Button
@@ -138,11 +139,11 @@ export default function NewApplicationPage() {
               onClick={() => router.push("/applications")}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+              {tc("back")}
             </Button>
             <Button onClick={handleSave} disabled={saving || !name.trim()}>
               <Save className="mr-2 h-4 w-4" />
-              {saving ? "Creating..." : "Create Application"}
+              {saving ? t("creating") : t("createButton")}
             </Button>
           </div>
         }
@@ -152,12 +153,12 @@ export default function NewApplicationPage() {
         {/* Identity */}
         <Card>
           <CardHeader>
-            <CardTitle>Identity</CardTitle>
-            <CardDescription>Basic application information</CardDescription>
+            <CardTitle>{t("identity")}</CardTitle>
+            <CardDescription>{t("identityDescription")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label>{tc("name")}</Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -165,12 +166,11 @@ export default function NewApplicationPage() {
                 className="font-mono"
               />
               <p className="text-xs text-muted-foreground">
-                Unique identifier. Use lowercase with hyphens (e.g.,
-                my-mobile-app, partner-api).
+                {t("nameHint")}
               </p>
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{tc("description")}</Label>
               <Input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -183,18 +183,18 @@ export default function NewApplicationPage() {
         {/* Plan */}
         <Card>
           <CardHeader>
-            <CardTitle>Plan</CardTitle>
+            <CardTitle>{t("plan")}</CardTitle>
             <CardDescription>
-              Assign a plan to apply shared policies and rate limits
+              {t("planDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Select value={planId} onValueChange={setPlanId}>
               <SelectTrigger>
-                <SelectValue placeholder="No plan (standalone)" />
+                <SelectValue placeholder={t("noPlan")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No plan (standalone)</SelectItem>
+                <SelectItem value="none">{t("noPlan")}</SelectItem>
                 {plans.filter((p) => !!p.id).map((p) => (
                   <SelectItem key={p.id} value={p.id!}>
                     <div className="flex items-center gap-2">
@@ -215,9 +215,9 @@ export default function NewApplicationPage() {
         {/* Authentication */}
         <Card>
           <CardHeader>
-            <CardTitle>Authentication</CardTitle>
+            <CardTitle>{t("authentication")}</CardTitle>
             <CardDescription>
-              Choose how this application will authenticate with the gateway
+              {t("authenticationDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -259,7 +259,7 @@ export default function NewApplicationPage() {
               {authMethod === "key-auth" && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium">API Key</Label>
+                    <Label className="text-xs font-medium">{t("apiKey")}</Label>
                     <Button
                       type="button"
                       variant="outline"
@@ -268,7 +268,7 @@ export default function NewApplicationPage() {
                       onClick={handleGenerateKey}
                     >
                       <Shuffle className="mr-1.5 h-3 w-3" />
-                      Regenerate
+                      {t("regenerate")}
                     </Button>
                   </div>
                   <div className="flex items-center gap-2">
@@ -278,7 +278,7 @@ export default function NewApplicationPage() {
                         setAuthConfig({ ...authConfig, key: e.target.value })
                       }
                       className="font-mono text-xs"
-                      placeholder="Enter or generate an API key"
+                      placeholder={t("apiKeyPlaceholder")}
                     />
                     <Button
                       type="button"
@@ -289,15 +289,14 @@ export default function NewApplicationPage() {
                         navigator.clipboard.writeText(
                           (authConfig.key as string) || ""
                         )
-                        toast.success("API key copied to clipboard")
+                        toast.success(t("toasts.apiKeyCopied"))
                       }}
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
                   <p className="text-[10px] text-muted-foreground">
-                    Save this key — it will be used by the application to
-                    authenticate requests via the <code>apikey</code> header.
+                    {t("apiKeyHint")}
                   </p>
                 </div>
               )}

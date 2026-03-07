@@ -191,7 +191,7 @@ export function ContractPanel({
         <SheetHeader className="px-4 py-3 border-b shrink-0">
           <div className="flex items-center gap-2">
             <Settings2 className="h-4 w-4 text-primary" />
-            <SheetTitle className="text-sm">API Contract</SheetTitle>
+            <SheetTitle className="text-sm">API Spec</SheetTitle>
           </div>
           <SheetDescription className="text-xs">
             {flow.name} &mdash; {flow.entrypoint.methods.join(", ") || "ANY"} {flow.entrypoint.uri || "/"}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import {
   CheckCircle2,
   Clock,
@@ -66,6 +67,8 @@ const PROVIDERS = [
 ]
 
 export default function BackupContent() {
+  const t = useTranslations("settings.backup")
+  const tc = useTranslations("common")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -136,11 +139,11 @@ export default function BackupContent() {
 
   const handleSaveConfig = async () => {
     if (!repoUrl.trim()) {
-      toast.error("Repository URL is required")
+      toast.error(t("repoUrlRequired"))
       return
     }
     if (!token.trim() && !hasToken) {
-      toast.error("Access token is required")
+      toast.error(t("tokenRequired"))
       return
     }
 
@@ -155,10 +158,10 @@ export default function BackupContent() {
       setConfigured(true)
       setHasToken(true)
       setToken("")
-      toast.success("Backup configuration saved")
+      toast.success(t("configSaved"))
       fetchHistory()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save configuration")
+      toast.error(err instanceof Error ? err.message : t("failedToSaveConfig"))
     } finally {
       setSaving(false)
     }
@@ -170,10 +173,10 @@ export default function BackupContent() {
     try {
       const result = await api.testBackupConnection()
       setTestResult(result)
-      if (result.ok) toast.success("Connection successful")
+      if (result.ok) toast.success(t("connectionSuccessful"))
       else toast.error(result.message)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Connection test failed"
+      const msg = err instanceof Error ? err.message : t("connectionTestFailed")
       setTestResult({ ok: false, message: msg })
       toast.error(msg)
     } finally {
@@ -185,10 +188,10 @@ export default function BackupContent() {
     setBackupCreating(true)
     try {
       const result = await api.createBackup()
-      toast.success(`Backup created: ${result.commit_sha}`)
+      toast.success(t("backupCreated", { sha: result.commit_sha }))
       fetchHistory()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create backup")
+      toast.error(err instanceof Error ? err.message : t("failedToCreateBackup"))
     } finally {
       setBackupCreating(false)
     }
@@ -203,7 +206,7 @@ export default function BackupContent() {
       const data = await api.previewRestore(sha)
       setPreviewData(data)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load preview")
+      toast.error(err instanceof Error ? err.message : t("failedToLoadPreview"))
       setPreviewOpen(false)
     } finally {
       setPreviewLoading(false)
@@ -214,10 +217,10 @@ export default function BackupContent() {
     setRestoring(true)
     try {
       const result = await api.restoreBackup(sha)
-      toast.success(`${result.message} (${result.applied} resources applied)`)
+      toast.success(t("restoreSuccess", { message: result.message, count: result.applied }))
       setRestoreConfirmSha(null)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to restore backup")
+      toast.error(err instanceof Error ? err.message : t("failedToRestore"))
     } finally {
       setRestoring(false)
     }
@@ -227,8 +230,8 @@ export default function BackupContent() {
     return (
       <div className="space-y-6">
         <div>
-          <h3 className="text-lg font-semibold">Backup & Restore</h3>
-          <p className="text-sm text-muted-foreground mt-1">Git-based configuration backup</p>
+          <h3 className="text-lg font-semibold">{t("title")}</h3>
+          <p className="text-sm text-muted-foreground mt-1">{t("subtitle")}</p>
         </div>
         <Skeleton className="h-[200px] rounded-lg" />
         <Skeleton className="h-[300px] rounded-lg" />
@@ -239,9 +242,9 @@ export default function BackupContent() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold">Backup & Restore</h3>
+        <h3 className="text-lg font-semibold">{t("title")}</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Backup all gateway configuration to a Git repository
+          {t("fullDescription")}
         </p>
       </div>
 
@@ -250,15 +253,15 @@ export default function BackupContent() {
         <div className="flex items-center justify-between mb-5">
           <div>
             <div className="flex items-center gap-2">
-              <h4 className="text-sm font-semibold">Git Repository</h4>
+              <h4 className="text-sm font-semibold">{t("gitRepository")}</h4>
               {configured && (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-200">
-                  Configured
+                  {t("configured")}
                 </Badge>
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Connect a Git repository to store backups
+              {t("gitRepoDescription")}
             </p>
           </div>
           <Button size="sm" onClick={handleSaveConfig} disabled={saving || !repoUrl.trim()}>
@@ -267,13 +270,13 @@ export default function BackupContent() {
             ) : (
               <Save className="h-3.5 w-3.5 mr-1.5" />
             )}
-            {saving ? "Saving..." : "Save"}
+            {saving ? tc("saving") : tc("save")}
           </Button>
         </div>
 
         <div className="grid gap-4 max-w-lg">
           <div className="space-y-2">
-            <Label>Provider</Label>
+            <Label>{t("provider")}</Label>
             <div className="grid grid-cols-3 gap-3">
               {PROVIDERS.map((p) => (
                 <label
@@ -300,18 +303,18 @@ export default function BackupContent() {
           </div>
 
           <div className="space-y-2">
-            <Label>Repository URL</Label>
+            <Label>{t("repositoryUrl")}</Label>
             <Input
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
               placeholder={PROVIDERS.find((p) => p.value === provider)?.placeholder}
             />
-            <p className="text-xs text-muted-foreground">HTTPS clone URL of the backup repository</p>
+            <p className="text-xs text-muted-foreground">{t("repoUrlHint")}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Branch</Label>
+              <Label>{t("branch")}</Label>
               <Input
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
@@ -329,7 +332,7 @@ export default function BackupContent() {
                 type="password"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
-                placeholder={hasToken ? "Leave empty to keep current" : PROVIDERS.find((p) => p.value === provider)?.tokenPlaceholder}
+                placeholder={hasToken ? t("leaveEmptyToKeep") : PROVIDERS.find((p) => p.value === provider)?.tokenPlaceholder}
               />
             </div>
           </div>
@@ -346,7 +349,7 @@ export default function BackupContent() {
               ) : (
                 <Plug className="h-3.5 w-3.5 mr-1.5" />
               )}
-              Test Connection
+              {t("testConnection")}
             </Button>
             {testResult && (
               <div className={`flex items-center gap-1.5 text-xs ${testResult.ok ? "text-emerald-600" : "text-destructive"}`}>
@@ -362,9 +365,9 @@ export default function BackupContent() {
       <div className="rounded-lg border bg-card p-6">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h4 className="text-sm font-semibold">Backup History</h4>
+            <h4 className="text-sm font-semibold">{t("backupHistory")}</h4>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Previous backups stored in the Git repository
+              {t("backupHistoryDescription")}
             </p>
           </div>
           <Button
@@ -377,7 +380,7 @@ export default function BackupContent() {
             ) : (
               <Upload className="h-3.5 w-3.5 mr-1.5" />
             )}
-            {backupCreating ? "Creating..." : "Backup Now"}
+            {backupCreating ? t("creating") : t("backupNow")}
           </Button>
         </div>
 
@@ -385,7 +388,7 @@ export default function BackupContent() {
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <GitBranch className="h-8 w-8 text-muted-foreground/40 mb-3" />
             <p className="text-sm text-muted-foreground">
-              Configure a Git repository above to enable backups
+              {t("configureRepoFirst")}
             </p>
           </div>
         ) : historyLoading ? (
@@ -398,7 +401,7 @@ export default function BackupContent() {
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Clock className="h-8 w-8 text-muted-foreground/40 mb-3" />
             <p className="text-sm text-muted-foreground">
-              No backups yet. Click &quot;Backup Now&quot; to create the first one.
+              {t("noBackupsYet")}
             </p>
           </div>
         ) : (
@@ -427,7 +430,7 @@ export default function BackupContent() {
                     onClick={() => handlePreview(commit.sha)}
                   >
                     <Eye className="h-3 w-3 mr-1" />
-                    Preview
+                    {t("preview")}
                   </Button>
                   <Button
                     variant="ghost"
@@ -436,7 +439,7 @@ export default function BackupContent() {
                     onClick={() => setRestoreConfirmSha(commit.sha)}
                   >
                     <Download className="h-3 w-3 mr-1" />
-                    Restore
+                    {t("restore")}
                   </Button>
                 </div>
               </div>
@@ -451,7 +454,7 @@ export default function BackupContent() {
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <RotateCcw className="h-4 w-4" />
-              Restore Preview
+              {t("restorePreview")}
             </SheetTitle>
             <SheetDescription>
               Contents of backup <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{previewSha}</code>
@@ -467,7 +470,7 @@ export default function BackupContent() {
               {previewData.added.length > 0 && (
                 <div>
                   <h4 className="text-sm font-medium mb-2 text-emerald-600">
-                    Resources ({previewData.added.length})
+                    {t("resources")} ({previewData.added.length})
                   </h4>
                   <div className="space-y-1">
                     {previewData.added.map((file) => (
@@ -482,7 +485,7 @@ export default function BackupContent() {
               {previewData.modified.length > 0 && (
                 <div>
                   <h4 className="text-sm font-medium mb-2 text-amber-600">
-                    Modified ({previewData.modified.length})
+                    {t("modified")} ({previewData.modified.length})
                   </h4>
                   <div className="space-y-1">
                     {previewData.modified.map((file) => (
@@ -497,7 +500,7 @@ export default function BackupContent() {
               {previewData.deleted.length > 0 && (
                 <div>
                   <h4 className="text-sm font-medium mb-2 text-destructive">
-                    Deleted ({previewData.deleted.length})
+                    {t("deleted")} ({previewData.deleted.length})
                   </h4>
                   <div className="space-y-1">
                     {previewData.deleted.map((file) => (
@@ -520,7 +523,7 @@ export default function BackupContent() {
                   }}
                 >
                   <Download className="h-3.5 w-3.5 mr-1.5" />
-                  Restore This Backup
+                  {t("restoreThisBackup")}
                 </Button>
               </div>
             </div>
@@ -532,15 +535,13 @@ export default function BackupContent() {
       <AlertDialog open={!!restoreConfirmSha} onOpenChange={(open) => !open && setRestoreConfirmSha(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Restore backup?</AlertDialogTitle>
+            <AlertDialogTitle>{t("restoreConfirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will overwrite the current gateway configuration with the backup from commit{" "}
-              <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{restoreConfirmSha}</code>.
-              All existing routes, services, upstreams, and consumers will be replaced.
+              {t("restoreConfirmDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={restoring}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={restoring}>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => restoreConfirmSha && handleRestore(restoreConfirmSha)}
               disabled={restoring}
@@ -551,7 +552,7 @@ export default function BackupContent() {
               ) : (
                 <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
               )}
-              {restoring ? "Restoring..." : "Yes, Restore"}
+              {restoring ? t("restoring") : t("yesRestore")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

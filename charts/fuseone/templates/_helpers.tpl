@@ -102,6 +102,26 @@ app.kubernetes.io/component: clickhouse-keeper
 {{- end }}
 
 {{/*
+Event Gateway labels
+*/}}
+{{- define "fuseone.eventGateway.labels" -}}
+{{ include "fuseone.labels" . }}
+app.kubernetes.io/component: event-gateway
+{{- end }}
+
+{{- define "fuseone.eventGateway.selectorLabels" -}}
+{{ include "fuseone.selectorLabels" . }}
+app.kubernetes.io/component: event-gateway
+{{- end }}
+
+{{/*
+Event Gateway internal URL
+*/}}
+{{- define "fuseone.eventGateway.url" -}}
+{{- printf "http://%s-event-gateway:%s" (include "fuseone.fullname" .) (.Values.eventGateway.service.port | toString) }}
+{{- end }}
+
+{{/*
 PostgreSQL host - internal or external
 */}}
 {{- define "fuseone.postgresql.host" -}}

@@ -2,6 +2,7 @@
 
 import { ChevronsUpDown, LogOut, User } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -23,6 +24,7 @@ import type { User as UserType } from "@/types/auth"
 export function NavUser({ user }: { user: UserType | null }) {
   const { isMobile } = useSidebar()
   const router = useRouter()
+  const t = useTranslations("navUser")
 
   const handleLogout = async () => {
     await api.logout()
@@ -77,12 +79,12 @@ export function NavUser({ user }: { user: UserType | null }) {
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => router.push("/settings?tab=profile")}>
               <User className="mr-2 h-4 w-4" />
-              Perfil
+              {t("profile")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
-              Sair
+              {t("logout")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

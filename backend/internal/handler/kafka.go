@@ -2,8 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -74,7 +72,6 @@ type createKafkaConnectionRequest struct {
 	SASLMechanism    *string  `json:"sasl_mechanism"`
 	SASLUsername     *string  `json:"sasl_username"`
 	SASLPassword     *string  `json:"sasl_password"`
-	BridgeURL        string   `json:"bridge_url"`
 	IsActive         *bool    `json:"is_active"`
 }
 
@@ -105,11 +102,6 @@ func (h *KafkaHandler) CreateConnection(c *gin.Context) {
 		return
 	}
 
-	bridgeURL := req.BridgeURL
-	if bridgeURL == "" {
-		bridgeURL = "http://kafka-bridge:8080"
-	}
-
 	isActive := true
 	if req.IsActive != nil {
 		isActive = *req.IsActive
@@ -130,7 +122,6 @@ func (h *KafkaHandler) CreateConnection(c *gin.Context) {
 		SASLMechanism:    req.SASLMechanism,
 		SASLUsername:     req.SASLUsername,
 		SASLPassword:     req.SASLPassword,
-		BridgeURL:        bridgeURL,
 		IsActive:         isActive,
 		CreatedBy:        createdBy,
 	}
@@ -154,7 +145,6 @@ type updateKafkaConnectionRequest struct {
 	SASLMechanism    *string  `json:"sasl_mechanism"`
 	SASLUsername     *string  `json:"sasl_username"`
 	SASLPassword     *string  `json:"sasl_password"`
-	BridgeURL        *string  `json:"bridge_url"`
 	IsActive         *bool    `json:"is_active"`
 }
 
@@ -218,9 +208,6 @@ func (h *KafkaHandler) UpdateConnection(c *gin.Context) {
 	}
 	if req.SASLPassword != nil {
 		existing.SASLPassword = req.SASLPassword
-	}
-	if req.BridgeURL != nil {
-		existing.BridgeURL = *req.BridgeURL
 	}
 	if req.IsActive != nil {
 		existing.IsActive = *req.IsActive
@@ -290,7 +277,7 @@ func (h *KafkaHandler) ListTopics(c *gin.Context) {
 		return
 	}
 
-	client := service.NewKafkaBridgeClient(conn.BridgeURL, h.logger)
+	client := service.NewKafkaDirectClient(conn, h.logger)
 	topics, err := client.ListTopics(c.Request.Context())
 	if err != nil {
 		h.logger.Error("failed to list topics", zap.Error(err))
@@ -316,7 +303,7 @@ func (h *KafkaHandler) GetTopic(c *gin.Context) {
 		return
 	}
 
-	client := service.NewKafkaBridgeClient(conn.BridgeURL, h.logger)
+	client := service.NewKafkaDirectClient(conn, h.logger)
 	detail, err := client.GetTopic(c.Request.Context(), topicName)
 	if err != nil {
 		h.logger.Error("failed to get topic", zap.String("topic", topicName), zap.Error(err))
@@ -332,7 +319,7 @@ type produceMessageRequest struct {
 	Headers map[string]string `json:"headers"`
 }
 
-// ProduceMessage produces a message to a topic via the Kafka Bridge.
+// ProduceMessage produces a message to a topic directly via franz-go.
 func (h *KafkaHandler) ProduceMessage(c *gin.Context) {
 	conn, ok := h.loadActiveConnection(c)
 	if !ok {
@@ -351,7 +338,7 @@ func (h *KafkaHandler) ProduceMessage(c *gin.Context) {
 		return
 	}
 
-	client := service.NewKafkaBridgeClient(conn.BridgeURL, h.logger)
+	client := service.NewKafkaDirectClient(conn, h.logger)
 	result, err := client.ProduceMessage(c.Request.Context(), topicName, service.ProduceRequest{
 		Key:     req.Key,
 		Value:   req.Value,
@@ -366,11 +353,10 @@ func (h *KafkaHandler) ProduceMessage(c *gin.Context) {
 }
 
 type consumeMessagesRequest struct {
-	GroupID  string `json:"group_id" binding:"required"`
-	MaxBytes int    `json:"max_bytes"`
+	MaxMessages int `json:"max_messages"`
 }
 
-// ConsumeMessages consumes messages from a topic via the Kafka Bridge.
+// ConsumeMessages fetches recent messages from a topic directly via franz-go.
 func (h *KafkaHandler) ConsumeMessages(c *gin.Context) {
 	conn, ok := h.loadActiveConnection(c)
 	if !ok {
@@ -384,21 +370,10 @@ func (h *KafkaHandler) ConsumeMessages(c *gin.Context) {
 	}
 
 	var req consumeMessagesRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": err.Error()}})
-		return
-	}
+	_ = c.ShouldBindJSON(&req) // optional body
 
-	maxBytes := req.MaxBytes
-	if maxBytes <= 0 {
-		maxBytes = 1048576 // 1MB default
-	}
-
-	// Generate a unique instance ID for this one-shot consume
-	instanceID := "fuseone-browser-" + strconv.FormatInt(time.Now().UnixNano(), 36)
-
-	client := service.NewKafkaBridgeClient(conn.BridgeURL, h.logger)
-	messages, err := client.ConsumeMessages(c.Request.Context(), req.GroupID, instanceID, topicName, maxBytes)
+	client := service.NewKafkaDirectClient(conn, h.logger)
+	messages, err := client.ConsumeMessages(c.Request.Context(), topicName, req.MaxMessages)
 	if err != nil {
 		h.logger.Error("failed to consume messages", zap.String("topic", topicName), zap.Error(err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": gin.H{"message": err.Error()}})

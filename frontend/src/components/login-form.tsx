@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -37,6 +38,7 @@ export function LoginForm({
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter()
+  const t = useTranslations("login")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -57,7 +59,7 @@ export function LoginForm({
       await api.login(username, password, totpRequired ? totpCode : undefined)
       router.push("/dashboard")
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Login failed"
+      const message = err instanceof Error ? err.message : t("loginFailed")
       if (message.includes("totp_required")) {
         setTotpRequired(true)
       } else {
@@ -78,7 +80,7 @@ export function LoginForm({
       sessionStorage.setItem("oauth_provider", provider.provider)
       window.location.href = url
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to start OAuth flow")
+      toast.error(err instanceof Error ? err.message : t("oauthFailed"))
       setOauthLoading(null)
     }
   }
@@ -91,13 +93,13 @@ export function LoginForm({
             <FieldGroup>
               <div className="flex flex-col items-center gap-2 text-center">
                 <img src="/logo-mark.svg" alt="FuseOne" className="h-10 w-10" />
-                <h1 className="text-2xl font-bold">FuseOne API Gateway</h1>
+                <h1 className="text-2xl font-bold">{t("title")}</h1>
                 <p className="text-muted-foreground text-balance">
-                  Entre com suas credenciais para acessar o painel
+                  {t("subtitle")}
                 </p>
               </div>
               <Field>
-                <FieldLabel htmlFor="username">Username</FieldLabel>
+                <FieldLabel htmlFor="username">{t("username")}</FieldLabel>
                 <Input
                   id="username"
                   type="text"
@@ -109,7 +111,7 @@ export function LoginForm({
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor="password">Password</FieldLabel>
+                <FieldLabel htmlFor="password">{t("password")}</FieldLabel>
                 <Input
                   id="password"
                   type="password"
@@ -121,7 +123,7 @@ export function LoginForm({
               </Field>
               {totpRequired && (
                 <Field>
-                  <FieldLabel htmlFor="totp_code">Authentication Code</FieldLabel>
+                  <FieldLabel htmlFor="totp_code">{t("totpLabel")}</FieldLabel>
                   <Input
                     id="totp_code"
                     type="text"
@@ -135,13 +137,13 @@ export function LoginForm({
                     className="font-mono text-center text-lg tracking-widest"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Enter the 6-digit code from your authenticator app
+                    {t("totpHint")}
                   </p>
                 </Field>
               )}
               <Field>
                 <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? "Entrando..." : "Entrar"}
+                  {loading ? t("loggingIn") : t("loginButton")}
                 </Button>
               </Field>
 
@@ -151,7 +153,7 @@ export function LoginForm({
                   <div className="relative">
                     <Separator />
                     <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-xs text-muted-foreground">
-                      ou
+                      {t("or")}
                     </span>
                   </div>
                   <div className="flex flex-col gap-2">
@@ -174,8 +176,8 @@ export function LoginForm({
                             {label.charAt(0)}
                           </span>
                           {oauthLoading === provider.provider
-                            ? "Redirecting..."
-                            : `Entrar com ${label}`}
+                            ? t("redirecting")
+                            : t("signInWith", { provider: label })}
                         </Button>
                       )
                     })}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { ArrowLeft, Plus, Save, X, Trash2 } from "lucide-react"
@@ -57,6 +58,8 @@ interface UpstreamNode {
 }
 
 export default function NewStreamRoutePage() {
+  const t = useTranslations("streamRoutes")
+  const tc = useTranslations("common")
   const router = useRouter()
   const [saving, setSaving] = useState(false)
 
@@ -137,11 +140,11 @@ export default function NewStreamRoutePage() {
   const handleSave = async () => {
     const validNodes = nodes.filter((n) => n.host.trim() && n.port > 0)
     if (upstreamMode === "inline" && validNodes.length === 0) {
-      toast.error("At least one upstream node is required")
+      toast.error(t("validation.nodeRequired"))
       return
     }
     if (upstreamMode === "ref" && !upstreamId.trim()) {
-      toast.error("Upstream ID is required")
+      toast.error(t("validation.upstreamIdRequired"))
       return
     }
 
@@ -185,11 +188,11 @@ export default function NewStreamRoutePage() {
       }
 
       await api.createResource("stream-routes", body)
-      toast.success("Stream route created")
+      toast.success(t("toasts.created"))
       router.push("/stream-routes")
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to create stream route"
+        err instanceof Error ? err.message : t("toasts.failedCreate")
       )
     } finally {
       setSaving(false)
@@ -199,8 +202,8 @@ export default function NewStreamRoutePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="New Stream Route"
-        description="Create a TCP/UDP Layer 4 proxy route"
+        title={t("createTitle")}
+        description={t("createDescription")}
         actions={
           <div className="flex gap-2">
             <Button
@@ -208,11 +211,11 @@ export default function NewStreamRoutePage() {
               onClick={() => router.push("/stream-routes")}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+              {tc("back")}
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               <Save className="mr-2 h-4 w-4" />
-              {saving ? "Creating..." : "Create Route"}
+              {saving ? t("creating") : t("createButton")}
             </Button>
           </div>
         }
@@ -222,14 +225,14 @@ export default function NewStreamRoutePage() {
         {/* Basic Info */}
         <Card>
           <CardHeader>
-            <CardTitle>Basic Info</CardTitle>
+            <CardTitle>{t("basicInfo")}</CardTitle>
             <CardDescription>
-              Name and description for this stream route
+              {t("basicInfoDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Name (optional)</Label>
+              <Label>{t("nameOptional")}</Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -237,7 +240,7 @@ export default function NewStreamRoutePage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Description (optional)</Label>
+              <Label>{t("descriptionOptional")}</Label>
               <Input
                 value={desc}
                 onChange={(e) => setDesc(e.target.value)}
@@ -250,38 +253,37 @@ export default function NewStreamRoutePage() {
         {/* Match Conditions */}
         <Card>
           <CardHeader>
-            <CardTitle>Match Conditions</CardTitle>
+            <CardTitle>{t("matchConditions")}</CardTitle>
             <CardDescription>
-              Filter incoming connections by L4 attributes. Leave empty to match
-              all traffic on the stream listen port.
+              {t("matchConditionsDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Client IP / CIDR</Label>
+              <Label>{t("clientIpCidr")}</Label>
               <Input
                 value={remoteAddr}
                 onChange={(e) => setRemoteAddr(e.target.value)}
                 placeholder="192.168.0.0/24 or 10.0.0.1"
               />
               <p className="text-xs text-muted-foreground">
-                Match connections from this client IP address or CIDR range
+                {t("clientIpCidrHint")}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Server Address</Label>
+                <Label>{t("serverAddress")}</Label>
                 <Input
                   value={serverAddr}
                   onChange={(e) => setServerAddr(e.target.value)}
                   placeholder="0.0.0.0"
                 />
                 <p className="text-xs text-muted-foreground">
-                  The gateway address that accepted the connection
+                  {t("serverAddressHint")}
                 </p>
               </div>
               <div className="space-y-2">
-                <Label>Server Port</Label>
+                <Label>{t("serverPort")}</Label>
                 <Input
                   type="number"
                   value={serverPort}
@@ -289,20 +291,19 @@ export default function NewStreamRoutePage() {
                   placeholder="9100"
                 />
                 <p className="text-xs text-muted-foreground">
-                  The gateway listening port
+                  {t("serverPortHint")}
                 </p>
               </div>
             </div>
             <div className="space-y-2">
-              <Label>SNI (TLS Server Name)</Label>
+              <Label>{t("sniLabel")}</Label>
               <Input
                 value={sni}
                 onChange={(e) => setSni(e.target.value)}
                 placeholder="db.example.com"
               />
               <p className="text-xs text-muted-foreground">
-                Match by TLS Server Name Indication. Requires TLS-enabled
-                stream listener.
+                {t("sniHint")}
               </p>
             </div>
           </CardContent>
@@ -311,14 +312,14 @@ export default function NewStreamRoutePage() {
         {/* Upstream */}
         <Card>
           <CardHeader>
-            <CardTitle>Upstream</CardTitle>
+            <CardTitle>{t("upstream")}</CardTitle>
             <CardDescription>
-              Where to forward matched TCP/UDP connections
+              {t("upstreamDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Mode</Label>
+              <Label>{t("mode")}</Label>
               <Select
                 value={upstreamMode}
                 onValueChange={(v) =>
@@ -330,10 +331,10 @@ export default function NewStreamRoutePage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="inline">
-                    Inline — Define nodes here
+                    {t("modeInline")}
                   </SelectItem>
                   <SelectItem value="ref">
-                    Reference — Use existing upstream
+                    {t("modeReference")}
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -341,18 +342,18 @@ export default function NewStreamRoutePage() {
 
             {upstreamMode === "ref" ? (
               <div className="space-y-2">
-                <Label>Upstream ID</Label>
+                <Label>{t("upstreamId")}</Label>
                 <Input
                   value={upstreamId}
                   onChange={(e) => setUpstreamId(e.target.value)}
-                  placeholder="Enter upstream ID"
+                  placeholder={t("upstreamIdPlaceholder")}
                 />
               </div>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Load Balancing</Label>
+                    <Label>{t("loadBalancing")}</Label>
                     <Select
                       value={lbType}
                       onValueChange={(v) =>
@@ -365,18 +366,18 @@ export default function NewStreamRoutePage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="roundrobin">Round Robin</SelectItem>
+                        <SelectItem value="roundrobin">{t("lbRoundRobin")}</SelectItem>
                         <SelectItem value="chash">
-                          Consistent Hash
+                          {t("lbConsistentHash")}
                         </SelectItem>
                         <SelectItem value="least_conn">
-                          Least Connections
+                          {t("lbLeastConn")}
                         </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Upstream Scheme</Label>
+                    <Label>{t("upstreamScheme")}</Label>
                     <Select
                       value={upstreamScheme}
                       onValueChange={(v) =>
@@ -387,15 +388,15 @@ export default function NewStreamRoutePage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="tcp">TCP (plain)</SelectItem>
-                        <SelectItem value="tls">TLS (encrypted)</SelectItem>
+                        <SelectItem value="tcp">{t("schemeTcp")}</SelectItem>
+                        <SelectItem value="tls">{t("schemeTls")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Nodes</Label>
+                  <Label>{t("nodes")}</Label>
                   <div className="space-y-2">
                     {nodes.map((node, i) => (
                       <div key={i} className="flex gap-2 items-center">
@@ -456,7 +457,7 @@ export default function NewStreamRoutePage() {
                       onClick={handleAddNode}
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Add Node
+                      {t("addNode")}
                     </Button>
                     <p className="text-xs text-muted-foreground">
                       host : port : weight
@@ -473,9 +474,9 @@ export default function NewStreamRoutePage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Protocol (xRPC)</CardTitle>
+                <CardTitle>{t("protocol")}</CardTitle>
                 <CardDescription>
-                  Enable application-layer protocol awareness on the TCP stream
+                  {t("protocolDescription")}
                 </CardDescription>
               </div>
               <Switch
@@ -487,7 +488,7 @@ export default function NewStreamRoutePage() {
           {enableProtocol && (
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Protocol</Label>
+                <Label>{t("protocolLabel")}</Label>
                 <Select
                   value={protocolName}
                   onValueChange={setProtocolName}
@@ -501,11 +502,11 @@ export default function NewStreamRoutePage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Enables protocol-aware routing, metrics, and fault injection
+                  {t("protocolHint")}
                 </p>
               </div>
               <div className="space-y-2">
-                <Label>Protocol Configuration (JSON, optional)</Label>
+                <Label>{t("protocolConfigJson")}</Label>
                 <Textarea
                   value={protocolConf}
                   onChange={(e) => setProtocolConf(e.target.value)}
@@ -520,10 +521,9 @@ export default function NewStreamRoutePage() {
         {/* Plugins / Access Control */}
         <Card>
           <CardHeader>
-            <CardTitle>Plugins</CardTitle>
+            <CardTitle>{t("plugins")}</CardTitle>
             <CardDescription>
-              Access control, connection limits, and logging for this stream
-              route
+              {t("pluginsDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -552,7 +552,7 @@ export default function NewStreamRoutePage() {
                           setPluginJson(JSON.stringify(config, null, 2))
                         }}
                       >
-                        Edit
+                        {tc("edit")}
                       </Button>
                       <Button
                         variant="ghost"
@@ -605,14 +605,14 @@ export default function NewStreamRoutePage() {
                 />
                 <div className="flex gap-2">
                   <Button size="sm" onClick={handleSavePlugin}>
-                    Apply
+                    {t("apply")}
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => setEditingPlugin(null)}
                   >
-                    Cancel
+                    {tc("cancel")}
                   </Button>
                 </div>
               </div>

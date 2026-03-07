@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -47,6 +48,8 @@ import { api } from "@/lib/api-client"
 import type { APISIXConsumer, APISIXConsumerGroup } from "@/types/apisix"
 
 export default function PlanDetailPage() {
+  const t = useTranslations("plans")
+  const tc = useTranslations("common")
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
@@ -81,7 +84,7 @@ export default function PlanDetailPage() {
       const allConsumers = (consumersRes?.list || []).map((n) => n.value as APISIXConsumer)
       setMembers(allConsumers.filter((c) => c.group_id === id))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load plan")
+      toast.error(err instanceof Error ? err.message : tc("failedToLoad", { resource: t("title") }))
     } finally {
       setLoading(false)
     }
@@ -94,9 +97,9 @@ export default function PlanDetailPage() {
         desc: description,
         plugins: Object.keys(plugins).length > 0 ? plugins : undefined,
       })
-      toast.success("Plan saved")
+      toast.success(t("toasts.saved"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save plan")
+      toast.error(err instanceof Error ? err.message : tc("failedToSave", { resource: t("title") }))
     } finally {
       setSaving(false)
     }
@@ -148,9 +151,9 @@ export default function PlanDetailPage() {
   if (!plan) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-lg font-medium text-muted-foreground">Plan not found</p>
+        <p className="text-lg font-medium text-muted-foreground">{t("notFound")}</p>
         <Button variant="outline" className="mt-4" onClick={() => router.push("/plans")}>
-          Back to Plans
+          {t("backToList")}
         </Button>
       </div>
     )
@@ -159,17 +162,17 @@ export default function PlanDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Plan: ${id}`}
-        description="Edit plan policies and view members"
+        title={`${t("detailTitle")}: ${id}`}
+        description={t("detailDescription")}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => router.push("/plans")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+              {tc("back")}
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               <Save className="mr-2 h-4 w-4" />
-              {saving ? "Saving..." : "Save"}
+              {saving ? tc("saving") : tc("save")}
             </Button>
           </div>
         }
@@ -179,19 +182,19 @@ export default function PlanDetailPage() {
         {/* Identity */}
         <Card>
           <CardHeader>
-            <CardTitle>Identity</CardTitle>
+            <CardTitle>{t("identity")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label>{tc("name")}</Label>
               <Input value={id} readOnly className="font-mono bg-muted" />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{tc("description")}</Label>
               <Input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Plan description"
+                placeholder={t("descriptionPlaceholder")}
               />
             </div>
           </CardContent>
@@ -200,15 +203,15 @@ export default function PlanDetailPage() {
         {/* Policies */}
         <Card>
           <CardHeader>
-            <CardTitle>Policies</CardTitle>
+            <CardTitle>{t("policies")}</CardTitle>
             <CardDescription>
-              Plugins applied to all applications in this plan
+              {t("policiesDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {Object.keys(plugins).length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
-                No policies configured.
+                {t("noPolicies")}
               </p>
             ) : (
               Object.entries(plugins).map(([pluginName, config]) => {
@@ -240,7 +243,7 @@ export default function PlanDetailPage() {
                           }
                         }}
                       >
-                        Edit
+                        {tc("edit")}
                       </Button>
                       <Button
                         variant="ghost"
@@ -261,7 +264,7 @@ export default function PlanDetailPage() {
               onClick={() => setShowPicker(true)}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Add Policy
+              {t("addPolicy")}
             </Button>
           </CardContent>
         </Card>
@@ -269,22 +272,22 @@ export default function PlanDetailPage() {
         {/* Members */}
         <Card>
           <CardHeader>
-            <CardTitle>Members</CardTitle>
+            <CardTitle>{t("members")}</CardTitle>
             <CardDescription>
-              Applications assigned to this plan ({members.length})
+              {t("membersDescription", { count: members.length })}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {members.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
-                No applications assigned to this plan yet.
+                {t("noMembers")}
               </p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableHead>Name</TableHead>
-                    <TableHead>Description</TableHead>
+                    <TableHead>{tc("name")}</TableHead>
+                    <TableHead>{tc("description")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -313,7 +316,7 @@ export default function PlanDetailPage() {
       {/* Policy Picker Sheet */}
       <Sheet open={showPicker} onOpenChange={setShowPicker}>
         <SheetContent side="right" className="p-0 sm:max-w-sm">
-          <SheetTitle className="sr-only">Add Policy</SheetTitle>
+          <SheetTitle className="sr-only">{t("addPolicy")}</SheetTitle>
           <PolicyGallery
             onAddPolicy={handleAddPolicy}
             existingPolicies={Object.keys(plugins)}
@@ -339,7 +342,7 @@ export default function PlanDetailPage() {
               />
             ) : (
               <div className="space-y-2">
-                <Label>Configuration (JSON)</Label>
+                <Label>{t("configurationJson")}</Label>
                 <Textarea
                   value={jsonFallback}
                   onChange={(e) => setJsonFallback(e.target.value)}
@@ -351,9 +354,9 @@ export default function PlanDetailPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingPlugin(null)}>
-              Cancel
+              {tc("cancel")}
             </Button>
-            <Button onClick={handleSavePlugin}>Apply</Button>
+            <Button onClick={handleSavePlugin}>{t("apply")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

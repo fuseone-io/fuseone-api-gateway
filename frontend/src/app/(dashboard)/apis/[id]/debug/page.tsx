@@ -67,6 +67,9 @@ import { useDebugStore } from "@/stores/debug-store"
 import type { DebugLog, DebugLogFilter } from "@/types/debug"
 import type { ApiDefRecord } from "@/types/api"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
+import { PageHeader } from "@/components/page-header"
+import { AIInsightButton } from "@/components/ai-assistant/AIInsightButton"
 
 const PAGE_SIZE = 30
 const POLL_INTERVAL = 3_000
@@ -89,6 +92,23 @@ function LogDetailSheet({ log, open, onClose }: { log: DebugLog | null; open: bo
             <Badge variant="outline" className={`shrink-0 font-mono text-[11px] ${statusBadgeClass(log.resp_status)}`}>
               {log.resp_status}
             </Badge>
+            <AIInsightButton
+              variant="ghost"
+              buildPrompt={() => {
+                const lines = [
+                  `Analyze this specific gateway request:`,
+                  `- Method: ${log.req_method}  URI: ${log.req_uri}`,
+                  `- Status: ${log.resp_status}  Total latency: ${log.latency_total}ms (upstream: ${log.latency_upstream ?? "n/a"}ms, gateway: ${log.latency_gateway ?? "n/a"}ms)`,
+                  `- Client IP: ${log.client_ip || "n/a"}  Upstream: ${log.upstream_addr || "n/a"}`,
+                  `- Request size: ${log.req_size}B  Response size: ${log.resp_size}B`,
+                ]
+                if (log.consumer_name) lines.push(`- Application: ${log.consumer_name}`)
+                if (log.resp_status >= 400) lines.push(`\nThis request returned an error (${log.resp_status}). What could be the cause and how to fix it?`)
+                else if (log.latency_total > 1000) lines.push(`\nThis request was slow (${log.latency_total}ms). What could be causing the high latency?`)
+                else lines.push(`\nAny observations or recommendations for this request?`)
+                return lines.join("\n")
+              }}
+            />
           </SheetTitle>
           <SheetDescription className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
             <span className="flex items-center gap-1">
@@ -252,6 +272,8 @@ function CollapsibleCode({ title, badge, defaultOpen, variant = "default", child
 /* ─── Main Page ─── */
 
 export default function ApiDebugPage() {
+  const t = useTranslations("apis")
+  const tc = useTranslations("common")
   const params = useParams()
 
   const apiId = params.id as string
@@ -305,7 +327,7 @@ export default function ApiDebugPage() {
         setRecord(rec)
         if (rec.name) sessionStorage.setItem(`breadcrumb:${apiId}`, rec.name)
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to load API")
+        toast.error(err instanceof Error ? err.message : tc("failedToLoad", { resource: "API" }))
       } finally {
         setLoadingApi(false)
       }
@@ -347,7 +369,7 @@ export default function ApiDebugPage() {
       setTotal(res.meta?.total || 0)
       setLastRefresh(new Date())
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to fetch logs"
+      const msg = err instanceof Error ? err.message : tc("failedToLoad", { resource: "logs" })
       if (!autoRefresh) toast.error(msg)
     } finally {
       setLoading(false)
@@ -375,9 +397,9 @@ export default function ApiDebugPage() {
     try {
       const result = await api.debugToggleApi(apiId)
       setDebugEnabled(result.enabled)
-      toast.success(result.enabled ? "Debug mode enabled" : "Debug mode disabled")
+      toast.success(result.enabled ? t("detail.debug.debugEnabled") : t("detail.debug.debugDisabled"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to toggle debug")
+      toast.error(err instanceof Error ? err.message : t("detail.debug.failedToggle"))
     } finally {
       setToggling(false)
     }
@@ -398,7 +420,7 @@ export default function ApiDebugPage() {
     } catch (err) {
       if (field === "include_req_body") setIncludeReqBody(!value)
       else setIncludeRespBody(!value)
-      toast.error(err instanceof Error ? err.message : "Failed to update capture options")
+      toast.error(err instanceof Error ? err.message : t("detail.debug.failedUpdateCapture"))
     }
   }
 
@@ -433,50 +455,45 @@ export default function ApiDebugPage() {
   return (
     <div className="space-y-6">
       {/* ─── Header ─── */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Bug className="h-5 w-5 text-primary shrink-0" />
-            <h1 className="text-2xl font-bold tracking-tight truncate">{record?.name || "API"}</h1>
-            {record?.version && (
-              <Badge variant="outline" className="text-[10px] font-mono shrink-0">v{record.version}</Badge>
+      <PageHeader
+        title={record?.name || "API"}
+        description={t("detail.requestLogs")}
+        icon={<Bug className="h-5 w-5" />}
+        badge={record?.version ? <Badge variant="outline" className="text-[10px] font-mono shrink-0">v{record.version}</Badge> : undefined}
+        actions={
+          <div className="flex items-center gap-3">
+            {/* Debug status badge */}
+            <Badge
+              variant="outline"
+              className={
+                debugEnabled
+                  ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30 gap-1.5"
+                  : "bg-slate-500/15 text-slate-600 border-slate-500/30 gap-1.5"
+              }
+            >
+              {debugEnabled && <Radio className="h-3 w-3 animate-pulse" />}
+              {debugEnabled ? t("detail.debug.debugActive") : t("detail.debug.debugOff")}
+            </Badge>
+
+            {/* Toggle button */}
+            {isDraft ? (
+              <Button variant="outline" size="sm" disabled>
+                <Bug className="mr-1.5 h-3.5 w-3.5" /> {t("detail.deployFirst")}
+              </Button>
+            ) : (
+              <Button
+                variant={debugEnabled ? "outline" : "default"}
+                size="sm"
+                onClick={handleToggleDebug}
+                disabled={toggling}
+              >
+                {toggling ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Bug className="mr-1.5 h-3.5 w-3.5" />}
+                {debugEnabled ? t("detail.debug.stopCapture") : t("detail.debug.startCapture")}
+              </Button>
             )}
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">Request logs and traffic debugging</p>
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          {/* Debug status badge */}
-          <Badge
-            variant="outline"
-            className={
-              debugEnabled
-                ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30 gap-1.5"
-                : "bg-slate-500/15 text-slate-600 border-slate-500/30 gap-1.5"
-            }
-          >
-            {debugEnabled && <Radio className="h-3 w-3 animate-pulse" />}
-            {debugEnabled ? "Debug Active" : "Debug Off"}
-          </Badge>
-
-          {/* Toggle button */}
-          {isDraft ? (
-            <Button variant="outline" size="sm" disabled>
-              <Bug className="mr-1.5 h-3.5 w-3.5" /> Deploy First
-            </Button>
-          ) : (
-            <Button
-              variant={debugEnabled ? "outline" : "default"}
-              size="sm"
-              onClick={handleToggleDebug}
-              disabled={toggling}
-            >
-              {toggling ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Bug className="mr-1.5 h-3.5 w-3.5" />}
-              {debugEnabled ? "Stop Capture" : "Start Capture"}
-            </Button>
-          )}
-        </div>
-      </div>
+        }
+      />
 
       {/* Capture options (inline below header) */}
       {debugEnabled && !isDraft && (
@@ -486,18 +503,18 @@ export default function ApiDebugPage() {
               checked={includeReqBody}
               onCheckedChange={(v) => handleCaptureChange("include_req_body", !!v)}
             />
-            <span className="text-xs text-muted-foreground">Request body</span>
+            <span className="text-xs text-muted-foreground">{t("detail.debug.requestBody")}</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <Checkbox
               checked={includeRespBody}
               onCheckedChange={(v) => handleCaptureChange("include_resp_body", !!v)}
             />
-            <span className="text-xs text-muted-foreground">Response body</span>
+            <span className="text-xs text-muted-foreground">{t("detail.debug.responseBody")}</span>
           </label>
           <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
             <Info className="h-3 w-3" />
-            Headers always captured
+            {t("detail.debug.headersAlwaysCaptured")}
           </span>
         </div>
       )}
@@ -508,7 +525,7 @@ export default function ApiDebugPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Total Requests</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("detail.totalRequests")}</p>
                 <p className="text-2xl font-bold mt-1">{stats.totalRequests.toLocaleString()}</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
@@ -521,7 +538,7 @@ export default function ApiDebugPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Avg Latency</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("detail.avgLatency")}</p>
                 <p className="text-2xl font-bold mt-1">{formatLatency(stats.avgLatency)}</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
@@ -534,7 +551,7 @@ export default function ApiDebugPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Error Rate</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("detail.errorRate")}</p>
                 <p className={`text-2xl font-bold mt-1 ${stats.errorRate > 10 ? "text-red-600" : stats.errorRate > 0 ? "text-amber-600" : "text-emerald-600"}`}>
                   {stats.errorRate}%
                 </p>
@@ -549,7 +566,7 @@ export default function ApiDebugPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">P95 Latency</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("detail.p95Latency")}</p>
                 <p className="text-2xl font-bold mt-1">{formatLatency(stats.p95Latency)}</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/10">
@@ -564,10 +581,10 @@ export default function ApiDebugPage() {
       <div className="flex items-center gap-2 flex-wrap">
         <Select value={methodFilter} onValueChange={(v) => { setMethodFilter(v); setPage(1) }}>
           <SelectTrigger className="w-[120px] h-9 text-xs">
-            <SelectValue placeholder="Method" />
+            <SelectValue placeholder={t("detail.debug.tableHeaders.method")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Methods</SelectItem>
+            <SelectItem value="all">{t("detail.debug.allMethods")}</SelectItem>
             <SelectItem value="GET">GET</SelectItem>
             <SelectItem value="POST">POST</SelectItem>
             <SelectItem value="PUT">PUT</SelectItem>
@@ -578,22 +595,22 @@ export default function ApiDebugPage() {
 
         <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1) }}>
           <SelectTrigger className="w-[130px] h-9 text-xs">
-            <SelectValue placeholder="Status" />
+            <SelectValue placeholder={t("detail.debug.tableHeaders.status")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="2xx">2xx Success</SelectItem>
-            <SelectItem value="3xx">3xx Redirect</SelectItem>
-            <SelectItem value="4xx">4xx Client</SelectItem>
-            <SelectItem value="5xx">5xx Server</SelectItem>
-            <SelectItem value="error">Errors (4xx+5xx)</SelectItem>
+            <SelectItem value="all">{t("detail.debug.allStatus")}</SelectItem>
+            <SelectItem value="2xx">{t("detail.debug.statusLabels.success2xx")}</SelectItem>
+            <SelectItem value="3xx">{t("detail.debug.statusLabels.redirect3xx")}</SelectItem>
+            <SelectItem value="4xx">{t("detail.debug.statusLabels.client4xx")}</SelectItem>
+            <SelectItem value="5xx">{t("detail.debug.statusLabels.server5xx")}</SelectItem>
+            <SelectItem value="error">{t("detail.debug.statusLabels.errors")}</SelectItem>
           </SelectContent>
         </Select>
 
         <div className="relative flex-1 min-w-[180px] max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            placeholder="Search URI..."
+            placeholder={t("detail.debug.searchUri")}
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setPage(1) }}
             className="pl-8 h-9 text-xs"
@@ -607,7 +624,7 @@ export default function ApiDebugPage() {
           onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
         >
           <SlidersHorizontal className="h-3.5 w-3.5" />
-          More Filters
+          {t("detail.debug.moreFilters")}
           {activeAdvancedCount > 0 && (
             <Badge variant="default" className="h-4 text-[10px] px-1.5 ml-0.5">
               {activeAdvancedCount}
@@ -617,7 +634,7 @@ export default function ApiDebugPage() {
 
         {hasFilters && (
           <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 gap-1 text-xs">
-            <X className="h-3 w-3" /> Clear
+            <X className="h-3 w-3" /> {tc("filter")}
           </Button>
         )}
 
@@ -644,7 +661,7 @@ export default function ApiDebugPage() {
       {showAdvancedFilters && (
         <div className="flex items-center gap-4 flex-wrap p-3 rounded-lg border bg-muted/30">
           <div className="flex items-center gap-1.5">
-            <Label className="text-xs text-muted-foreground whitespace-nowrap">Source IP</Label>
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">{t("detail.debug.sourceIp")}</Label>
             <Input
               placeholder="e.g. 192.168.1.1"
               value={clientIpFilter}
@@ -654,13 +671,13 @@ export default function ApiDebugPage() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <Label className="text-xs text-muted-foreground whitespace-nowrap">Min Latency</Label>
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">{t("detail.debug.minLatency")}</Label>
             <Select value={latencyFilter} onValueChange={(v) => { setLatencyFilter(v); setPage(1) }}>
               <SelectTrigger className="w-[120px] h-8 text-xs">
-                <SelectValue placeholder="Any" />
+                <SelectValue placeholder={t("detail.debug.any")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Any</SelectItem>
+                <SelectItem value="all">{t("detail.debug.any")}</SelectItem>
                 <SelectItem value="100">&gt;100ms</SelectItem>
                 <SelectItem value="500">&gt;500ms</SelectItem>
                 <SelectItem value="1000">&gt;1s</SelectItem>
@@ -670,7 +687,7 @@ export default function ApiDebugPage() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <Label className="text-xs text-muted-foreground whitespace-nowrap">Application</Label>
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">{t("detail.debug.application")}</Label>
             <Input
               placeholder="application name"
               value={consumerFilter}
@@ -694,17 +711,17 @@ export default function ApiDebugPage() {
         <Card>
           <CardContent className="py-16 text-center">
             <Bug className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm font-medium">No traffic captured yet</p>
+            <p className="text-sm font-medium">{t("detail.debug.noTrafficCaptured")}</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
               {!debugEnabled
-                ? "Enable debug mode above to start capturing traffic."
+                ? t("detail.debug.enableDebugAbove")
                 : hasFilters
-                  ? "No logs match your filters."
-                  : "Send requests to this API and logs will appear here."}
+                  ? t("detail.debug.noLogsMatch")
+                  : t("detail.debug.sendRequests")}
             </p>
             {hasFilters && (
               <Button variant="outline" size="sm" className="mt-3" onClick={clearFilters}>
-                <Filter className="h-3.5 w-3.5 mr-1.5" /> Clear Filters
+                <Filter className="h-3.5 w-3.5 mr-1.5" /> {tc("filter")}
               </Button>
             )}
           </CardContent>
@@ -714,14 +731,14 @@ export default function ApiDebugPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[80px]">Time</TableHead>
-                <TableHead className="w-[70px]">Method</TableHead>
-                <TableHead>URI</TableHead>
-                <TableHead className="w-[120px]">Client IP</TableHead>
-                <TableHead className="w-[65px]">Status</TableHead>
-                <TableHead className="w-[80px] text-right">Latency</TableHead>
-                <TableHead className="w-[70px] text-right">Req</TableHead>
-                <TableHead className="w-[70px] text-right">Resp</TableHead>
+                <TableHead className="w-[80px]">{t("detail.debug.tableHeaders.time")}</TableHead>
+                <TableHead className="w-[70px]">{t("detail.debug.tableHeaders.method")}</TableHead>
+                <TableHead>{t("detail.debug.tableHeaders.uri")}</TableHead>
+                <TableHead className="w-[120px]">{t("detail.debug.tableHeaders.clientIp")}</TableHead>
+                <TableHead className="w-[65px]">{t("detail.debug.tableHeaders.status")}</TableHead>
+                <TableHead className="w-[80px] text-right">{t("detail.debug.tableHeaders.latency")}</TableHead>
+                <TableHead className="w-[70px] text-right">{t("detail.debug.tableHeaders.req")}</TableHead>
+                <TableHead className="w-[70px] text-right">{t("detail.debug.tableHeaders.resp")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -766,9 +783,9 @@ export default function ApiDebugPage() {
           <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/30">
             <p className="text-xs text-muted-foreground">
               {total > 0 ? (
-                <>Showing <span className="font-medium text-foreground">{rangeStart}-{rangeEnd}</span> of <span className="font-medium text-foreground">{total}</span> entries</>
+                <>{t("detail.debug.showing")} <span className="font-medium text-foreground">{rangeStart}-{rangeEnd}</span> {t("detail.debug.of")} <span className="font-medium text-foreground">{total}</span> {t("detail.debug.entries")}</>
               ) : (
-                "No entries"
+                t("detail.debug.noEntries")
               )}
             </p>
             <div className="flex items-center gap-1">

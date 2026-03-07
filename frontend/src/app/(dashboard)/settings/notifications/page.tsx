@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import {
   Bell,
   Hash,
@@ -76,6 +77,8 @@ function getConfigSummary(contact: NotificationContact): string {
 }
 
 export default function NotificationsContent() {
+  const t = useTranslations("settings.notifications")
+  const tc = useTranslations("common")
   const [contacts, setContacts] = useState<NotificationContact[]>([])
   const [loading, setLoading] = useState(true)
   const [showDialog, setShowDialog] = useState(false)
@@ -87,7 +90,7 @@ export default function NotificationsContent() {
       const data = await api.listNotificationContacts()
       setContacts(data)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load contacts")
+      toast.error(err instanceof Error ? err.message : t("failedToLoad"))
     } finally {
       setLoading(false)
     }
@@ -100,10 +103,10 @@ export default function NotificationsContent() {
   const handleDelete = async (id: string) => {
     try {
       await api.deleteNotificationContact(id)
-      toast.success("Contact deleted")
+      toast.success(t("contactDeleted"))
       fetchData()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete")
+      toast.error(err instanceof Error ? err.message : t("failedToDelete"))
     }
   }
 
@@ -112,7 +115,7 @@ export default function NotificationsContent() {
       await api.updateNotificationContact(contact.id, { enabled: !contact.enabled })
       fetchData()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update")
+      toast.error(err instanceof Error ? err.message : t("failedToUpdate"))
     }
   }
 
@@ -120,9 +123,9 @@ export default function NotificationsContent() {
     setTestingId(id)
     try {
       await api.testNotificationContact(id)
-      toast.success("Test notification sent successfully!")
+      toast.success(t("testSuccess"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Test failed")
+      toast.error(err instanceof Error ? err.message : t("testFailed"))
     } finally {
       setTestingId(null)
     }
@@ -147,14 +150,14 @@ export default function NotificationsContent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Notification Channels</h3>
+          <h3 className="text-lg font-semibold">{t("heading")}</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure reusable notification channels for alerts and system events
+            {t("subtitle")}
           </p>
         </div>
         <Button size="sm" onClick={() => setShowDialog(true)}>
           <Plus className="h-3.5 w-3.5 mr-1.5" />
-          Add Channel
+          {t("addChannel")}
         </Button>
       </div>
 
@@ -167,31 +170,30 @@ export default function NotificationsContent() {
       ) : contacts.length === 0 ? (
         <div className="py-12 text-center rounded-lg border border-dashed bg-muted/30">
           <Bell className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm font-medium">No notification channels configured</p>
+          <p className="text-sm font-medium">{t("noChannelsConfigured")}</p>
           <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-            Add Slack, Teams, or webhook channels to receive alert notifications.
-            Channels configured here can be reused across multiple alert rules.
+            {t("noChannelsDescription")}
           </p>
           <Button variant="outline" size="sm" className="mt-4" onClick={() => setShowDialog(true)}>
             <Plus className="h-3.5 w-3.5 mr-1.5" />
-            Add First Channel
+            {t("addFirstChannel")}
           </Button>
         </div>
       ) : (
         <div className="rounded-lg border bg-card p-6">
           <div className="mb-5">
-            <h4 className="text-sm font-semibold">Channels</h4>
-            <p className="text-xs text-muted-foreground mt-0.5">{contacts.length} channel{contacts.length !== 1 ? "s" : ""} configured</p>
+            <h4 className="text-sm font-semibold">{t("channels")}</h4>
+            <p className="text-xs text-muted-foreground mt-0.5">{t("channelsCount", { count: contacts.length })}</p>
           </div>
           <div className="rounded-lg border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Endpoint</TableHead>
-                  <TableHead>Enabled</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{tc("name")}</TableHead>
+                  <TableHead>{tc("type")}</TableHead>
+                  <TableHead>{t("endpoint")}</TableHead>
+                  <TableHead>{tc("enabled")}</TableHead>
+                  <TableHead className="text-right">{tc("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -233,7 +235,7 @@ export default function NotificationsContent() {
                           ) : (
                             <Send className="h-3 w-3 mr-1" />
                           )}
-                          Test
+                          {tc("test")}
                         </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(contact)}>
                           <Pencil className="h-3.5 w-3.5" />
@@ -272,6 +274,8 @@ function ContactDialog({
   onSaved: () => void
   editingContact: NotificationContact | null
 }) {
+  const t = useTranslations("settings.notifications")
+  const tc = useTranslations("common")
   const [name, setName] = useState("")
   const [type, setType] = useState<NotificationContact["type"]>("slack")
   const [url, setUrl] = useState("")
@@ -317,11 +321,11 @@ function ContactDialog({
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      toast.error("Name is required")
+      toast.error(t("nameRequired"))
       return
     }
     if (!url.trim()) {
-      toast.error("URL is required")
+      toast.error(t("urlRequired"))
       return
     }
 
@@ -334,7 +338,7 @@ function ContactDialog({
           config: buildConfig(),
           enabled,
         })
-        toast.success("Channel updated")
+        toast.success(t("channelUpdated"))
       } else {
         const data: CreateNotificationContactRequest = {
           name: name.trim(),
@@ -343,11 +347,11 @@ function ContactDialog({
           enabled,
         }
         await api.createNotificationContact(data)
-        toast.success("Channel created")
+        toast.success(t("channelCreated"))
       }
       onSaved()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save")
+      toast.error(err instanceof Error ? err.message : t("failedToSave"))
     } finally {
       setSaving(false)
     }
@@ -369,16 +373,16 @@ function ContactDialog({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
-            {editingContact ? "Edit Channel" : "New Notification Channel"}
+            {editingContact ? t("editChannel") : t("newChannel")}
           </SheetTitle>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto space-y-4 px-4">
           <div className="space-y-2">
-            <Label>Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., #ops-alerts, DevOps Webhook" />
+            <Label>{tc("name")}</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("namePlaceholder")} />
           </div>
           <div className="space-y-2">
-            <Label>Type</Label>
+            <Label>{tc("type")}</Label>
             <Select value={type} onValueChange={(v) => setType(v as NotificationContact["type"])}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -400,19 +404,19 @@ function ContactDialog({
           </div>
           {type === "slack" && (
             <div className="space-y-2">
-              <Label>Channel Override (optional)</Label>
+              <Label>{t("channelOverride")}</Label>
               <Input value={slackChannel} onChange={(e) => setSlackChannel(e.target.value)} placeholder="#channel" />
             </div>
           )}
           <div className="flex items-center gap-2">
             <Switch checked={enabled} onCheckedChange={setEnabled} id="contact-enabled" />
-            <Label htmlFor="contact-enabled" className="text-sm cursor-pointer">Enabled</Label>
+            <Label htmlFor="contact-enabled" className="text-sm cursor-pointer">{tc("enabled")}</Label>
           </div>
         </div>
         <SheetFooter className="border-t pt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{tc("cancel")}</Button>
           <Button onClick={handleSubmit} disabled={saving}>
-            {saving ? "Saving..." : editingContact ? "Save Changes" : "Create Channel"}
+            {saving ? tc("saving") : editingContact ? tc("saveChanges") : t("createChannel")}
           </Button>
         </SheetFooter>
       </SheetContent>

@@ -1,6 +1,8 @@
 "use client"
 
 import React from "react"
+import { Info, Lightbulb, AlertTriangle, Hash } from "lucide-react"
+import { CodeHighlighter } from "@/components/docs/code-highlighter"
 
 interface DocRendererProps {
   content: string
@@ -26,6 +28,7 @@ type Block =
   | { type: "paragraph"; children: InlineNode[] }
   | { type: "list"; ordered: boolean; items: InlineNode[][] }
   | { type: "code"; lang: string; code: string }
+  | { type: "table"; headers: string[]; alignments: ("left" | "center" | "right")[]; rows: string[][] }
   | { type: "callout"; variant: "note" | "tip" | "warning"; children: InlineNode[] }
 
 type InlineNode =
@@ -86,11 +89,36 @@ function parseBlocks(md: string): Block[] {
       } else if (joined.startsWith("**Dica:**") || joined.startsWith("**Tip:**")) {
         variant = "tip"
         text = joined.replace(/^\*\*(Dica|Tip):\*\*\s*/, "")
-      } else if (joined.startsWith("**Atencao:**") || joined.startsWith("**Warning:**") || joined.startsWith("**Cuidado:**")) {
+      } else if (joined.startsWith("**Atenção:**") || joined.startsWith("**Atencao:**") || joined.startsWith("**Warning:**") || joined.startsWith("**Cuidado:**")) {
         variant = "warning"
-        text = joined.replace(/^\*\*(Atencao|Warning|Cuidado):\*\*\s*/, "")
+        text = joined.replace(/^\*\*(Atenção|Atencao|Warning|Cuidado):\*\*\s*/, "")
       }
       blocks.push({ type: "callout", variant, children: parseInline(text) })
+      continue
+    }
+
+    // Table (| col | col |)
+    if (line.trimStart().startsWith("|") && line.trimEnd().endsWith("|")) {
+      const tableLines: string[] = []
+      while (i < lines.length && lines[i].trimStart().startsWith("|") && lines[i].trimEnd().endsWith("|")) {
+        tableLines.push(lines[i])
+        i++
+      }
+      if (tableLines.length >= 2) {
+        const parseCells = (row: string) =>
+          row.split("|").slice(1, -1).map((c) => c.trim())
+        const headers = parseCells(tableLines[0])
+        // Parse alignment row (|---|:---:|---:|)
+        const alignRow = parseCells(tableLines[1])
+        const alignments = alignRow.map((cell): "left" | "center" | "right" => {
+          const trimmed = cell.replace(/\s/g, "")
+          if (trimmed.startsWith(":") && trimmed.endsWith(":")) return "center"
+          if (trimmed.endsWith(":")) return "right"
+          return "left"
+        })
+        const rows = tableLines.slice(2).map(parseCells)
+        blocks.push({ type: "table", headers, alignments, rows })
+      }
       continue
     }
 
@@ -109,7 +137,7 @@ function parseBlocks(md: string): Block[] {
 
     // Paragraph — collect consecutive non-special lines
     const paraLines: string[] = []
-    while (i < lines.length && lines[i].trim() && !lines[i].startsWith("#") && !lines[i].startsWith("```") && !lines[i].startsWith("> ") && !lines[i].match(/^[\s]*[-*]\s/) && !lines[i].match(/^[\s]*\d+\.\s/)) {
+    while (i < lines.length && lines[i].trim() && !lines[i].startsWith("#") && !lines[i].startsWith("```") && !lines[i].startsWith("> ") && !(lines[i].trimStart().startsWith("|") && lines[i].trimEnd().endsWith("|")) && !lines[i].match(/^[\s]*[-*]\s/) && !lines[i].match(/^[\s]*\d+\.\s/)) {
       paraLines.push(lines[i])
       i++
     }
@@ -157,21 +185,34 @@ function parseInline(text: string): InlineNode[] {
 
 function RenderBlock({ block }: { block: Block }) {
   switch (block.type) {
-    case "heading":
-      return React.createElement(
-        `h${block.level}` as keyof React.JSX.IntrinsicElements,
-        {
-          id: slugify(block.text),
-          className: block.level === 1
-            ? "text-2xl font-bold mt-8 mb-4 first:mt-0"
-            : block.level === 2
-            ? "text-xl font-semibold mt-6 mb-3"
-            : block.level === 3
-            ? "text-lg font-medium mt-4 mb-2"
-            : "text-base font-medium mt-3 mb-1",
-        },
-        block.text,
+    case "heading": {
+      const slug = slugify(block.text)
+      const Tag = `h${block.level}` as keyof React.JSX.IntrinsicElements
+      const baseClass = block.level === 1
+        ? "text-2xl font-bold mt-8 mb-4 first:mt-0"
+        : block.level === 2
+        ? "text-xl font-semibold mt-6 mb-3"
+        : block.level === 3
+        ? "text-lg font-medium mt-4 mb-2"
+        : "text-base font-medium mt-3 mb-1"
+
+      return (
+        <div className="group flex items-center gap-2">
+          {React.createElement(
+            Tag,
+            { id: slug, className: `${baseClass} scroll-mt-20` },
+            block.text,
+          )}
+          <a
+            href={`#${slug}`}
+            className="opacity-0 transition-opacity group-hover:opacity-100"
+            aria-label={`Link para ${block.text}`}
+          >
+            <Hash className="h-4 w-4 text-muted-foreground" />
+          </a>
+        </div>
       )
+    }
 
     case "paragraph":
       return (
@@ -180,10 +221,10 @@ function RenderBlock({ block }: { block: Block }) {
         </p>
       )
 
-    case "list":
+    case "list": {
       const Tag = block.ordered ? "ol" : "ul"
       return (
-        <Tag className={`mb-4 space-y-1 pl-6 ${block.ordered ? "list-decimal" : "list-disc"} text-muted-foreground`}>
+        <Tag className={`mb-4 space-y-1 pl-6 ${block.ordered ? "list-decimal" : "list-disc"} text-muted-foreground marker:text-primary`}>
           {block.items.map((item, i) => (
             <li key={i} className="leading-relaxed">
               <RenderInline nodes={item} />
@@ -191,25 +232,80 @@ function RenderBlock({ block }: { block: Block }) {
           ))}
         </Tag>
       )
+    }
 
     case "code":
+      return <CodeHighlighter code={block.code} lang={block.lang || "text"} />
+
+    case "table":
       return (
-        <pre className="mb-4 overflow-x-auto rounded-lg border bg-muted/50 p-4">
-          <code className="text-sm">{block.code}</code>
-        </pre>
+        <div className="mb-4 overflow-x-auto rounded-lg border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                {block.headers.map((h, j) => (
+                  <th
+                    key={j}
+                    className="px-4 py-2.5 text-left font-semibold text-foreground"
+                    style={{ textAlign: block.alignments[j] || "left" }}
+                  >
+                    <RenderInline nodes={parseInline(h)} />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {block.rows.map((row, ri) => (
+                <tr key={ri} className="border-b last:border-0 hover:bg-muted/30">
+                  {row.map((cell, ci) => (
+                    <td
+                      key={ci}
+                      className="px-4 py-2 text-muted-foreground"
+                      style={{ textAlign: block.alignments[ci] || "left" }}
+                    >
+                      <RenderInline nodes={parseInline(cell)} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )
 
     case "callout": {
-      const styles = {
-        note: "border-blue-500/30 bg-blue-500/5 text-blue-700 dark:text-blue-300",
-        tip: "border-green-500/30 bg-green-500/5 text-green-700 dark:text-green-300",
-        warning: "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-300",
+      const config = {
+        note: {
+          icon: Info,
+          border: "border-blue-500",
+          bg: "bg-blue-500/5",
+          iconColor: "text-blue-500",
+          label: "Nota",
+        },
+        tip: {
+          icon: Lightbulb,
+          border: "border-emerald-500",
+          bg: "bg-emerald-500/5",
+          iconColor: "text-emerald-500",
+          label: "Dica",
+        },
+        warning: {
+          icon: AlertTriangle,
+          border: "border-amber-500",
+          bg: "bg-amber-500/5",
+          iconColor: "text-amber-500",
+          label: "Atenção",
+        },
       }
-      const labels = { note: "Nota", tip: "Dica", warning: "Atencao" }
+      const c = config[block.variant]
+      const Icon = c.icon
       return (
-        <div className={`mb-4 rounded-lg border-l-4 p-4 ${styles[block.variant]}`}>
-          <span className="font-semibold">{labels[block.variant]}: </span>
-          <RenderInline nodes={block.children} />
+        <div className={`mb-4 flex gap-3 rounded-lg border-l-4 ${c.border} ${c.bg} p-4`}>
+          <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${c.iconColor}`} />
+          <div className="text-sm leading-relaxed">
+            <span className={`font-semibold ${c.iconColor}`}>{c.label}: </span>
+            <RenderInline nodes={block.children} />
+          </div>
         </div>
       )
     }
@@ -229,7 +325,7 @@ function RenderInline({ nodes }: { nodes: InlineNode[] }) {
             return <em key={i}>{node.text}</em>
           case "code":
             return (
-              <code key={i} className="rounded bg-muted px-1.5 py-0.5 text-sm font-mono">
+              <code key={i} className="rounded border border-border/50 bg-muted px-1.5 py-0.5 text-sm font-mono">
                 {node.text}
               </code>
             )

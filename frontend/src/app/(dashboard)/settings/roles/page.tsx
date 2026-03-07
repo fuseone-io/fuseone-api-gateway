@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import {
   Pencil,
   Plus,
@@ -43,6 +44,8 @@ import type { Role } from "@/types/auth"
 import { toast } from "sonner"
 
 export default function RolesContent() {
+  const t = useTranslations("settings.roles")
+  const tc = useTranslations("common")
   const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
   const [showDialog, setShowDialog] = useState(false)
@@ -55,7 +58,7 @@ export default function RolesContent() {
       const data = await api.listRoles()
       setRoles(data)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load roles")
+      toast.error(err instanceof Error ? err.message : t("failedToLoad"))
     } finally {
       setLoading(false)
     }
@@ -84,32 +87,32 @@ export default function RolesContent() {
     if (!deleteRoleId) return
     try {
       await api.deleteRole(deleteRoleId)
-      toast.success("Role deleted")
+      toast.success(t("roleDeleted"))
       setShowDeleteDialog(false)
       setDeleteRoleId(null)
       fetchData()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete role")
+      toast.error(err instanceof Error ? err.message : t("failedToDelete"))
     }
   }
 
   const formatPermissions = (perms: string[]) => {
-    if (perms.length === 1 && perms[0] === "*") return "Full Access"
-    return `${perms.length} permission${perms.length !== 1 ? "s" : ""}`
+    if (perms.length === 1 && perms[0] === "*") return t("fullAccess")
+    return t("permissionCount", { count: perms.length })
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Roles & Permissions</h3>
+          <h3 className="text-lg font-semibold">{t("title")}</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure roles and granular RBAC permissions
+            {t("subtitle")}
           </p>
         </div>
         <Button size="sm" onClick={() => setShowDialog(true)}>
           <Plus className="h-3.5 w-3.5 mr-1.5" />
-          Add Role
+          {t("addRole")}
         </Button>
       </div>
 
@@ -122,26 +125,26 @@ export default function RolesContent() {
       ) : roles.length === 0 ? (
         <div className="py-12 text-center rounded-lg border border-dashed bg-muted/30">
           <ShieldCheck className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm font-medium">No roles configured</p>
+          <p className="text-sm font-medium">{t("noRolesConfigured")}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Create custom roles to control access to API Gateway resources.
+            {t("noRolesDescription")}
           </p>
         </div>
       ) : (
         <div className="rounded-lg border bg-card p-6">
           <div className="mb-5">
-            <h4 className="text-sm font-semibold">Roles</h4>
-            <p className="text-xs text-muted-foreground mt-0.5">{roles.length} role{roles.length !== 1 ? "s" : ""} configured</p>
+            <h4 className="text-sm font-semibold">{t("rolesLabel")}</h4>
+            <p className="text-xs text-muted-foreground mt-0.5">{t("rolesCount", { count: roles.length })}</p>
           </div>
           <div className="rounded-lg border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Permissions</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{tc("name")}</TableHead>
+                  <TableHead>{tc("description")}</TableHead>
+                  <TableHead>{t("permissions")}</TableHead>
+                  <TableHead>{tc("type")}</TableHead>
+                  <TableHead className="text-right">{tc("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -164,11 +167,11 @@ export default function RolesContent() {
                     <TableCell>
                       {role.is_system ? (
                         <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 border-blue-200">
-                          System
+                          {t("system")}
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-xs">
-                          Custom
+                          {tc("custom")}
                         </Badge>
                       )}
                     </TableCell>
@@ -215,17 +218,17 @@ export default function RolesContent() {
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete Role</DialogTitle>
+            <DialogTitle>{t("deleteRole")}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this role? Users assigned to this role will need to be reassigned first.
+              {t("deleteConfirm")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-              Cancel
+              {tc("cancel")}
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
-              Delete
+              {tc("delete")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -245,6 +248,8 @@ function RoleDialog({
   onSaved: () => void
   editingRole: Role | null
 }) {
+  const t = useTranslations("settings.roles")
+  const tc = useTranslations("common")
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [permissions, setPermissions] = useState<string[]>([])
@@ -294,11 +299,11 @@ function RoleDialog({
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      toast.error("Role name is required")
+      toast.error(t("roleNameRequired"))
       return
     }
     if (permissions.length === 0) {
-      toast.error("Select at least one permission")
+      toast.error(t("selectAtLeastOnePermission"))
       return
     }
 
@@ -310,18 +315,18 @@ function RoleDialog({
           description: description.trim(),
           permissions,
         })
-        toast.success("Role updated")
+        toast.success(t("roleUpdated"))
       } else {
         await api.createRole({
           name: name.trim(),
           description: description.trim(),
           permissions,
         })
-        toast.success("Role created")
+        toast.success(t("roleCreated"))
       }
       onSaved()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save role")
+      toast.error(err instanceof Error ? err.message : t("failedToSave"))
     } finally {
       setSaving(false)
     }
@@ -333,12 +338,12 @@ function RoleDialog({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4" />
-            {editingRole ? "Edit Role" : "New Role"}
+            {editingRole ? t("editRole") : t("newRole")}
           </SheetTitle>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto space-y-4 px-4">
           <div className="space-y-2">
-            <Label>Name</Label>
+            <Label>{tc("name")}</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -346,7 +351,7 @@ function RoleDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label>Description</Label>
+            <Label>{tc("description")}</Label>
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -358,13 +363,13 @@ function RoleDialog({
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>Permissions</Label>
+              <Label>{t("permissions")}</Label>
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={selectAll}>
-                  Select All
+                  {t("selectAll")}
                 </Button>
                 <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={clearAll}>
-                  Clear
+                  {t("clear")}
                 </Button>
               </div>
             </div>
@@ -409,16 +414,16 @@ function RoleDialog({
               })}
             </div>
             <p className="text-xs text-muted-foreground">
-              {permissions.length} permission{permissions.length !== 1 ? "s" : ""} selected
+              {t("permissionsSelected", { count: permissions.length })}
             </p>
           </div>
         </div>
         <SheetFooter className="border-t pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {tc("cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={saving}>
-            {saving ? "Saving..." : editingRole ? "Save Changes" : "Create Role"}
+            {saving ? tc("saving") : editingRole ? tc("saveChanges") : t("createRole")}
           </Button>
         </SheetFooter>
       </SheetContent>

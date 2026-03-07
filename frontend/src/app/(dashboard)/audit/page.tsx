@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import { ScrollText, Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -26,26 +27,26 @@ import { PageHeader } from "@/components/page-header"
 import type { AuditLog } from "@/types/auth"
 
 const ACTION_OPTIONS = [
-  { value: "all", label: "All Actions" },
-  { value: "create", label: "Create" },
-  { value: "update", label: "Update" },
-  { value: "delete", label: "Delete" },
-  { value: "login", label: "Login" },
-  { value: "logout", label: "Logout" },
+  { value: "all", labelKey: "allActions" },
+  { value: "create", labelKey: "actionCreate" },
+  { value: "update", labelKey: "actionUpdate" },
+  { value: "delete", labelKey: "actionDelete" },
+  { value: "login", labelKey: "actionLogin" },
+  { value: "logout", labelKey: "actionLogout" },
 ]
 
 const RESOURCE_TYPE_OPTIONS = [
-  { value: "all", label: "All Resources" },
-  { value: "route", label: "Route" },
-  { value: "service", label: "Service" },
-  { value: "upstream", label: "Upstream" },
-  { value: "consumer", label: "Consumer" },
-  { value: "ssl", label: "SSL" },
-  { value: "global_rule", label: "Global Rule" },
-  { value: "plugin_config", label: "Plugin Config" },
-  { value: "stream_route", label: "Stream Route" },
-  { value: "user", label: "User" },
-  { value: "role", label: "Role" },
+  { value: "all", labelKey: "allResources" },
+  { value: "route", labelKey: "resourceRoute" },
+  { value: "service", labelKey: "resourceService" },
+  { value: "upstream", labelKey: "resourceUpstream" },
+  { value: "consumer", labelKey: "resourceConsumer" },
+  { value: "ssl", labelKey: "resourceSsl" },
+  { value: "global_rule", labelKey: "resourceGlobalRule" },
+  { value: "plugin_config", labelKey: "resourcePluginConfig" },
+  { value: "stream_route", labelKey: "resourceStreamRoute" },
+  { value: "user", labelKey: "resourceUser" },
+  { value: "role", labelKey: "resourceRole" },
 ]
 
 function formatTimestamp(iso: string): string {
@@ -69,6 +70,8 @@ function getStatusVariant(status: string): "default" | "secondary" | "destructiv
 }
 
 export default function AuditPage() {
+  const t = useTranslations("audit")
+  const tc = useTranslations("common")
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
   const [actionFilter, setActionFilter] = useState("all")
@@ -96,19 +99,20 @@ export default function AuditPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Audit Log"
-        description="Track all changes and actions performed in the API Gateway"
+        title={t("title")}
+        description={t("description")}
+        icon={<ScrollText className="h-6 w-6" />}
       />
 
       <div className="flex flex-wrap gap-3">
         <Select value={actionFilter} onValueChange={setActionFilter}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by action" />
+            <SelectValue placeholder={t("filterByAction")} />
           </SelectTrigger>
           <SelectContent>
             {ACTION_OPTIONS.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
+                {t(opt.labelKey)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -116,12 +120,12 @@ export default function AuditPage() {
 
         <Select value={resourceTypeFilter} onValueChange={setResourceTypeFilter}>
           <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Filter by resource" />
+            <SelectValue placeholder={t("filterByResource")} />
           </SelectTrigger>
           <SelectContent>
             {RESOURCE_TYPE_OPTIONS.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
+                {t(opt.labelKey)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -132,12 +136,12 @@ export default function AuditPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead>Time</TableHead>
-              <TableHead>User</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Resource Type</TableHead>
-              <TableHead>Resource ID</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>{t("time")}</TableHead>
+              <TableHead>{t("user")}</TableHead>
+              <TableHead>{t("action")}</TableHead>
+              <TableHead>{t("resourceType")}</TableHead>
+              <TableHead>{t("resourceId")}</TableHead>
+              <TableHead>{tc("status")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -156,10 +160,10 @@ export default function AuditPage() {
                 <TableCell colSpan={6} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2">
                     <ScrollText className="h-8 w-8 text-muted-foreground" />
-                    <p className="text-muted-foreground">No audit logs found</p>
+                    <p className="text-muted-foreground">{t("noLogsFound")}</p>
                     {(actionFilter !== "all" || resourceTypeFilter !== "all") && (
                       <p className="text-sm text-muted-foreground">
-                        Try adjusting your filters
+                        {t("tryAdjustingFilters")}
                       </p>
                     )}
                   </div>

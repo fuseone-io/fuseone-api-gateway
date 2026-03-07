@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react"
@@ -36,6 +37,8 @@ import { PolicyGallery } from "@/components/flow/policy-gallery"
 import { api } from "@/lib/api-client"
 
 export default function NewPlanPage() {
+  const t = useTranslations("plans")
+  const tc = useTranslations("common")
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState("")
@@ -48,11 +51,11 @@ export default function NewPlanPage() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error("Plan name is required")
+      toast.error(t("validation.nameRequired"))
       return
     }
     if (!/^[a-zA-Z0-9_-]+$/.test(name.trim())) {
-      toast.error("Plan name must contain only letters, numbers, hyphens and underscores")
+      toast.error(t("validation.nameFormat"))
       return
     }
     setSaving(true)
@@ -62,10 +65,10 @@ export default function NewPlanPage() {
         desc: description,
         plugins: Object.keys(plugins).length > 0 ? plugins : undefined,
       })
-      toast.success("Plan created")
+      toast.success(t("toasts.created"))
       router.push(`/plans/${name.trim()}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create plan")
+      toast.error(err instanceof Error ? err.message : t("toasts.failedCreate"))
     } finally {
       setSaving(false)
     }
@@ -107,17 +110,17 @@ export default function NewPlanPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Create Plan"
-        description="Define shared policies and rate limits"
+        title={t("createTitle")}
+        description={t("createDescription")}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => router.push("/plans")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+              {tc("back")}
             </Button>
             <Button onClick={handleSave} disabled={saving || !name.trim()}>
               <Save className="mr-2 h-4 w-4" />
-              {saving ? "Creating..." : "Create Plan"}
+              {saving ? t("creating") : t("createButton")}
             </Button>
           </div>
         }
@@ -127,12 +130,12 @@ export default function NewPlanPage() {
         {/* Identity */}
         <Card>
           <CardHeader>
-            <CardTitle>Identity</CardTitle>
-            <CardDescription>Basic plan information</CardDescription>
+            <CardTitle>{t("identity")}</CardTitle>
+            <CardDescription>{t("identityDescription")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label>{tc("name")}</Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -140,11 +143,11 @@ export default function NewPlanPage() {
                 className="font-mono"
               />
               <p className="text-xs text-muted-foreground">
-                Unique identifier. Use lowercase with hyphens (e.g., free-tier, pro-plan).
+                {t("nameHint")}
               </p>
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{tc("description")}</Label>
               <Input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -157,15 +160,15 @@ export default function NewPlanPage() {
         {/* Policies */}
         <Card>
           <CardHeader>
-            <CardTitle>Policies</CardTitle>
+            <CardTitle>{t("policies")}</CardTitle>
             <CardDescription>
-              Plugins applied to all applications in this plan
+              {t("policiesDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {Object.keys(plugins).length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
-                No policies configured. Add rate limits, IP restrictions, or other plugins.
+                {t("noPoliciesConfigured")}
               </p>
             ) : (
               Object.entries(plugins).map(([pluginName, config]) => {
@@ -198,7 +201,7 @@ export default function NewPlanPage() {
                           }
                         }}
                       >
-                        Edit
+                        {tc("edit")}
                       </Button>
                       <Button
                         variant="ghost"
@@ -219,7 +222,7 @@ export default function NewPlanPage() {
               onClick={() => setShowPicker(true)}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Add Policy
+              {t("addPolicy")}
             </Button>
           </CardContent>
         </Card>
@@ -228,7 +231,7 @@ export default function NewPlanPage() {
       {/* Policy Picker Sheet */}
       <Sheet open={showPicker} onOpenChange={setShowPicker}>
         <SheetContent side="right" className="p-0 sm:max-w-sm">
-          <SheetTitle className="sr-only">Add Policy</SheetTitle>
+          <SheetTitle className="sr-only">{t("addPolicy")}</SheetTitle>
           <PolicyGallery
             onAddPolicy={handleAddPolicy}
             existingPolicies={Object.keys(plugins)}
@@ -254,7 +257,7 @@ export default function NewPlanPage() {
               />
             ) : (
               <div className="space-y-2">
-                <Label>Configuration (JSON)</Label>
+                <Label>{t("configurationJson")}</Label>
                 <Textarea
                   value={jsonFallback}
                   onChange={(e) => setJsonFallback(e.target.value)}
@@ -266,9 +269,9 @@ export default function NewPlanPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingPlugin(null)}>
-              Cancel
+              {tc("cancel")}
             </Button>
-            <Button onClick={handleSavePlugin}>Apply</Button>
+            <Button onClick={handleSavePlugin}>{t("apply")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

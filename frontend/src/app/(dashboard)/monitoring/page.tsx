@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useTranslations } from "next-intl"
 import {
   Activity,
   AlertTriangle,
@@ -44,6 +45,7 @@ import { AnalyticsTab } from "./analytics-tab"
 import { TroubleshootingTab } from "./troubleshooting-tab"
 import { AlertsTab } from "./alerts-tab"
 import { TracesTab } from "./traces-tab"
+import { GatewayTab } from "./gateway-tab"
 
 const AUTO_REFRESH_INTERVAL = 10_000
 
@@ -79,23 +81,28 @@ function countNodes(checkers: UpstreamHealthChecker[]) {
 }
 
 function StatusBadge({ status }: { status: UpstreamHealthNode["status"] }) {
+  const t = useTranslations("monitoring")
+
   if (status === "healthy") {
     return (
       <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-700 gap-1">
         <CheckCircle2 className="h-3 w-3" />
-        Healthy
+        {t("upstreamHealth.statusHealthy")}
       </Badge>
     )
   }
   return (
     <Badge variant="destructive" className="gap-1">
       <XCircle className="h-3 w-3" />
-      Unhealthy
+      {t("upstreamHealth.statusUnhealthy")}
     </Badge>
   )
 }
 
 function UpstreamHealthTab() {
+  const t = useTranslations("monitoring")
+  const tc = useTranslations("common")
+
   const [checkers, setCheckers] = useState<UpstreamHealthChecker[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -153,7 +160,7 @@ function UpstreamHealthTab() {
 
   const handleManualRefresh = () => {
     setLoading(true)
-    fetchHealth().then(() => toast.success("Health data refreshed"))
+    fetchHealth().then(() => toast.success(t("upstreamHealth.refreshed")))
   }
 
   const { total, healthy, unhealthy } = countNodes(checkers)
@@ -185,11 +192,11 @@ function UpstreamHealthTab() {
       <Card>
         <CardContent className="p-8 text-center">
           <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-          <p className="text-lg font-medium">Unable to fetch health data</p>
+          <p className="text-lg font-medium">{t("upstreamHealth.unableToFetch")}</p>
           <p className="text-sm text-muted-foreground mt-1">{error}</p>
           <Button variant="outline" className="mt-4" onClick={handleManualRefresh}>
             <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
+            {tc("retry")}
           </Button>
         </CardContent>
       </Card>
@@ -204,7 +211,7 @@ function UpstreamHealthTab() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Total Nodes</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("upstreamHealth.totalNodes")}</p>
                 <p className="text-2xl font-bold mt-1">{total}</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/50">
@@ -217,7 +224,7 @@ function UpstreamHealthTab() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Healthy</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("upstreamHealth.healthy")}</p>
                 <p className="text-2xl font-bold text-emerald-600 mt-1">{healthy}</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
@@ -230,7 +237,7 @@ function UpstreamHealthTab() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Unhealthy</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("upstreamHealth.unhealthy")}</p>
                 <p className="text-2xl font-bold text-red-600 mt-1">{unhealthy}</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10">
@@ -247,19 +254,19 @@ function UpstreamHealthTab() {
           <div className="flex items-center gap-2">
             <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} id="auto-refresh" />
             <label htmlFor="auto-refresh" className="text-sm text-muted-foreground cursor-pointer">
-              Auto-refresh (10s)
+              {t("upstreamHealth.autoRefresh")}
             </label>
           </div>
           {lastRefresh && (
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              Last updated: {lastRefresh.toLocaleTimeString()}
+              {t("upstreamHealth.lastUpdated", { time: lastRefresh.toLocaleTimeString() })}
             </span>
           )}
         </div>
         <Button variant="outline" size="sm" onClick={handleManualRefresh} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          Refresh
+          {tc("refresh")}
         </Button>
       </div>
 
@@ -268,10 +275,9 @@ function UpstreamHealthTab() {
         <Card>
           <CardContent className="p-12 text-center">
             <Heart className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-            <p className="text-lg font-medium">No health checks configured</p>
+            <p className="text-lg font-medium">{t("upstreamHealth.noHealthChecks")}</p>
             <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-              Health check data will appear here when upstreams have active or passive health checks enabled.
-              Configure health checks in your upstream settings.
+              {t("upstreamHealth.noHealthChecksDescription")}
             </p>
           </CardContent>
         </Card>
@@ -281,14 +287,14 @@ function UpstreamHealthTab() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Upstream</TableHead>
-                  <TableHead>Node</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Success</TableHead>
-                  <TableHead className="text-right">HTTP Failures</TableHead>
-                  <TableHead className="text-right">TCP Failures</TableHead>
-                  <TableHead className="text-right">Timeouts</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead>{t("upstreamHealth.tableHeaders.upstream")}</TableHead>
+                  <TableHead>{t("upstreamHealth.tableHeaders.node")}</TableHead>
+                  <TableHead>{t("upstreamHealth.tableHeaders.status")}</TableHead>
+                  <TableHead className="text-right">{t("upstreamHealth.tableHeaders.success")}</TableHead>
+                  <TableHead className="text-right">{t("upstreamHealth.tableHeaders.httpFailures")}</TableHead>
+                  <TableHead className="text-right">{t("upstreamHealth.tableHeaders.tcpFailures")}</TableHead>
+                  <TableHead className="text-right">{t("upstreamHealth.tableHeaders.timeouts")}</TableHead>
+                  <TableHead>{t("upstreamHealth.tableHeaders.type")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -344,6 +350,7 @@ function UpstreamHealthTab() {
 }
 
 export default function MonitoringPage() {
+  const t = useTranslations("monitoring")
   const monitoringTab = useUIStore((s) => s.monitoringTab)
   const setMonitoringTab = useUIStore((s) => s.setMonitoringTab)
   const firingCount = useAlertStore((s) => s.firingCount)
@@ -356,31 +363,36 @@ export default function MonitoringPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Monitoring"
-        description="Health status, troubleshooting, analytics, and alerts for your API Gateway"
+        title={t("title")}
+        description={t("description")}
+        icon={<Activity className="h-6 w-6" />}
       />
 
       <Tabs value={monitoringTab} onValueChange={setMonitoringTab}>
         <TabsList>
+          <TabsTrigger value="gateway" className="gap-1.5">
+            <Server className="h-4 w-4" />
+            {t("tabs.gateway")}
+          </TabsTrigger>
           <TabsTrigger value="upstream-health" className="gap-1.5">
             <Heart className="h-4 w-4" />
-            Upstream Health
+            {t("tabs.upstreamHealth")}
           </TabsTrigger>
           <TabsTrigger value="troubleshooting" className="gap-1.5">
             <Search className="h-4 w-4" />
-            Troubleshooting
+            {t("tabs.troubleshooting")}
           </TabsTrigger>
           <TabsTrigger value="traces" className="gap-1.5">
             <Activity className="h-4 w-4" />
-            Traces
+            {t("tabs.traces")}
           </TabsTrigger>
           <TabsTrigger value="analytics" className="gap-1.5">
             <BarChart3 className="h-4 w-4" />
-            Analytics
+            {t("tabs.analytics")}
           </TabsTrigger>
           <TabsTrigger value="alerts" className="gap-1.5">
             <Bell className="h-4 w-4" />
-            Alerts
+            {t("tabs.alerts")}
             {firingCount > 0 && (
               <Badge variant="destructive" className="ml-1 h-5 min-w-[20px] px-1.5 text-[10px]">
                 {firingCount}
@@ -388,6 +400,10 @@ export default function MonitoringPage() {
             )}
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="gateway" className="mt-4">
+          <GatewayTab />
+        </TabsContent>
 
         <TabsContent value="upstream-health" className="mt-4">
           <UpstreamHealthTab />

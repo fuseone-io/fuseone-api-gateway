@@ -1,20 +1,21 @@
 "use client"
 
+import { useTranslations } from "next-intl"
 import { BookOpen } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 import { DOC_CATEGORIES } from "@/lib/docs"
 import { DocCategoryCard } from "@/components/docs/doc-category-card"
 
 export default function DocsPage() {
+  const t = useTranslations("docs")
   return (
     <div className="max-w-5xl">
       <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <BookOpen className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold tracking-tight">Documentacao</h1>
-        </div>
-        <p className="text-lg text-muted-foreground">
-          Guias completos, referencias e boas praticas para a plataforma FuseOne API Gateway.
-        </p>
+        <PageHeader
+          title={t("title")}
+          description={t("fullDescription")}
+          icon={<BookOpen className="h-6 w-6" />}
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useTranslations } from "next-intl"
 import Link from "next/link"
 import {
   LineChart,
@@ -44,6 +45,7 @@ import {
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
+import { PageHeader } from "@/components/page-header"
 import { MetricsDateRange } from "@/components/metrics-date-range"
 import { api } from "@/lib/api-client"
 import {
@@ -70,6 +72,8 @@ function formatCost(value: number): string {
 }
 
 export default function AIGatewayPage() {
+  const t = useTranslations("ai")
+  const tc = useTranslations("common")
   const [dateRange, setDateRange] = useState<DateRangeValue>({ type: "preset", preset: "1h" })
   const [timeSeries, setTimeSeries] = useState<AITokenTimeSeries[]>([])
   const [summary, setSummary] = useState<AITokenSummary | null>(null)
@@ -120,7 +124,7 @@ export default function AIGatewayPage() {
 
   const handleManualRefresh = () => {
     setLoading(true)
-    fetchData().then(() => toast.success("AI metrics refreshed"))
+    fetchData().then(() => toast.success(t("metricsRefreshed")))
   }
 
   const spanHours = dateRangeSpanHours(dateRange)
@@ -175,21 +179,19 @@ export default function AIGatewayPage() {
   if (error && timeSeries.length === 0) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Bot className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">AI Gateway</h1>
-            <p className="text-sm text-muted-foreground">Monitor AI/LLM token usage, costs, and performance</p>
-          </div>
-        </div>
+        <PageHeader
+          title={t("title")}
+          description={t("description")}
+          icon={<Bot className="h-6 w-6" />}
+        />
         <Card>
           <CardContent className="p-8 text-center">
             <Bot className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-            <p className="text-lg font-medium">Unable to fetch AI metrics</p>
+            <p className="text-lg font-medium">{t("unableToFetch")}</p>
             <p className="text-sm text-muted-foreground mt-1">{error}</p>
             <Button variant="outline" className="mt-4" onClick={handleManualRefresh}>
               <RefreshCw className="h-4 w-4 mr-2" />
-              Retry
+              {tc("retry")}
             </Button>
           </CardContent>
         </Card>
@@ -202,21 +204,19 @@ export default function AIGatewayPage() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Bot className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">AI Gateway</h1>
-            <p className="text-sm text-muted-foreground">Monitor AI/LLM token usage, costs, and performance</p>
-          </div>
-        </div>
-        <Link href="/ai/settings">
-          <Button variant="outline" size="sm">
-            <Settings className="h-4 w-4 mr-2" />
-            AI Settings
-          </Button>
-        </Link>
-      </div>
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        icon={<Bot className="h-6 w-6" />}
+        actions={
+          <Link href="/ai/settings">
+            <Button variant="outline" size="sm">
+              <Settings className="h-4 w-4 mr-2" />
+              {t("aiSettings")}
+            </Button>
+          </Link>
+        }
+      />
 
       {/* Controls */}
       <div className="flex items-center justify-between">
@@ -225,7 +225,7 @@ export default function AIGatewayPage() {
           <div className="flex items-center gap-2">
             <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} id="ai-auto-refresh" />
             <label htmlFor="ai-auto-refresh" className="text-sm text-muted-foreground cursor-pointer">
-              Auto-refresh (30s)
+              {t("autoRefresh")}
             </label>
           </div>
           {lastRefresh && (
@@ -238,7 +238,7 @@ export default function AIGatewayPage() {
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleManualRefresh} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+            {tc("refresh")}
           </Button>
         </div>
       </div>
@@ -250,7 +250,7 @@ export default function AIGatewayPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Total Tokens</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("totalTokens")}</p>
                   <p className="text-2xl font-bold mt-1">{formatNumber(summary.total_tokens)}</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
@@ -263,7 +263,7 @@ export default function AIGatewayPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Total Cost USD</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("totalCostUsd")}</p>
                   <p className="text-2xl font-bold mt-1">{formatCost(summary.total_cost_usd)}</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
@@ -276,7 +276,7 @@ export default function AIGatewayPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Avg Tokens/Request</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("avgTokensPerRequest")}</p>
                   <p className="text-2xl font-bold mt-1">{formatNumber(Math.round(summary.avg_tokens_per_request))}</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
@@ -289,7 +289,7 @@ export default function AIGatewayPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Active Models</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("activeModels")}</p>
                   <p className="text-2xl font-bold mt-1">{summary.unique_models}</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/10">
@@ -305,10 +305,9 @@ export default function AIGatewayPage() {
         <Card>
           <CardContent className="p-12 text-center">
             <Bot className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-            <p className="text-lg font-medium">No AI traffic data yet</p>
+            <p className="text-lg font-medium">{t("noTrafficDataTitle")}</p>
             <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-              Metrics will appear here once AI/LLM requests flow through the gateway.
-              Configure your AI providers and routes to start collecting token usage data.
+              {t("noTrafficDataDescription")}
             </p>
           </CardContent>
         </Card>
@@ -317,8 +316,8 @@ export default function AIGatewayPage() {
           {/* Token Time Series Chart */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Token Usage Over Time</CardTitle>
-              <CardDescription>Prompt and completion tokens per interval</CardDescription>
+              <CardTitle className="text-base">{t("tokenUsageOverTime")}</CardTitle>
+              <CardDescription>{t("tokenUsageDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
@@ -329,13 +328,13 @@ export default function AIGatewayPage() {
                   <Tooltip
                     {...tooltipStyle}
                     formatter={(value, name) => {
-                      const label = name === "prompt_tokens" ? "Prompt Tokens" : "Completion Tokens"
+                      const label = name === "prompt_tokens" ? t("promptTokens") : t("completionTokens")
                       return [formatNumber(value as number), label]
                     }}
                   />
                   <Legend
                     formatter={(value: string) =>
-                      value === "prompt_tokens" ? "Prompt Tokens" : "Completion Tokens"
+                      value === "prompt_tokens" ? t("promptTokens") : t("completionTokens")
                     }
                   />
                   <Line
@@ -362,8 +361,8 @@ export default function AIGatewayPage() {
           {/* Cost Over Time Chart */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Cost Over Time</CardTitle>
-              <CardDescription>Estimated cost in USD per interval</CardDescription>
+              <CardTitle className="text-base">{t("costOverTime")}</CardTitle>
+              <CardDescription>{t("costOverTimeDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
@@ -373,13 +372,13 @@ export default function AIGatewayPage() {
                   <YAxis className="text-xs" tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
                   <Tooltip
                     {...tooltipStyle}
-                    formatter={(value) => [formatCost(value as number), "Estimated Cost"]}
+                    formatter={(value) => [formatCost(value as number), t("estimatedCost")]}
                   />
                   <Bar
                     dataKey="estimated_cost_usd"
                     fill="#10b981"
                     radius={[4, 4, 0, 0]}
-                    name="Estimated Cost"
+                    name={t("estimatedCost")}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -391,17 +390,17 @@ export default function AIGatewayPage() {
             <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Top Providers</CardTitle>
-                  <CardDescription>AI provider usage breakdown</CardDescription>
+                  <CardTitle className="text-base">{t("topProviders")}</CardTitle>
+                  <CardDescription>{t("topProvidersDescription")}</CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Provider</TableHead>
-                        <TableHead className="text-right">Requests</TableHead>
-                        <TableHead className="text-right">Total Tokens</TableHead>
-                        <TableHead className="text-right">Cost</TableHead>
+                        <TableHead>{t("provider")}</TableHead>
+                        <TableHead className="text-right">{t("requests")}</TableHead>
+                        <TableHead className="text-right">{t("totalTokens")}</TableHead>
+                        <TableHead className="text-right">{t("cost")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -428,8 +427,8 @@ export default function AIGatewayPage() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Token Distribution by Provider</CardTitle>
-                  <CardDescription>Share of total tokens per provider</CardDescription>
+                  <CardTitle className="text-base">{t("tokenDistribution")}</CardTitle>
+                  <CardDescription>{t("tokenDistributionDescription")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
@@ -458,7 +457,7 @@ export default function AIGatewayPage() {
                       </Pie>
                       <Tooltip
                         {...tooltipStyle}
-                        formatter={(value) => [formatNumber(value as number), "Tokens"]}
+                        formatter={(value) => [formatNumber(value as number), t("tokens")]}
                       />
                       <Legend />
                     </PieChart>
@@ -475,8 +474,8 @@ export default function AIGatewayPage() {
                 <div className="flex items-center gap-2">
                   <Bot className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <CardTitle className="text-base">Top Models</CardTitle>
-                    <CardDescription>Detailed model-level token usage and costs</CardDescription>
+                    <CardTitle className="text-base">{t("topModels")}</CardTitle>
+                    <CardDescription>{t("topModelsDescription")}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -484,13 +483,13 @@ export default function AIGatewayPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Provider</TableHead>
-                      <TableHead>Model</TableHead>
-                      <TableHead className="text-right">Requests</TableHead>
-                      <TableHead className="text-right">Prompt Tokens</TableHead>
-                      <TableHead className="text-right">Completion Tokens</TableHead>
-                      <TableHead className="text-right">Total Tokens</TableHead>
-                      <TableHead className="text-right">Cost</TableHead>
+                      <TableHead>{t("provider")}</TableHead>
+                      <TableHead>{t("model")}</TableHead>
+                      <TableHead className="text-right">{t("requests")}</TableHead>
+                      <TableHead className="text-right">{t("promptTokens")}</TableHead>
+                      <TableHead className="text-right">{t("completionTokens")}</TableHead>
+                      <TableHead className="text-right">{t("totalTokens")}</TableHead>
+                      <TableHead className="text-right">{t("cost")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

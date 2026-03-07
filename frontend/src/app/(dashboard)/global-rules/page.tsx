@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useTranslations } from "next-intl"
 import Link from "next/link"
 import { toast } from "sonner"
 import {
@@ -45,6 +46,8 @@ import { api } from "@/lib/api-client"
 import type { APISIXGlobalRule } from "@/types/apisix"
 
 export default function GlobalRulesPage() {
+  const t = useTranslations("globalRules")
+  const tc = useTranslations("common")
   const [rules, setRules] = useState<APISIXGlobalRule[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -70,10 +73,10 @@ export default function GlobalRulesPage() {
     if (!deleteId) return
     try {
       await api.deleteResource("global-rules", deleteId)
-      toast.success("Global policy deleted")
+      toast.success(t("policyDeleted"))
       fetchRules()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete failed")
+      toast.error(err instanceof Error ? err.message : t("deleteFailed"))
     } finally {
       setDeleteId(null)
     }
@@ -110,13 +113,14 @@ export default function GlobalRulesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Global Policies"
-        description="Manage plugins that apply to all API traffic"
+        title={t("title")}
+        description={t("description")}
+        icon={<ShieldCheck className="h-6 w-6" />}
         actions={
           <Button asChild>
             <Link href="/global-rules/new">
               <Plus className="mr-2 h-4 w-4" />
-              New Policy
+              {t("newPolicy")}
             </Link>
           </Button>
         }
@@ -125,7 +129,7 @@ export default function GlobalRulesPage() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search policies..."
+          placeholder={t("searchPlaceholder")}
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -158,11 +162,11 @@ export default function GlobalRulesPage() {
                   <div className="flex flex-col items-center gap-2">
                     <ShieldCheck className="h-8 w-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
-                      {search ? "No policies match your search" : "No global policies configured"}
+                      {search ? t("noSearchResults") : t("noPolicies")}
                     </p>
                     {!search && (
                       <Button asChild variant="outline" size="sm">
-                        <Link href="/global-rules/new">Create your first global policy</Link>
+                        <Link href="/global-rules/new">{t("createFirstPolicy")}</Link>
                       </Button>
                     )}
                   </div>
@@ -209,7 +213,7 @@ export default function GlobalRulesPage() {
                     </TableCell>
                     <TableCell>
                       {system ? (
-                        <span className="text-xs text-muted-foreground">Read-only</span>
+                        <span className="text-xs text-muted-foreground">{t("readOnly")}</span>
                       ) : (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -221,7 +225,7 @@ export default function GlobalRulesPage() {
                             <DropdownMenuItem asChild>
                               <Link href={`/global-rules/${rule.id}`}>
                                 <Pencil className="mr-2 h-4 w-4" />
-                                Edit
+                                {tc("edit")}
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem
@@ -229,7 +233,7 @@ export default function GlobalRulesPage() {
                               onClick={() => setDeleteId(rule.id!)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
+                              {tc("delete")}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -246,16 +250,14 @@ export default function GlobalRulesPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Global Policy</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this global policy? This action cannot be
-              undone. All API traffic will be affected as these plugins will no
-              longer be applied.
+              {t("deleteConfirm")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{tc("delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

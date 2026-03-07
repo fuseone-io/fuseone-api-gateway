@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import {
   Search,
@@ -191,6 +192,8 @@ const ITEMS_PER_PAGE = 20
 // --- Main Component ---
 
 export default function PluginsPage() {
+  const t = useTranslations("plugins")
+  const tc = useTranslations("common")
   const [plugins, setPlugins] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -263,15 +266,16 @@ export default function PluginsPage() {
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
-        title="Policy Catalog"
-        description="Discover available policies for your API Gateway."
+        title={t("title")}
+        description={t("description")}
+        icon={<Puzzle className="h-6 w-6" />}
       />
 
       {/* Search bar — full width */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by name, category, or description..."
+          placeholder={t("searchPlaceholder")}
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
           className="pl-9 h-10"
@@ -281,7 +285,7 @@ export default function PluginsPage() {
       {/* Category filter chips */}
       <div className="flex items-center gap-2 flex-wrap">
         <FilterChip
-          label="All Plugins"
+          label={t("allPlugins")}
           count={categoryCounts.all}
           active={activeCategory === "all"}
           onClick={() => handleCategoryChange("all")}
@@ -325,11 +329,11 @@ export default function PluginsPage() {
             <Puzzle className="h-7 w-7 text-muted-foreground" />
           </div>
           <div className="text-center">
-            <p className="text-sm font-medium">No plugins found</p>
+            <p className="text-sm font-medium">{t("noPluginsFound")}</p>
             <p className="text-sm text-muted-foreground mt-1">
               {search
-                ? "Try adjusting your search or clearing the filters."
-                : "No plugins are currently available."}
+                ? t("tryAdjustingSearch")
+                : t("noPluginsAvailable")}
             </p>
           </div>
         </div>
@@ -337,7 +341,7 @@ export default function PluginsPage() {
         <>
           {/* Results count */}
           <p className="text-sm text-muted-foreground">
-            Showing {visible.length} of {filtered.length} plugins
+            {t("showingCount", { visible: visible.length, total: filtered.length })}
           </p>
 
           {/* Cards grid */}
@@ -362,10 +366,10 @@ export default function PluginsPage() {
                 onClick={() => setVisibleCount((v) => v + ITEMS_PER_PAGE)}
               >
                 <Loader2 className="h-4 w-4 mr-2" />
-                Load more plugins
+                {t("loadMore")}
               </Button>
               <p className="text-xs text-muted-foreground">
-                {filtered.length - visibleCount} remaining
+                {t("remaining", { count: filtered.length - visibleCount })}
               </p>
             </div>
           )}
@@ -375,7 +379,7 @@ export default function PluginsPage() {
       {/* Detail Sheet */}
       <Sheet open={!!detailPlugin} onOpenChange={() => setDetailPlugin(null)}>
         <SheetContent side="right" className="overflow-y-auto" style={{ maxWidth: "36rem" }}>
-          <SheetTitle className="sr-only">Policy Details</SheetTitle>
+          <SheetTitle className="sr-only">{t("policyDetails")}</SheetTitle>
           {detailData && (
             <PluginDetailSheet
               plugin={detailData}
@@ -397,6 +401,7 @@ function PluginDetailSheet({
   plugin: EnrichedPlugin
   onNavigate: (name: string) => void
 }) {
+  const t = useTranslations("plugins")
   const IconComp = getIcon(plugin.icon ?? undefined)
   const catStyle = plugin.category ? CATEGORY_BADGE_STYLES[plugin.category] : null
   const phaseStyle = plugin.phase ? PHASE_BADGE_STYLES[plugin.phase] : null
@@ -437,7 +442,7 @@ function PluginDetailSheet({
             )}
             {plugin.isManaged && (
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                Managed
+                {t("managed")}
               </Badge>
             )}
           </div>
@@ -448,7 +453,7 @@ function PluginDetailSheet({
         <>
           {/* Overview */}
           <div className="space-y-2">
-            <h3 className="text-sm font-semibold">Overview</h3>
+            <h3 className="text-sm font-semibold">{t("overview")}</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
               {doc.overview}
             </p>
@@ -457,7 +462,7 @@ function PluginDetailSheet({
           {/* Use Cases */}
           {doc.useCases.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Common Use Cases</h3>
+              <h3 className="text-sm font-semibold">{t("commonUseCases")}</h3>
               <ul className="space-y-1.5">
                 {doc.useCases.map((uc, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -472,7 +477,7 @@ function PluginDetailSheet({
           {/* Configuration Examples */}
           {doc.examples.length > 0 && (
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold">Configuration Examples</h3>
+              <h3 className="text-sm font-semibold">{t("configExamples")}</h3>
               {doc.examples.map((ex, i) => (
                 <div key={i} className="space-y-1.5">
                   <p className="text-sm font-medium">{ex.title}</p>
@@ -488,7 +493,7 @@ function PluginDetailSheet({
           {/* Best Practices */}
           {doc.bestPractices.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Best Practices</h3>
+              <h3 className="text-sm font-semibold">{t("bestPractices")}</h3>
               <ul className="space-y-1.5">
                 {doc.bestPractices.map((bp, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -503,7 +508,7 @@ function PluginDetailSheet({
           {/* Cautions */}
           {doc.cautions.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Cautions</h3>
+              <h3 className="text-sm font-semibold">{t("cautions")}</h3>
               <ul className="space-y-1.5">
                 {doc.cautions.map((c, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -518,7 +523,7 @@ function PluginDetailSheet({
           {/* Related Plugins */}
           {doc.relatedPlugins && doc.relatedPlugins.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Related Policies</h3>
+              <h3 className="text-sm font-semibold">{t("relatedPolicies")}</h3>
               <div className="flex flex-wrap gap-1.5">
                 {doc.relatedPlugins.map((name) => {
                   const related = PLUGINS.find((p) => p.name === name)
@@ -539,12 +544,12 @@ function PluginDetailSheet({
         </>
       ) : (
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold">Overview</h3>
+          <h3 className="text-sm font-semibold">{t("overview")}</h3>
           <p className="text-sm text-muted-foreground">{plugin.description}</p>
           <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3 mt-4">
             <Info className="h-4 w-4 text-muted-foreground shrink-0" />
             <p className="text-xs text-muted-foreground">
-              Detailed documentation for this policy will be available in a future update.
+              {t("docsComingSoon")}
             </p>
           </div>
         </div>
@@ -602,6 +607,8 @@ function FilterChip({
 // --- Plugin Card ---
 
 function PluginCard({ plugin, onDetail }: { plugin: EnrichedPlugin; onDetail: () => void }) {
+  const t = useTranslations("plugins")
+  const tc = useTranslations("common")
   const IconComp = getIcon(plugin.icon ?? undefined)
   const catStyle = plugin.category ? CATEGORY_BADGE_STYLES[plugin.category] : null
   const phaseStyle = plugin.phase ? PHASE_BADGE_STYLES[plugin.phase] : null
@@ -661,7 +668,7 @@ function PluginCard({ plugin, onDetail }: { plugin: EnrichedPlugin; onDetail: ()
         <div className="flex items-center gap-1">
           {plugin.isManaged && (
             <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
-              Managed
+              {t("managed")}
             </Badge>
           )}
           <Button
@@ -670,7 +677,7 @@ function PluginCard({ plugin, onDetail }: { plugin: EnrichedPlugin; onDetail: ()
             className="h-6 px-2 text-xs"
             onClick={onDetail}
           >
-            Details
+            {tc("details")}
           </Button>
         </div>
       </div>

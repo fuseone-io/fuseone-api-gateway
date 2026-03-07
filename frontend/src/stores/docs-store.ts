@@ -5,7 +5,7 @@ interface DocsState {
   setSearchQuery: (q: string) => void
   expandedCategories: Record<string, boolean>
   toggleCategory: (slug: string) => void
-  setExpandedCategory: (slug: string, expanded: boolean) => void
+  expandOnly: (slug: string) => void
 }
 
 export const useDocsStore = create<DocsState>((set, get) => ({
@@ -14,10 +14,15 @@ export const useDocsStore = create<DocsState>((set, get) => ({
   expandedCategories: {},
   toggleCategory: (slug) => {
     const current = get().expandedCategories
-    set({ expandedCategories: { ...current, [slug]: !current[slug] } })
+    const isOpen = !!current[slug]
+    // Accordion: close all, then toggle target
+    const next: Record<string, boolean> = {}
+    if (!isOpen) {
+      next[slug] = true
+    }
+    set({ expandedCategories: next })
   },
-  setExpandedCategory: (slug, expanded) => {
-    const current = get().expandedCategories
-    set({ expandedCategories: { ...current, [slug]: expanded } })
+  expandOnly: (slug) => {
+    set({ expandedCategories: { [slug]: true } })
   },
 }))

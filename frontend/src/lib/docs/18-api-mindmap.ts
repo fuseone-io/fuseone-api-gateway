@@ -7,10 +7,10 @@ export const apiMindmapCategory: DocCategory = {
     "Crie APIs visualmente a partir de entidades e relacionamentos usando o canvas interativo do Design Studio.",
   icon: "Network",
   articles: [
-    // ── 1. Introducao ──────────────────────────────────────────────────
+    // ── 1. Introdução ──────────────────────────────────────────────────
     {
       slug: "introducao-mindmap",
-      title: "Introducao ao API Mindmap",
+      title: "Introdução ao API Mindmap",
       description:
         "Entenda como usar o canvas visual para modelar APIs a partir de entidades e relacionamentos.",
       icon: "Network",
@@ -18,32 +18,32 @@ export const apiMindmapCategory: DocCategory = {
       content: [
         {
           id: "o-que-e",
-          title: "O que e o API Mindmap?",
-          body: `O API Mindmap e uma ferramenta visual do Design Studio que permite modelar APIs a partir de **entidades e relacionamentos** antes de definir endpoints manualmente.
+          title: "O que é o API Mindmap?",
+          body: `O API Mindmap é uma ferramenta visual do Design Studio que permite modelar APIs a partir de **entidades e relacionamentos** antes de definir endpoints manualmente.
 
-Em vez de comecar pela lista de rotas, voce comeca pela **ideia**:
+Em vez de começar pela lista de rotas, você começa pela **ideia**:
 
 1. Crie entidades (User, Product, Order...)
 2. Defina campos e tipos para cada entidade
 3. Conecte entidades com relacionamentos (1:1, 1:N, N:N)
-4. Marque operacoes CRUD por entidade
+4. Marque operações CRUD por entidade
 5. Clique **"Generate API"** — o sistema cria tudo automaticamente
 
-O resultado e uma API completa com flows, contracts (schemas), exemplos e opcionalmente mocks.
+O resultado é uma API completa com flows, contracts (schemas), exemplos e opcionalmente mocks.
 
-> **Diferencial:** Nenhuma ferramenta de API management oferece mindmap → API. A maioria comeca pelo YAML/JSON — nos comecamos pela ideia.`,
+> **Diferencial:** Nenhuma ferramenta de API management oferece mindmap → API. A maioria começa pelo YAML/JSON — nós começamos pela ideia.`,
         },
         {
           id: "quando-usar",
           title: "Quando Usar",
-          body: `O API Mindmap e ideal para:
+          body: `O API Mindmap é ideal para:
 
-- **Greenfield APIs** — voce esta criando uma API do zero e quer modelar as entidades antes
-- **Prototipacao rapida** — precisa de uma API funcional (com mocks) em minutos
+- **Greenfield APIs** — você está criando uma API do zero e quer modelar as entidades antes
+- **Prototipação rápida** — precisa de uma API funcional (com mocks) em minutos
 - **Workshops de design** — alinhar equipe sobre a estrutura da API visualmente
-- **Migracoes** — modelar a API alvo antes de migrar de um sistema legado
+- **Migrações** — modelar a API-alvo antes de migrar de um sistema legado
 
-Para APIs que ja existem ou que voce ja tem uma spec OpenAPI, use o **Import OpenAPI** ou **Design First** (contracts manuais).`,
+Para APIs que já existem ou que você já tem uma spec OpenAPI, use o **Import OpenAPI** ou **Design First** (contracts manuais).`,
         },
       ],
     },
@@ -52,7 +52,7 @@ Para APIs que ja existem ou que voce ja tem uma spec OpenAPI, use o **Import Ope
       slug: "entidades-campos",
       title: "Entidades e Campos",
       description:
-        "Como criar entidades, definir campos com tipos, e configurar chaves primarias.",
+        "Como criar entidades, definir campos com tipos, e configurar chaves primárias.",
       icon: "Box",
       tags: ["entidade", "campos", "tipos", "pk", "schema"],
       content: [
@@ -61,33 +61,33 @@ Para APIs que ja existem ou que voce ja tem uma spec OpenAPI, use o **Import Ope
           title: "Criando Entidades",
           body: `Para adicionar uma entidade ao canvas:
 
-1. Clique no botao **"+ Entity"** na toolbar
-2. A entidade aparece no centro do canvas com um campo \`id\` (UUID) pre-configurado
-3. O editor lateral abre automaticamente para voce configurar
+1. Clique no botão **"+ Entity"** na toolbar
+2. A entidade aparece no centro do canvas com um campo \`id\` (UUID) pré-configurado
+3. O editor lateral abre automaticamente para você configurar
 
 Cada entidade tem:
 - **Nome** — ex: "User", "Product", "Order"
 - **Plural** — auto-derivado (users, products) ou customizado
-- **Cor** — para identificacao visual no canvas
+- **Cor** — para identificação visual no canvas
 - **Campos** — propriedades da entidade
-- **Operacoes** — CRUD e custom
+- **Operações** — CRUD e custom
 
-Voce pode arrastar entidades pelo canvas para organizar visualmente.`,
+Você pode arrastar entidades pelo canvas para organizá-las visualmente.`,
         },
         {
           id: "definindo-campos",
           title: "Definindo Campos",
           body: `Na aba **Fields** do editor lateral, adicione campos com:
 
-| Propriedade | Descricao |
+| Propriedade | Descrição |
 |-------------|-----------|
 | **Name** | Nome do campo (ex: \`email\`, \`price\`, \`created_at\`) |
 | **Type** | Tipo do valor (ver tabela abaixo) |
-| **Required** | Se o campo e obrigatorio |
-| **PK** | Marca como chave primaria (excluido do body de criacao) |
+| **Required** | Se o campo é obrigatório |
+| **PK** | Marca como chave primária (excluído do body de criação) |
 | **Array** | Transforma em array do tipo selecionado |
 
-**Tipos disponiveis:**
+**Tipos disponíveis:**
 
 | Tipo | Schema | Exemplo |
 |------|--------|---------|
@@ -102,7 +102,7 @@ Voce pode arrastar entidades pelo canvas para organizar visualmente.`,
 | Object | \`object\` | {} |
 | Array | \`array\` | [] |
 
-> **Dica:** Comece sempre com um campo \`id\` do tipo UUID marcado como PK. O sistema ja cria isso automaticamente.`,
+> **Dica:** Comece sempre com um campo \`id\` do tipo UUID marcado como PK. O sistema já cria isso automaticamente.`,
         },
       ],
     },
@@ -124,52 +124,52 @@ Voce pode arrastar entidades pelo canvas para organizar visualmente.`,
 2. O editor lateral abre para configurar o relacionamento
 3. Selecione a **cardinalidade**: 1:1, 1:N ou N:N
 
-Os handles estao nos 4 lados de cada entidade (topo, direita, baixo, esquerda).
+Os handles estão nos 4 lados de cada entidade (topo, direita, baixo, esquerda).
 
 **Regras:**
-- Nao e possivel criar relacionamento de uma entidade para ela mesma
-- Nao e possivel criar relacionamento duplicado entre o mesmo par`,
+- Não é possível criar relacionamento de uma entidade para ela mesma
+- Não é possível criar relacionamento duplicado entre o mesmo par`,
         },
         {
           id: "cardinalidades",
-          title: "Cardinalidades e Geracao",
+          title: "Cardinalidades e Geração",
           body: `Cada tipo de cardinalidade gera endpoints diferentes:
 
 **1:1 (One to One)**
-- Visual: linha solida azul
-- Geracao: nenhum endpoint adicional (apenas referencia)
+- Visual: linha sólida azul
+- Geração: nenhum endpoint adicional (apenas referência)
 
 **1:N (One to Many)**
-- Visual: linha solida com badge "1:N"
-- Geracao: endpoint nested \`GET /parents/:parentId/children\`
+- Visual: linha sólida com badge "1:N"
+- Geração: endpoint nested \`GET /parents/:parentId/children\`
 - Exemplo: User (1) → Order (N) gera \`GET /users/:userId/orders\`
 
 **N:N (Many to Many)**
 - Visual: linha tracejada roxa animada
-- Geracao: endpoints de associacao (futuro)
+- Geração: endpoints de associação (futuro)
 
 **Field Mapping:**
-Voce pode configurar qual campo da entidade source mapeia para qual campo da target:
+Você pode configurar qual campo da entidade source mapeia para qual campo da target:
 - Source field: geralmente \`id\` (PK da entidade pai)
 - Target field: geralmente \`{parent}Id\` (FK na entidade filha)`,
         },
       ],
     },
-    // ── 4. Operacoes CRUD ──────────────────────────────────────────────
+    // ── 4. Operações CRUD ──────────────────────────────────────────────
     {
       slug: "operacoes-crud",
-      title: "Operacoes CRUD e Custom",
+      title: "Operações CRUD e Custom",
       description:
-        "Configure quais operacoes cada entidade suporta e adicione operacoes customizadas.",
+        "Configure quais operações cada entidade suporta e adicione operações customizadas.",
       icon: "Settings",
-      tags: ["crud", "operacoes", "custom", "get", "post", "put", "delete"],
+      tags: ["crud", "operações", "custom", "get", "post", "put", "delete"],
       content: [
         {
           id: "crud-padrao",
-          title: "Operacoes CRUD Padrao",
-          body: `Na aba **Operations** do editor lateral, marque as operacoes CRUD:
+          title: "Operações CRUD Padrão",
+          body: `Na aba **Operations** do editor lateral, marque as operações CRUD:
 
-| Operacao | Metodo | Endpoint Gerado | Response |
+| Operação | Método | Endpoint Gerado | Response |
 |----------|--------|----------------|----------|
 | **List** | GET | \`/{plural}\` | Array/paginado |
 | **Get by ID** | GET | \`/{plural}/:id\` | Objeto + 404 |
@@ -179,52 +179,52 @@ Voce pode configurar qual campo da entidade source mapeia para qual campo da tar
 
 Use **"Select All"** para habilitar CRUD completo de uma vez.
 
-No canvas, cada entidade mostra 5 pontinhos coloridos no rodape:
-- **Verde** = operacao habilitada
-- **Cinza** = operacao desabilitada`,
+No canvas, cada entidade mostra 5 pontinhos coloridos no rodapé:
+- **Verde** = operação habilitada
+- **Cinza** = operação desabilitada`,
         },
         {
           id: "operacoes-custom",
-          title: "Operacoes Customizadas",
-          body: `Alem do CRUD padrao, voce pode adicionar operacoes customizadas:
+          title: "Operações Customizadas",
+          body: `Além do CRUD padrão, você pode adicionar operações customizadas:
 
-1. Na aba **Operations**, role ate "Custom Operations"
+1. Na aba **Operations**, role até "Custom Operations"
 2. Digite o nome (ex: "Activate")
-3. Selecione o metodo HTTP (POST, PATCH, etc.)
-4. O path suffix e gerado automaticamente (ex: \`/:id/activate\`)
+3. Selecione o método HTTP (POST, PATCH, etc.)
+4. O path suffix é gerado automaticamente (ex: \`/:id/activate\`)
 
 Exemplos comuns:
-- \`POST /users/:id/activate\` — Ativar usuario
+- \`POST /users/:id/activate\` — Ativar usuário
 - \`POST /orders/:id/cancel\` — Cancelar pedido
 - \`PATCH /products/:id/stock\` — Atualizar estoque`,
         },
       ],
     },
-    // ── 5. Geracao de API ──────────────────────────────────────────────
+    // ── 5. Geração de API ──────────────────────────────────────────────
     {
       slug: "geracao-api",
-      title: "Geracao de API a partir do Mindmap",
+      title: "Geração de API a partir do Mindmap",
       description:
         "Como o mindmap se transforma em uma API completa com flows, contracts e mocks.",
       icon: "Rocket",
-      tags: ["geracao", "generate", "api", "flows", "contracts", "mocks"],
+      tags: ["geração", "generate", "api", "flows", "contracts", "mocks"],
       content: [
         {
           id: "processo",
-          title: "Processo de Geracao",
+          title: "Processo de Geração",
           body: `Ao clicar **"Generate API"** na toolbar:
 
-1. Um dialog abre com opcoes de geracao
-2. Configure nome, context path e opcoes
+1. Um dialog abre com opções de geração
+2. Configure nome, context path e opções
 3. Clique **"Generate"**
 4. O sistema cria a \`ApiDefinition\` completa
-5. Voce e redirecionado para o editor de API com tudo pre-preenchido
+5. Você é redirecionado para o editor de API com tudo pré-preenchido
 
-**Opcoes de geracao:**
+**Opções de geração:**
 
-| Opcao | Descricao |
+| Opção | Descrição |
 |-------|-----------|
-| **API Name** | Nome da API (pre-preenchido com nome do mindmap) |
+| **API Name** | Nome da API (pré-preenchido com nome do mindmap) |
 | **Context Path** | Path base (ex: \`/api\`, auto-derivado do nome) |
 | **Generate contracts** | Cria schemas request/response para cada flow |
 | **Generate mocks** | Adiciona plugin mocking com responses de exemplo |
@@ -233,26 +233,26 @@ Exemplos comuns:
         },
         {
           id: "o-que-e-gerado",
-          title: "O que e Gerado",
-          body: `Para cada entidade com operacoes habilitadas, o sistema gera:
+          title: "O que é Gerado",
+          body: `Para cada entidade com operações habilitadas, o sistema gera:
 
 **Flows (rotas):**
-- Um flow por operacao CRUD habilitada
-- Um flow por operacao customizada
+- Um flow por operação CRUD habilitada
+- Um flow por operação customizada
 - Flows nested para relacionamentos 1:N (ex: \`GET /users/:userId/orders\`)
 
 **Contracts (schemas):**
 - Request schema baseado nos campos (excluindo PK para POST)
 - Response schemas por status code (200, 201, 204, 400, 404)
 - Exemplos gerados automaticamente a partir dos schemas
-- Parametros de path (ex: \`:id\`)
+- Parâmetros de path (ex: \`:id\`)
 
 **Mocks (opcional):**
 - Plugin \`mocking\` configurado com responses de exemplo
 - Frontend pode integrar imediatamente
 
 **Metadata:**
-- Referencia ao mindmap original salva nos labels da API
+- Referência ao mindmap original salva nos labels da API
 - Permite futuro "Edit Mindmap" para APIs geradas`,
         },
       ],
@@ -283,7 +283,7 @@ Exemplos comuns:
 
 **3. Refinar no Flow Editor**
 - Revise os flows gerados
-- Ajuste schemas no Contract Panel se necessario
+- Ajuste schemas no Contract Panel se necessário
 - Adicione plugins (auth, rate-limit, cors...)
 
 **4. Testar com Mocks**
@@ -297,8 +297,8 @@ Exemplos comuns:
 - Execute os testes de contrato
 
 **6. Deploy**
-- Faca deploy para o ambiente desejado
-- Monitore com alertas e metricas
+- Faça deploy para o ambiente desejado
+- Monitore com alertas e métricas
 
 > **Tempo total:** De uma ideia a uma API com mocks rodando em menos de 5 minutos.`,
         },

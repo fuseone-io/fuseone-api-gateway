@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import {
   Clock,
   FlaskConical,
@@ -51,20 +52,9 @@ import { PageHeader } from "@/components/page-header"
 import { useTestingStore } from "@/stores/testing-store"
 import type { TestSuite } from "@/types/testing"
 
-function formatRelativeTime(dateStr: string): string {
-  const now = new Date()
-  const date = new Date(dateStr)
-  const diffMs = now.getTime() - date.getTime()
-  const diffMin = Math.floor(diffMs / 60000)
-  if (diffMin < 1) return "agora"
-  if (diffMin < 60) return `${diffMin}min atras`
-  const diffHours = Math.floor(diffMin / 60)
-  if (diffHours < 24) return `${diffHours}h atras`
-  const diffDays = Math.floor(diffHours / 24)
-  return `${diffDays}d atras`
-}
-
 export default function TestSuitesPage() {
+  const t = useTranslations("testing")
+  const tc = useTranslations("common")
   const router = useRouter()
   const {
     suites,
@@ -89,6 +79,19 @@ export default function TestSuitesPage() {
   useEffect(() => {
     fetchSuites()
   }, [fetchSuites])
+
+  function formatRelativeTime(dateStr: string): string {
+    const now = new Date()
+    const date = new Date(dateStr)
+    const diffMs = now.getTime() - date.getTime()
+    const diffMin = Math.floor(diffMs / 60000)
+    if (diffMin < 1) return t("overview.timeAgo.now")
+    if (diffMin < 60) return t("overview.timeAgo.minutesAgo", { min: diffMin })
+    const diffHours = Math.floor(diffMin / 60)
+    if (diffHours < 24) return t("overview.timeAgo.hoursAgo", { hours: diffHours })
+    const diffDays = Math.floor(diffHours / 24)
+    return t("overview.timeAgo.daysAgo", { days: diffDays })
+  }
 
   const filtered = suites.filter((s) => {
     const matchesSearch =
@@ -116,14 +119,14 @@ export default function TestSuitesPage() {
           .map((t) => t.trim())
           .filter(Boolean),
       })
-      toast.success("Suite criada com sucesso")
+      toast.success(t("suitesPage.toasts.suiteCreated"))
       setCreateOpen(false)
       setNewName("")
       setNewDescription("")
       setNewTags("")
       router.push(`/testing/suites/${suite.id}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao criar suite")
+      toast.error(err instanceof Error ? err.message : t("suitesPage.toasts.failedToCreate"))
     } finally {
       setCreating(false)
     }
@@ -133,10 +136,10 @@ export default function TestSuitesPage() {
     if (!deleteTarget) return
     try {
       await deleteSuite(deleteTarget.id)
-      toast.success("Suite excluida")
+      toast.success(t("suitesPage.toasts.suiteDeleted"))
       setDeleteTarget(null)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao excluir suite")
+      toast.error(err instanceof Error ? err.message : t("suitesPage.toasts.failedToDelete"))
     }
   }
 
@@ -146,14 +149,14 @@ export default function TestSuitesPage() {
       const run = await runSuite(suiteId)
       toast.success(
         run.status === "passed"
-          ? "Teste aprovado!"
+          ? t("suitesPage.toasts.testPassed")
           : run.status === "failed"
-            ? "Teste falhou"
-            : "Teste executado"
+            ? t("suitesPage.toasts.testFailed")
+            : t("suitesPage.toasts.testExecuted")
       )
       router.push(`/testing/suites/${suiteId}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao executar suite")
+      toast.error(err instanceof Error ? err.message : t("suitesPage.toasts.failedToExecute"))
     } finally {
       setRunningId(null)
     }
@@ -179,44 +182,44 @@ export default function TestSuitesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Suites de Teste"
-        description="Gerencie suas suites de teste com steps e assertions"
+        title={t("suitesPage.title")}
+        description={t("suitesPage.description")}
         actions={
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
-                Nova Suite
+                {t("suitesPage.newSuite")}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Nova Suite de Teste</DialogTitle>
+                <DialogTitle>{t("suitesPage.newSuiteDialog.title")}</DialogTitle>
                 <DialogDescription>
-                  Crie uma nova suite. Voce podera adicionar steps e assertions depois.
+                  {t("suitesPage.newSuiteDialog.description")}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="space-y-2">
-                  <Label>Nome</Label>
+                  <Label>{tc("name")}</Label>
                   <Input
-                    placeholder="Ex: Testes da API de Usuarios"
+                    placeholder={t("suitesPage.newSuiteDialog.namePlaceholder")}
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Descricao</Label>
+                  <Label>{tc("description")}</Label>
                   <Textarea
-                    placeholder="Descricao da suite de teste..."
+                    placeholder={t("suitesPage.newSuiteDialog.descriptionPlaceholder")}
                     value={newDescription}
                     onChange={(e) => setNewDescription(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Tags (separadas por virgula)</Label>
+                  <Label>{t("suitesPage.newSuiteDialog.tagsLabel")}</Label>
                   <Input
-                    placeholder="api, usuarios, integracao"
+                    placeholder={t("suitesPage.newSuiteDialog.tagsPlaceholder")}
                     value={newTags}
                     onChange={(e) => setNewTags(e.target.value)}
                   />
@@ -224,10 +227,10 @@ export default function TestSuitesPage() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setCreateOpen(false)}>
-                  Cancelar
+                  {tc("cancel")}
                 </Button>
                 <Button onClick={handleCreate} disabled={creating || !newName.trim()}>
-                  {creating ? "Criando..." : "Criar Suite"}
+                  {creating ? t("suitesPage.newSuiteDialog.creating") : t("suitesPage.newSuiteDialog.createSuite")}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -240,7 +243,7 @@ export default function TestSuitesPage() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar suites..."
+            placeholder={t("suitesPage.searchPlaceholder")}
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -287,17 +290,17 @@ export default function TestSuitesPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FlaskConical className="h-12 w-12 text-muted-foreground/30 mb-4" />
             <p className="text-lg font-medium text-muted-foreground mb-2">
-              {search || tagFilter ? "Nenhuma suite encontrada" : "Nenhuma suite criada"}
+              {search || tagFilter ? t("suitesPage.noSuitesFound") : t("suitesPage.noSuitesCreated")}
             </p>
             <p className="text-sm text-muted-foreground mb-4">
               {search || tagFilter
-                ? "Tente ajustar os filtros de busca"
-                : "Crie sua primeira suite de teste para comecar"}
+                ? t("suitesPage.adjustFilters")
+                : t("suitesPage.createFirstSuite")}
             </p>
             {!search && !tagFilter && (
               <Button onClick={() => setCreateOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
-                Nova Suite
+                {t("suitesPage.newSuite")}
               </Button>
             )}
           </CardContent>
@@ -339,14 +342,14 @@ export default function TestSuitesPage() {
                       <DropdownMenuItem
                         onClick={() => router.push(`/testing/suites/${suite.id}`)}
                       >
-                        Ver Detalhes
+                        {t("suitesPage.viewDetails")}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleRun(suite.id)}
                         disabled={runningId === suite.id}
                       >
                         <Play className="mr-2 h-3.5 w-3.5" />
-                        {runningId === suite.id ? "Executando..." : "Executar"}
+                        {runningId === suite.id ? t("suitesPage.executing") : t("suitesPage.execute")}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
@@ -354,7 +357,7 @@ export default function TestSuitesPage() {
                         onClick={() => setDeleteTarget(suite)}
                       >
                         <Trash2 className="mr-2 h-3.5 w-3.5" />
-                        Excluir
+                        {tc("delete")}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -401,7 +404,7 @@ export default function TestSuitesPage() {
                     }}
                   >
                     <Play className="h-3 w-3 mr-1" />
-                    Executar
+                    {t("suitesPage.execute")}
                   </Button>
                 </div>
               </CardContent>
@@ -414,15 +417,14 @@ export default function TestSuitesPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Suite</AlertDialogTitle>
+            <AlertDialogTitle>{t("suitesPage.deleteSuiteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir a suite &ldquo;{deleteTarget?.name}&rdquo;?
-              Esta acao nao pode ser desfeita.
+              {t("suitesPage.deleteSuiteConfirm", { name: deleteTarget?.name || "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Excluir</AlertDialogAction>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{tc("delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

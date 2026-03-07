@@ -4,94 +4,94 @@ export const monitoramentoCategory: DocCategory = {
   slug: "monitoramento-alertas",
   title: "Monitoramento e Alertas",
   description:
-    "Acompanhe metricas em tempo real, configure debug logging e receba alertas sobre anomalias no seu API Gateway.",
+    "Acompanhe métricas em tempo real, configure debug logging e receba alertas sobre anomalias no seu API Gateway.",
   icon: "Activity",
   articles: [
-    // ── 1. Dashboard de Metricas ────────────────────────────────────────
+    // ── 1. Dashboard de Métricas ────────────────────────────────────────
     {
       slug: "dashboard-metricas",
-      title: "Dashboard de Metricas",
+      title: "Dashboard de Métricas",
       description:
-        "Visao geral do dashboard de monitoramento, metricas disponveis, filtros e detalhamento por rota e consumidor.",
+        "Visão geral do dashboard de monitoramento, métricas disponíveis, filtros e detalhamento por rota e consumidor.",
       icon: "BarChart3",
-      tags: ["metricas", "dashboard", "latencia"],
+      tags: ["métricas", "dashboard", "latência"],
       content: [
         {
           id: "visao-geral-dashboard",
-          title: "Visao Geral",
-          body: `O dashboard de monitoramento do FuseOne fornece visibilidade completa sobre o trafego que passa pelo API Gateway. Ele coleta metricas automaticamente de todas as rotas configuradas, sem necessidade de instrumentacao adicional.
+          title: "Visão Geral",
+          body: `O dashboard de monitoramento do FuseOne fornece visibilidade completa sobre o tráfego que passa pelo API Gateway. Ele coleta métricas automaticamente de todas as rotas configuradas, sem necessidade de instrumentação adicional.
 
-Acesse o dashboard pelo menu **Monitoramento** na barra lateral. A pagina principal exibe cards com as metricas mais importantes:
+Acesse o dashboard pelo menu **Monitoramento** na barra lateral. A página principal exibe cards com as métricas mais importantes:
 
-- **Requisicoes/s** — Taxa de requisicoes por segundo no periodo selecionado
-- **Latencia p50 / p99** — Percentis de latencia (metade das requisicoes e abaixo do p50; 99% abaixo do p99)
-- **Taxa de erro** — Percentual de respostas com codigo HTTP 4xx e 5xx
-- **Bandwidth** — Volume de dados trafegados (entrada + saida) em bytes
+- **Requisições/s** — Taxa de requisições por segundo no período selecionado
+- **Latência p50 / p99** — Percentis de latência (metade das requisições é abaixo do p50; 99% abaixo do p99)
+- **Taxa de erro** — Percentual de respostas com código HTTP 4xx e 5xx
+- **Bandwidth** — Volume de dados trafegados (entrada + saída) em bytes
 
-Abaixo dos cards, graficos de serie temporal mostram a evolucao dessas metricas ao longo do tempo, permitindo identificar tendencias e anomalias rapidamente.
+Abaixo dos cards, gráficos de série temporal mostram a evolução dessas métricas ao longo do tempo, permitindo identificar tendências e anomalias rapidamente.
 
-> **Nota:** As metricas sao coletadas a cada 15 segundos e ficam disponiveis com atraso maximo de 30 segundos. Dados historicos sao retidos por 90 dias por padrao.`,
+> **Nota:** As métricas são coletadas a cada 15 segundos e ficam disponíveis com atraso máximo de 30 segundos. Dados históricos são retidos por 90 dias por padrão.`,
         },
         {
           id: "filtros-periodo",
-          title: "Filtros e Periodo",
-          body: `O dashboard permite filtrar os dados em diversas dimensoes para focar na informacao relevante:
+          title: "Filtros e Período",
+          body: `O dashboard permite filtrar os dados em diversas dimensões para focar na informação relevante:
 
-### Filtros de Periodo
-Selecione o intervalo de tempo usando os botoes rapidos ou um intervalo customizado:
+### Filtros de Período
+Selecione o intervalo de tempo usando os botões rápidos ou um intervalo customizado:
 
-- **Ultima hora** — Resolucao de 15 segundos por ponto
-- **Ultimas 24h** — Resolucao de 5 minutos por ponto
-- **Ultimos 7 dias** — Resolucao de 1 hora por ponto
-- **Ultimos 30 dias** — Resolucao de 6 horas por ponto
-- **Customizado** — Selecione data/hora de inicio e fim
+- **Última hora** — Resolução de 15 segundos por ponto
+- **Últimas 24h** — Resolução de 5 minutos por ponto
+- **Últimos 7 dias** — Resolução de 1 hora por ponto
+- **Últimos 30 dias** — Resolução de 6 horas por ponto
+- **Customizado** — Selecione data/hora de início e fim
 
-### Filtros por Dimensao
-- **Rota** — Filtre por uma rota especifica (ou grupo de rotas)
-- **Consumidor** — Visualize metricas de um consumer autenticado
-- **Status code** — Isole requisicoes por faixa de status (2xx, 4xx, 5xx)
+### Filtros por Dimensão
+- **Rota** — Filtre por uma rota específica (ou grupo de rotas)
+- **Consumidor** — Visualize métricas de um consumer autenticado
+- **Status code** — Isole requisições por faixa de status (2xx, 4xx, 5xx)
 - **Upstream** — Filtre por servidor de destino
 
-> **Dica:** Voce pode combinar multiplos filtros simultaneamente. Por exemplo, visualize apenas requisicoes 5xx da rota \`/api/pagamentos\` nas ultimas 24 horas para investigar um problema especifico.`,
+> **Dica:** Você pode combinar múltiplos filtros simultaneamente. Por exemplo, visualize apenas requisições 5xx da rota \`/api/pagamentos\` nas últimas 24 horas para investigar um problema específico.`,
         },
         {
           id: "detalhamento-rota",
           title: "Detalhamento por Rota",
-          body: `Clicando em uma rota especifica no dashboard, voce acessa a pagina de detalhamento com metricas granulares daquela rota:
+          body: `Clicando em uma rota específica no dashboard, você acessa a página de detalhamento com métricas granulares daquela rota:
 
-- **Distribuicao de status codes** — Grafico de pizza mostrando a proporcao de 2xx, 3xx, 4xx e 5xx
-- **Histograma de latencia** — Distribuicao das latencias para identificar outliers
+- **Distribuição de status codes** — Gráfico de pizza mostrando a proporção de 2xx, 3xx, 4xx e 5xx
+- **Histograma de latência** — Distribuição das latências para identificar outliers
 - **Top consumers** — Ranking dos consumidores que mais utilizam esta rota
-- **Upstream response time** — Tempo de resposta do servidor de destino (separado da latencia do gateway)
-- **Bandwidth por direcao** — Bytes de entrada (request) e saida (response) separadamente
+- **Upstream response time** — Tempo de resposta do servidor de destino (separado da latência do gateway)
+- **Bandwidth por direção** — Bytes de entrada (request) e saída (response) separadamente
 
-A pagina de detalhamento tambem exibe o **log de requisicoes recentes** (ultimas 100) com informacoes resumidas: timestamp, consumer, status code, latencia e tamanho da resposta.
+A página de detalhamento também exibe o **log de requisições recentes** (últimas 100) com informações resumidas: timestamp, consumer, status code, latência e tamanho da resposta.
 
-> **Nota:** O log de requisicoes recentes nao inclui o corpo da requisicao/resposta por padrao. Para capturar corpos completos, utilize o recurso de Debug Logging descrito no proximo artigo.
+> **Nota:** O log de requisições recentes não inclui o corpo da requisição/resposta por padrão. Para capturar corpos completos, utilize o recurso de Debug Logging descrito no próximo artigo.
 
-Essas metricas granulares sao essenciais para diagnosticar problemas de performance, identificar rotas sobrecarregadas e planejar capacidade.`,
+Essas métricas granulares são essenciais para diagnosticar problemas de performance, identificar rotas sobrecarregadas e planejar capacidade.`,
         },
         {
           id: "detalhamento-consumer",
           title: "Detalhamento por Consumidor",
-          body: `O detalhamento por consumidor permite analisar o comportamento de uso de cada cliente ou aplicacao que se autentica no API Gateway.
+          body: `O detalhamento por consumidor permite analisar o comportamento de uso de cada cliente ou aplicação que se autentica no API Gateway.
 
-Na pagina do consumidor voce encontra:
+Na página do consumidor você encontra:
 
-- **Volume de requisicoes** — Total e taxa por segundo ao longo do tempo
+- **Volume de requisições** — Total e taxa por segundo ao longo do tempo
 - **Top rotas** — Quais rotas o consumidor mais utiliza
-- **Taxa de erro** — Se o consumidor esta gerando muitos erros (pode indicar integracao incorreta)
-- **Consumo de rate limit** — Quanto da cota alocada o consumidor esta utilizando
+- **Taxa de erro** — Se o consumidor está gerando muitos erros (pode indicar integração incorreta)
+- **Consumo de rate limit** — Quanto da cota alocada o consumidor está utilizando
 - **Tokens de IA** — Se o consumidor utiliza rotas de IA, exibe o consumo de tokens
 
-Essas informacoes sao valiosas para:
+Essas informações são valiosas para:
 
-- **Suporte tecnico** — Diagnosticar problemas reportados por um cliente especifico
+- **Suporte técnico** — Diagnosticar problemas reportados por um cliente específico
 - **Planejamento de capacidade** — Identificar clientes com crescimento acelerado de uso
-- **Billing** — Gerar relatorios de uso para cobranca por consumo
-- **Seguranca** — Detectar padroes de uso anomalos que podem indicar abuso
+- **Billing** — Gerar relatórios de uso para cobrança por consumo
+- **Segurança** — Detectar padrões de uso anômalos que podem indicar abuso
 
-> **Dica:** Configure alertas por consumidor para ser notificado quando um cliente ultrapassar thresholds de uso predefinidos, permitindo acao proativa antes que problemas ocorram.`,
+> **Dica:** Configure alertas por consumidor para ser notificado quando um cliente ultrapassar thresholds de uso predefinidos, permitindo ação proativa antes que problemas ocorram.`,
         },
       ],
     },
@@ -101,91 +101,91 @@ Essas informacoes sao valiosas para:
       slug: "debug-logging",
       title: "Debug Logging",
       description:
-        "Capture requisicoes e respostas completas para depuracao, com filtros por rota e codigo de status.",
+        "Capture requisições e respostas completas para depuração, com filtros por rota e código de status.",
       icon: "Bug",
       tags: ["debug", "logging", "troubleshooting"],
       content: [
         {
           id: "o-que-e-debug-log",
-          title: "O que e o Debug Logging",
-          body: `O Debug Logging e um recurso que permite capturar o conteudo completo de requisicoes e respostas que passam pelo API Gateway. Diferente do log padrao (que registra apenas metadados como status code e latencia), o debug log captura headers, query parameters e bodies completos.
+          title: "O que é o Debug Logging",
+          body: `O Debug Logging é um recurso que permite capturar o conteúdo completo de requisições e respostas que passam pelo API Gateway. Diferente do log padrão (que registra apenas metadados como status code e latência), o debug log captura headers, query parameters e bodies completos.
 
-Este recurso e projetado para uso temporario durante investigacao de problemas. Ele nao deve ficar habilitado permanentemente em producao, pois:
+Este recurso é projetado para uso temporário durante investigação de problemas. Ele não deve ficar habilitado permanentemente em produção, pois:
 
-- **Aumenta o uso de disco** — Corpos de requisicao e resposta podem ser grandes
-- **Impacta performance** — A captura adiciona latencia marginal ao processamento
-- **Riscos de privacidade** — Corpos podem conter dados sensiveis (tokens, senhas, PII)
+- **Aumenta o uso de disco** — Corpos de requisição e resposta podem ser grandes
+- **Impacta performance** — A captura adiciona latência marginal ao processamento
+- **Riscos de privacidade** — Corpos podem conter dados sensíveis (tokens, senhas, PII)
 
-> **Atencao:** Sempre defina um tempo limite ao habilitar debug logging. O FuseOne desabilita automaticamente a captura apos o periodo configurado para evitar que ela fique ativa inadvertidamente.`,
+> **Atenção:** Sempre defina um tempo limite ao habilitar debug logging. O FuseOne desabilita automaticamente a captura após o período configurado para evitar que ela fique ativa inadvertidamente.`,
         },
         {
           id: "habilitando-debug",
           title: "Habilitando o Debug Log",
-          body: `Para habilitar o debug logging em uma rota, acesse **APIs > [sua rota] > Debug** e clique em **Iniciar Captura**. Configure os seguintes parametros:
+          body: `Para habilitar o debug logging em uma rota, acesse **APIs > [sua rota] > Debug** e clique em **Iniciar Captura**. Configure os seguintes parâmetros:
 
-- **Duracao** — Tempo maximo de captura: 5 min, 15 min, 30 min, 1 hora ou customizado (maximo 4 horas)
-- **Limite de registros** — Numero maximo de requisicoes a capturar (padrao: 100)
-- **Filtro de status** — Capturar apenas requisicoes com determinados status codes (ex: somente 5xx)
-- **Capturar request body** — Habilita a captura do corpo da requisicao
+- **Duração** — Tempo máximo de captura: 5 min, 15 min, 30 min, 1 hora ou customizado (máximo 4 horas)
+- **Limite de registros** — Número máximo de requisições a capturar (padrão: 100)
+- **Filtro de status** — Capturar apenas requisições com determinados status codes (ex: somente 5xx)
+- **Capturar request body** — Habilita a captura do corpo da requisição
 - **Capturar response body** — Habilita a captura do corpo da resposta
-- **Tamanho maximo do body** — Limite em KB para truncar corpos grandes (padrao: 64 KB)
+- **Tamanho máximo do body** — Limite em KB para truncar corpos grandes (padrão: 64 KB)
 
-Apos configurar, clique em **Iniciar**. O botao mudara para um indicador pulsante indicando que a captura esta ativa.
+Após configurar, clique em **Iniciar**. O botão mudará para um indicador pulsante indicando que a captura está ativa.
 
 \`\`\`
 Status: Capturando (12/100 registros | 4:32 restantes)
 \`\`\`
 
-> **Dica:** Se voce sabe que o problema ocorre apenas em requisicoes com erro, use o filtro de status \`4xx,5xx\` para evitar capturar requisicoes bem-sucedidas e economizar espaco.`,
+> **Dica:** Se você sabe que o problema ocorre apenas em requisições com erro, use o filtro de status \`4xx,5xx\` para evitar capturar requisições bem-sucedidas e economizar espaço.`,
         },
         {
           id: "analisando-logs",
           title: "Analisando os Logs Capturados",
-          body: `Apos a captura, os registros ficam disponiveis na aba **Debug** da rota. Cada registro exibe:
+          body: `Após a captura, os registros ficam disponíveis na aba **Debug** da rota. Cada registro exibe:
 
-- **Timestamp** — Data e hora exata da requisicao
+- **Timestamp** — Data e hora exata da requisição
 - **Consumer** — Identidade do consumidor (se autenticado)
-- **Metodo e URI** — Ex: \`GET /api/v1/produtos?page=2\`
-- **Status code** — Codigo de resposta HTTP
-- **Latencia** — Tempo total de processamento
-- **Request headers** — Todos os headers da requisicao
+- **Método e URI** — Ex: \`GET /api/v1/produtos?page=2\`
+- **Status code** — Código de resposta HTTP
+- **Latência** — Tempo total de processamento
+- **Request headers** — Todos os headers da requisição
 - **Response headers** — Todos os headers da resposta
-- **Request body** — Corpo da requisicao (se capturado)
+- **Request body** — Corpo da requisição (se capturado)
 - **Response body** — Corpo da resposta (se capturado)
 
-Voce pode filtrar e buscar dentro dos registros capturados por qualquer campo. Clicando em um registro, ele expande mostrando os detalhes completos em um formato legivel com syntax highlighting para JSON e XML.
+Você pode filtrar e buscar dentro dos registros capturados por qualquer campo. Clicando em um registro, ele expande mostrando os detalhes completos em um formato legível com syntax highlighting para JSON e XML.
 
-> **Nota:** Os registros de debug sao armazenados temporariamente e removidos automaticamente apos 24 horas. Se precisar preserva-los, exporte para JSON antes que expirem.
+> **Nota:** Os registros de debug são armazenados temporariamente e removidos automaticamente após 24 horas. Se precisar preservá-los, exporte para JSON antes que expirem.
 
-A funcionalidade de debug logging e especialmente util para diagnosticar:
+A funcionalidade de debug logging é especialmente útil para diagnosticar:
 
-- Erros de transformacao de request/response
-- Problemas de autenticacao (headers incorretos)
-- Divergencias entre o que o cliente envia e o que o upstream recebe`,
+- Erros de transformação de request/response
+- Problemas de autenticação (headers incorretos)
+- Divergências entre o que o cliente envia e o que o upstream recebe`,
         },
         {
           id: "privacidade-seguranca",
-          title: "Privacidade e Seguranca",
-          body: `O debug logging captura dados potencialmente sensiveis. O FuseOne inclui mecanismos para minimizar riscos de exposicao:
+          title: "Privacidade e Segurança",
+          body: `O debug logging captura dados potencialmente sensíveis. O FuseOne inclui mecanismos para minimizar riscos de exposição:
 
-### Mascaramento Automatico
-Os seguintes campos sao automaticamente mascarados nos logs:
+### Mascaramento Automático
+Os seguintes campos são automaticamente mascarados nos logs:
 
-- **Authorization header** — Exibe apenas o tipo (Bearer, Basic) e os ultimos 4 caracteres
-- **API Keys** — Exibe apenas os ultimos 4 caracteres
-- **Cookies** — Nomes sao preservados, valores sao mascarados
+- **Authorization header** — Exibe apenas o tipo (Bearer, Basic) e os últimos 4 caracteres
+- **API Keys** — Exibe apenas os últimos 4 caracteres
+- **Cookies** — Nomes são preservados, valores são mascarados
 
 ### Mascaramento Customizado
-Voce pode configurar regras adicionais de mascaramento em **Configuracoes > Seguranca > Mascaramento de Logs**:
+Você pode configurar regras adicionais de mascaramento em **Configurações > Segurança > Mascaramento de Logs**:
 
-- Mascarar campos especificos no body (ex: \`password\`, \`cpf\`, \`credit_card\`)
+- Mascarar campos específicos no body (ex: \`password\`, \`cpf\`, \`credit_card\`)
 - Mascarar headers customizados
-- Aplicar regex para detectar e mascarar padroes (ex: numeros de cartao de credito)
+- Aplicar regex para detectar e mascarar padrões (ex: números de cartão de crédito)
 
 ### Controle de Acesso
-O acesso aos debug logs e restrito por permissao RBAC. Apenas usuarios com a permissao \`debug_logs:read\` podem visualizar os registros capturados. A acao de iniciar captura requer \`debug_logs:write\`.
+O acesso aos debug logs é restrito por permissão RBAC. Apenas usuários com a permissão \`debug_logs:read\` podem visualizar os registros capturados. A ação de iniciar captura requer \`debug_logs:write\`.
 
-> **Atencao:** Mesmo com mascaramento, evite capturar debug logs de rotas que processam dados altamente sensiveis (ex: endpoints de pagamento) em ambientes de producao, a menos que estritamente necessario.`,
+> **Atenção:** Mesmo com mascaramento, evite capturar debug logs de rotas que processam dados altamente sensíveis (ex: endpoints de pagamento) em ambientes de produção, a menos que estritamente necessário.`,
         },
       ],
     },
@@ -195,66 +195,66 @@ O acesso aos debug logs e restrito por permissao RBAC. Apenas usuarios com a per
       slug: "sistema-alertas",
       title: "Sistema de Alertas",
       description:
-        "Crie regras de alerta para taxa de erro, latencia, queda de trafego e orcamento de IA.",
+        "Crie regras de alerta para taxa de erro, latência, queda de tráfego e orçamento de IA.",
       icon: "Bell",
-      tags: ["alertas", "notificacoes", "monitoramento"],
+      tags: ["alertas", "notificações", "monitoramento"],
       content: [
         {
           id: "criando-alertas",
           title: "Criando Regras de Alerta",
-          body: `O sistema de alertas do FuseOne permite monitorar metricas continuamente e notificar sua equipe quando thresholds sao ultrapassados. Acesse **Monitoramento > Alertas** para gerenciar suas regras.
+          body: `O sistema de alertas do FuseOne permite monitorar métricas continuamente e notificar sua equipe quando thresholds são ultrapassados. Acesse **Monitoramento > Alertas** para gerenciar suas regras.
 
 Para criar uma nova regra de alerta, clique em **Novo Alerta** e configure:
 
 - **Nome** — Nome descritivo para o alerta (ex: "Taxa de erro alta - API Pagamentos")
-- **Metrica** — A metrica a ser monitorada:
-  - *Taxa de erro* — Percentual de requisicoes com erro (4xx/5xx)
-  - *Latencia p99* — Percentil 99 de latencia
-  - *Queda de trafego* — Reducao percentual no volume de requisicoes
-  - *Token budget* — Consumo de tokens de IA atingiu percentual do orcamento
-  - *Cost budget* — Custo de IA atingiu percentual do orcamento
-- **Operador e valor** — Condicao de disparo (ex: "maior que 5%", "acima de 500ms")
-- **Escopo** — Global, por rota especifica ou por consumidor
+- **Métrica** — A métrica a ser monitorada:
+  - *Taxa de erro* — Percentual de requisições com erro (4xx/5xx)
+  - *Latência p99* — Percentil 99 de latência
+  - *Queda de tráfego* — Redução percentual no volume de requisições
+  - *Token budget* — Consumo de tokens de IA atingiu percentual do orçamento
+  - *Cost budget* — Custo de IA atingiu percentual do orçamento
+- **Operador e valor** — Condição de disparo (ex: "maior que 5%", "acima de 500ms")
+- **Escopo** — Global, por rota específica ou por consumidor
 
-> **Nota:** Cada regra de alerta e avaliada independentemente. Voce pode ter multiplas regras para a mesma metrica com thresholds diferentes (ex: warning em 2% de erro, critical em 5%).`,
+> **Nota:** Cada regra de alerta é avaliada independentemente. Você pode ter múltiplas regras para a mesma métrica com thresholds diferentes (ex: warning em 2% de erro, critical em 5%).`,
         },
         {
           id: "janela-avaliacao",
-          title: "Janela de Avaliacao",
-          body: `A janela de avaliacao determina o periodo de tempo sobre o qual a metrica e calculada antes de decidir se o alerta deve disparar. Configurar corretamente a janela e essencial para evitar falsos positivos.
+          title: "Janela de Avaliação",
+          body: `A janela de avaliação determina o período de tempo sobre o qual a métrica é calculada antes de decidir se o alerta deve disparar. Configurar corretamente a janela é essencial para evitar falsos positivos.
 
-Opcoes de janela disponiveis:
+Opções de janela disponíveis:
 
-- **1 minuto** — Alta sensibilidade, pode gerar alertas por picos momentaneos
-- **5 minutos** — Bom equilibrio entre velocidade e estabilidade (recomendado para a maioria dos casos)
-- **15 minutos** — Menos sensivel, ideal para metricas com variacao natural alta
-- **1 hora** — Para tendencias de longo prazo (ex: queda gradual de trafego)
+- **1 minuto** — Alta sensibilidade, pode gerar alertas por picos momentâneos
+- **5 minutos** — Bom equilíbrio entre velocidade e estabilidade (recomendado para a maioria dos casos)
+- **15 minutos** — Menos sensível, ideal para métricas com variação natural alta
+- **1 hora** — Para tendências de longo prazo (ex: queda gradual de tráfego)
 
-Alem da janela, voce pode configurar a **contagem de violacoes** necessaria para disparar o alerta. Por exemplo: "disparar se a metrica violar o threshold em 3 de 5 janelas consecutivas".
+Além da janela, você pode configurar a **contagem de violações** necessária para disparar o alerta. Por exemplo: "disparar se a métrica violar o threshold em 3 de 5 janelas consecutivas".
 
 \`\`\`
 Janela: 5 minutos
 Threshold: Taxa de erro > 5%
-Violacoes: 3 de 5
+Violações: 3 de 5
 \`\`\`
 
-Neste exemplo, o alerta so dispara se a taxa de erro exceder 5% em pelo menos 3 das ultimas 5 janelas de 5 minutos. Isso reduz significativamente os falsos positivos causados por picos momentaneos.
+Neste exemplo, o alerta só dispara se a taxa de erro exceder 5% em pelo menos 3 das últimas 5 janelas de 5 minutos. Isso reduz significativamente os falsos positivos causados por picos momentâneos.
 
-> **Dica:** Comece com janelas de 5 minutos e violacoes de 2/3. Ajuste com base na experiencia — se receber muitos falsos positivos, aumente a janela ou as violacoes necessarias.`,
+> **Dica:** Comece com janelas de 5 minutos e violações de 2/3. Ajuste com base na experiência — se receber muitos falsos positivos, aumente a janela ou as violações necessárias.`,
         },
         {
           id: "canais-notificacao",
-          title: "Canais de Notificacao",
-          body: `Quando um alerta dispara, notificacoes sao enviadas pelos canais configurados. O FuseOne suporta os seguintes canais:
+          title: "Canais de Notificação",
+          body: `Quando um alerta dispara, notificações são enviadas pelos canais configurados. O FuseOne suporta os seguintes canais:
 
 ### Email
-Configure enderecos de email para receber notificacoes. Multiplos destinatarios podem ser adicionados separados por virgula.
+Configure endereços de email para receber notificações. Múltiplos destinatários podem ser adicionados separados por vírgula.
 
 ### Slack Webhook
-Integre com o Slack para receber notificacoes em um canal especifico. Configure a URL do webhook do Slack e opcionalmente customize o template da mensagem.
+Integre com o Slack para receber notificações em um canal específico. Configure a URL do webhook do Slack e opcionalmente customize o template da mensagem.
 
-### Webhook Generico
-Envie notificacoes para qualquer endpoint HTTP. O FuseOne envia um POST com payload JSON contendo detalhes do alerta:
+### Webhook Genérico
+Envie notificações para qualquer endpoint HTTP. O FuseOne envia um POST com payload JSON contendo detalhes do alerta:
 
 \`\`\`json
 {
@@ -268,126 +268,126 @@ Envie notificacoes para qualquer endpoint HTTP. O FuseOne envia um POST com payl
 }
 \`\`\`
 
-Gerencie canais de notificacao em **Configuracoes > Notificacoes**. Cada canal pode ser associado a um ou mais alertas, e cada alerta pode enviar para multiplos canais.
+Gerencie canais de notificação em **Configurações > Notificações**. Cada canal pode ser associado a um ou mais alertas, e cada alerta pode enviar para múltiplos canais.
 
-> **Dica:** Configure pelo menos dois canais para alertas criticos (ex: Slack para visibilidade imediata da equipe + email para registro formal). Isso garante que ninguem perca uma notificacao importante.`,
+> **Dica:** Configure pelo menos dois canais para alertas críticos (ex: Slack para visibilidade imediata da equipe + email para registro formal). Isso garante que ninguém perca uma notificação importante.`,
         },
         {
           id: "estados-historico",
-          title: "Estados e Historico",
-          body: `Cada alerta possui um estado que indica sua situacao atual:
+          title: "Estados e Histórico",
+          body: `Cada alerta possui um estado que indica sua situação atual:
 
-- **OK** — A metrica esta dentro dos limites configurados. Este e o estado normal.
-- **Firing** — O threshold foi violado e o alerta esta ativo. Notificacoes foram enviadas.
-- **Acknowledged** — Um membro da equipe reconheceu o alerta. Novas notificacoes nao sao enviadas ate que o estado mude.
-- **Silenced** — O alerta foi temporariamente silenciado (util durante manutencoes planejadas).
+- **OK** — A métrica está dentro dos limites configurados. Este é o estado normal.
+- **Firing** — O threshold foi violado e o alerta está ativo. Notificações foram enviadas.
+- **Acknowledged** — Um membro da equipe reconheceu o alerta. Novas notificações não são enviadas até que o estado mude.
+- **Silenced** — O alerta foi temporariamente silenciado (útil durante manutenções planejadas).
 
-O fluxo tipico de um alerta e:
+O fluxo típico de um alerta é:
 
-1. Alerta em **OK** — metricas normais
-2. Threshold violado — estado muda para **Firing**, notificacoes sao enviadas
-3. Equipe reconhece — estado muda para **Acknowledged** (via dashboard ou link na notificacao)
-4. Problema resolvido — metrica volta ao normal, estado retorna para **OK**
+1. Alerta em **OK** — métricas normais
+2. Threshold violado — estado muda para **Firing**, notificações são enviadas
+3. Equipe reconhece — estado muda para **Acknowledged** (via dashboard ou link na notificação)
+4. Problema resolvido — métrica volta ao normal, estado retorna para **OK**
 
-O historico completo de transicoes de estado e mantido para cada alerta, incluindo:
+O histórico completo de transições de estado é mantido para cada alerta, incluindo:
 
-- Data/hora de cada mudanca de estado
-- Valor da metrica no momento do disparo
-- Quem reconheceu o alerta (usuario)
-- Duracao de cada incidente (tempo entre firing e ok)
+- Data/hora de cada mudança de estado
+- Valor da métrica no momento do disparo
+- Quem reconheceu o alerta (usuário)
+- Duração de cada incidente (tempo entre firing e ok)
 
-> **Nota:** O historico de alertas e retido por 180 dias. Utilize os dados historicos para identificar padroes recorrentes e ajustar thresholds proativamente.`,
+> **Nota:** O histórico de alertas é retido por 180 dias. Utilize os dados históricos para identificar padrões recorrentes e ajustar thresholds proativamente.`,
         },
       ],
     },
 
-    // ── 4. Saude dos Upstreams ──────────────────────────────────────────
+    // ── 4. Saúde dos Upstreams ──────────────────────────────────────────
     {
       slug: "upstream-health",
-      title: "Saude dos Upstreams",
+      title: "Saúde dos Upstreams",
       description:
-        "Monitore a saude dos seus servidores de destino com health checks ativos e passivos.",
+        "Monitore a saúde dos seus servidores de destino com health checks ativos e passivos.",
       icon: "HeartPulse",
       tags: ["upstream", "health-check", "disponibilidade"],
       content: [
         {
           id: "como-funciona-health",
           title: "Como Funcionam os Health Checks",
-          body: `Os health checks garantem que o API Gateway envie requisicoes apenas para servidores de destino (upstreams) que estejam saudaveis. Quando um upstream e detectado como indisponivel, ele e automaticamente removido do pool de balanceamento, e o trafego e redistribuido para os upstreams restantes.
+          body: `Os health checks garantem que o API Gateway envie requisições apenas para servidores de destino (upstreams) que estejam saudáveis. Quando um upstream é detectado como indisponível, ele é automaticamente removido do pool de balanceamento, e o tráfego é redistribuído para os upstreams restantes.
 
 O API Gateway suporta dois tipos de health check:
 
 ### Health Check Ativo
-O gateway envia requisicoes periodicas de verificacao (probes) para cada upstream. Se o upstream nao responder ou retornar erro, e marcado como "unhealthy". Esse metodo detecta problemas proativamente, antes que requisicoes reais sejam afetadas.
+O gateway envia requisições periódicas de verificação (probes) para cada upstream. Se o upstream não responder ou retornar erro, é marcado como "unhealthy". Esse método detecta problemas proativamente, antes que requisições reais sejam afetadas.
 
 ### Health Check Passivo
-O gateway monitora as respostas das requisicoes reais. Se um upstream retornar muitos erros consecutivos (ex: 5 erros 5xx seguidos), e marcado como "unhealthy". Esse metodo nao gera trafego adicional, mas so detecta problemas quando requisicoes reais falham.
+O gateway monitora as respostas das requisições reais. Se um upstream retornar muitos erros consecutivos (ex: 5 erros 5xx seguidos), é marcado como "unhealthy". Esse método não gera tráfego adicional, mas só detecta problemas quando requisições reais falham.
 
-> **Dica:** Para a melhor protecao, combine ambos os tipos: health check ativo para deteccao proativa e passivo como camada adicional de seguranca.`,
+> **Dica:** Para a melhor proteção, combine ambos os tipos: health check ativo para detecção proativa e passivo como camada adicional de segurança.`,
         },
         {
           id: "dashboard-saude",
-          title: "Dashboard de Saude",
-          body: `O dashboard de saude dos upstreams fornece uma visao consolidada do estado de todos os servidores de destino. Acesse via **Monitoramento > Upstreams**.
+          title: "Dashboard de Saúde",
+          body: `O dashboard de saúde dos upstreams fornece uma visão consolidada do estado de todos os servidores de destino. Acesse via **Monitoramento > Upstreams**.
 
-A pagina exibe uma tabela com todos os upstreams configurados e suas informacoes:
+A página exibe uma tabela com todos os upstreams configurados e suas informações:
 
 - **Nome/ID** — Identificador do upstream
 - **Nodes** — Lista de servidores (IP:porta) no pool
 - **Status** — Indicador visual por node: verde (healthy), vermelho (unhealthy), cinza (sem check)
-- **Uptime** — Percentual de tempo em que o node esteve saudavel nas ultimas 24 horas
-- **Ultimo check** — Timestamp da ultima verificacao de saude
-- **Latencia** — Tempo de resposta do health check ativo (se configurado)
+- **Uptime** — Percentual de tempo em que o node esteve saudável nas últimas 24 horas
+- **Último check** — Timestamp da última verificação de saúde
+- **Latência** — Tempo de resposta do health check ativo (se configurado)
 
-Clicando em um upstream, voce acessa o detalhamento com:
+Clicando em um upstream, você acessa o detalhamento com:
 
-- **Historico de status** — Timeline mostrando transicoes entre healthy e unhealthy
-- **Metricas do health check** — Latencia das probes ao longo do tempo
-- **Logs de transicao** — Registros de quando cada node mudou de estado e o motivo
+- **Histórico de status** — Timeline mostrando transições entre healthy e unhealthy
+- **Métricas do health check** — Latência das probes ao longo do tempo
+- **Logs de transição** — Registros de quando cada node mudou de estado e o motivo
 
-> **Nota:** Upstreams sem health check configurado aparecem com status cinza (desconhecido). Recomendamos configurar health checks para todos os upstreams em producao.`,
+> **Nota:** Upstreams sem health check configurado aparecem com status cinza (desconhecido). Recomendamos configurar health checks para todos os upstreams em produção.`,
         },
         {
           id: "configurando-health-ativo",
           title: "Configurando Health Check Ativo",
-          body: `O health check ativo e configurado no upstream. Acesse **APIs > Upstreams > [upstream] > Health Check** para configurar:
+          body: `O health check ativo é configurado no upstream. Acesse **APIs > Upstreams > [upstream] > Health Check** para configurar:
 
-### Parametros Principais
+### Parâmetros Principais
 - **Tipo** — HTTP ou HTTPS (para verificar endpoints HTTPS)
-- **Path** — Caminho do endpoint de verificacao (ex: \`/health\`, \`/ping\`)
+- **Path** — Caminho do endpoint de verificação (ex: \`/health\`, \`/ping\`)
 - **Host** — Header Host a enviar na probe (opcional)
-- **Intervalo** — Tempo entre verificacoes em segundos (padrao: 10s)
-- **Timeout** — Tempo maximo de espera pela resposta (padrao: 3s)
+- **Intervalo** — Tempo entre verificações em segundos (padrão: 10s)
+- **Timeout** — Tempo máximo de espera pela resposta (padrão: 3s)
 
-### Criterios de Saude
-- **Healthy — Status codes** — Codigos que indicam saude (padrao: 200)
-- **Healthy — Successes** — Numero de verificacoes consecutivas bem-sucedidas para marcar como healthy (padrao: 2)
-- **Unhealthy — Status codes** — Codigos que indicam falha (padrao: 500, 502, 503)
-- **Unhealthy — Failures** — Numero de verificacoes consecutivas falhadas para marcar como unhealthy (padrao: 3)
-- **Unhealthy — Timeouts** — Numero de timeouts consecutivos para marcar como unhealthy (padrao: 3)
+### Critérios de Saúde
+- **Healthy — Status codes** — Códigos que indicam saúde (padrão: 200)
+- **Healthy — Successes** — Número de verificações consecutivas bem-sucedidas para marcar como healthy (padrão: 2)
+- **Unhealthy — Status codes** — Códigos que indicam falha (padrão: 500, 502, 503)
+- **Unhealthy — Failures** — Número de verificações consecutivas falhadas para marcar como unhealthy (padrão: 3)
+- **Unhealthy — Timeouts** — Número de timeouts consecutivos para marcar como unhealthy (padrão: 3)
 
-> **Atencao:** Certifique-se de que o endpoint de health check da sua aplicacao e leve e rapido. Evite endpoints que facam queries ao banco de dados ou chamadas a servicos externos, pois isso pode causar falsos negativos.`,
+> **Atenção:** Certifique-se de que o endpoint de health check da sua aplicação é leve e rápido. Evite endpoints que façam queries ao banco de dados ou chamadas a serviços externos, pois isso pode causar falsos negativos.`,
         },
         {
           id: "configurando-health-passivo",
           title: "Configurando Health Check Passivo",
-          body: `O health check passivo monitora as respostas das requisicoes reais para detectar upstreams com problema. Ele nao gera trafego adicional, pois analisa o trafego ja existente.
+          body: `O health check passivo monitora as respostas das requisições reais para detectar upstreams com problema. Ele não gera tráfego adicional, pois analisa o tráfego já existente.
 
-### Parametros de Configuracao
-- **Healthy — Status codes** — Codigos de resposta que contam como sucesso (padrao: 200-299)
-- **Healthy — Successes** — Numero de respostas bem-sucedidas consecutivas para restaurar um node marcado como unhealthy (padrao: 5)
-- **Unhealthy — Status codes** — Codigos que contam como falha (padrao: 500, 502, 503, 504)
-- **Unhealthy — Failures** — Numero de falhas consecutivas para marcar como unhealthy (padrao: 5)
-- **Unhealthy — Timeouts** — Numero de timeouts consecutivos para marcar como unhealthy (padrao: 7)
+### Parâmetros de Configuração
+- **Healthy — Status codes** — Códigos de resposta que contam como sucesso (padrão: 200-299)
+- **Healthy — Successes** — Número de respostas bem-sucedidas consecutivas para restaurar um node marcado como unhealthy (padrão: 5)
+- **Unhealthy — Status codes** — Códigos que contam como falha (padrão: 500, 502, 503, 504)
+- **Unhealthy — Failures** — Número de falhas consecutivas para marcar como unhealthy (padrão: 5)
+- **Unhealthy — Timeouts** — Número de timeouts consecutivos para marcar como unhealthy (padrão: 7)
 
-Quando um node e marcado como unhealthy pelo check passivo, ele e removido do pool de balanceamento. Para ser restaurado, ele precisa receber requisicoes bem-sucedidas — mas como esta fora do pool, isso so acontece se:
+Quando um node é marcado como unhealthy pelo check passivo, ele é removido do pool de balanceamento. Para ser restaurado, ele precisa receber requisições bem-sucedidas — mas como está fora do pool, isso só acontece se:
 
 1. O health check **ativo** estiver configurado e detectar que o node voltou
 2. O administrador restaurar manualmente o node via dashboard
 
-> **Dica:** Por essa razao, recomendamos sempre combinar health check passivo com ativo. O passivo detecta problemas rapidamente (nas requisicoes reais), e o ativo garante a recuperacao automatica quando o node volta a funcionar.
+> **Dica:** Por essa razão, recomendamos sempre combinar health check passivo com ativo. O passivo detecta problemas rapidamente (nas requisições reais), e o ativo garante a recuperação automática quando o node volta a funcionar.
 
-A combinacao de ambos os tipos oferece a melhor protecao: deteccao rapida de falhas e recuperacao automatica de nodes restaurados.`,
+A combinação de ambos os tipos oferece a melhor proteção: detecção rápida de falhas e recuperação automática de nodes restaurados.`,
         },
       ],
     },

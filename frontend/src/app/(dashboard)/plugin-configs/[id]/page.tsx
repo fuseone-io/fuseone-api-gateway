@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import { ArrowLeft, Plus, Save, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -41,6 +42,8 @@ export default function EditPolicyTemplatePage() {
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
+  const t = useTranslations("pluginConfigs.detail")
+  const tc = useTranslations("common")
 
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -70,11 +73,11 @@ export default function EditPolicyTemplatePage() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error("Name is required")
+      toast.error(t("nameRequired"))
       return
     }
     if (Object.keys(plugins).length === 0) {
-      toast.error("Add at least one policy")
+      toast.error(t("addAtLeastOnePolicy"))
       return
     }
     setSaving(true)
@@ -84,10 +87,10 @@ export default function EditPolicyTemplatePage() {
         plugins,
         labels: Object.keys(labels).length > 0 ? labels : undefined,
       })
-      toast.success("Policy template updated")
+      toast.success(t("templateUpdated"))
       router.push("/plugin-configs")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update policy template")
+      toast.error(err instanceof Error ? err.message : t("updateFailed"))
     } finally {
       setSaving(false)
     }
@@ -112,7 +115,7 @@ export default function EditPolicyTemplatePage() {
       try {
         config = JSON.parse(jsonFallback || "{}")
       } catch {
-        toast.error("Invalid JSON")
+        toast.error(t("invalidJson"))
         return
       }
     }
@@ -163,12 +166,12 @@ export default function EditPolicyTemplatePage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Policy Template Not Found"
-          description={`Template with ID "${id}" does not exist`}
+          title={t("notFoundTitle")}
+          description={t("notFoundDescription", { id })}
           actions={
             <Button variant="outline" onClick={() => router.push("/plugin-configs")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+              {tc("back")}
             </Button>
           }
         />
@@ -179,20 +182,20 @@ export default function EditPolicyTemplatePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Edit Policy Template"
+        title={t("editTitle")}
         description={name || id}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => router.push("/plugin-configs")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+              {tc("back")}
             </Button>
             <Button
               onClick={handleSave}
               disabled={saving || !name.trim() || Object.keys(plugins).length === 0}
             >
               <Save className="mr-2 h-4 w-4" />
-              {saving ? "Saving..." : "Save Template"}
+              {saving ? tc("saving") : t("saveTemplate")}
             </Button>
           </div>
         }
@@ -202,19 +205,19 @@ export default function EditPolicyTemplatePage() {
         {/* Template Details */}
         <Card>
           <CardHeader>
-            <CardTitle>Template Details</CardTitle>
+            <CardTitle>{t("templateDetails")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Name *</Label>
+              <Label>{tc("name")} *</Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Rate Limit + CORS"
+                placeholder={t("namePlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>Labels</Label>
+              <Label>{t("labelsLabel")}</Label>
               {Object.keys(labels).length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {Object.entries(labels).map(([k, v]) => (
@@ -232,14 +235,14 @@ export default function EditPolicyTemplatePage() {
               )}
               <div className="flex items-center gap-2">
                 <Input
-                  placeholder="Key"
+                  placeholder={t("labelKeyPlaceholder")}
                   value={newLabelKey}
                   onChange={(e) => setNewLabelKey(e.target.value)}
                   className="flex-1"
                   onKeyDown={(e) => e.key === "Enter" && handleAddLabel()}
                 />
                 <Input
-                  placeholder="Value"
+                  placeholder={t("labelValuePlaceholder")}
                   value={newLabelValue}
                   onChange={(e) => setNewLabelValue(e.target.value)}
                   className="flex-1"
@@ -261,15 +264,15 @@ export default function EditPolicyTemplatePage() {
         {/* Policies */}
         <Card>
           <CardHeader>
-            <CardTitle>Policies</CardTitle>
+            <CardTitle>{t("policies")}</CardTitle>
             <CardDescription>
-              Policies included in this template. Routes using this template will inherit all these policies.
+              {t("policiesDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {Object.keys(plugins).length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
-                No policies configured. Add policies to build your template.
+                {t("noPoliciesConfigured")}
               </p>
             ) : (
               Object.entries(plugins).map(([pluginName, config]) => {
@@ -305,7 +308,7 @@ export default function EditPolicyTemplatePage() {
                           }
                         }}
                       >
-                        Edit
+                        {tc("edit")}
                       </Button>
                       <Button
                         variant="ghost"
@@ -326,7 +329,7 @@ export default function EditPolicyTemplatePage() {
               onClick={() => setShowPicker(true)}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Add Policy
+              {t("addPolicy")}
             </Button>
           </CardContent>
         </Card>
@@ -335,7 +338,7 @@ export default function EditPolicyTemplatePage() {
       {/* Policy Picker Sheet */}
       <Sheet open={showPicker} onOpenChange={setShowPicker}>
         <SheetContent side="right" className="p-0 sm:max-w-sm">
-          <SheetTitle className="sr-only">Add Policy</SheetTitle>
+          <SheetTitle className="sr-only">{t("addPolicy")}</SheetTitle>
           <PolicyGallery
             onAddPolicy={handleAddPolicy}
             existingPolicies={Object.keys(plugins)}
@@ -348,9 +351,7 @@ export default function EditPolicyTemplatePage() {
         <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Configure{" "}
-              {PLUGINS.find((p) => p.name === editingPlugin)?.label ||
-                editingPlugin}
+              {t("configure", { plugin: PLUGINS.find((p) => p.name === editingPlugin)?.label || editingPlugin || "" })}
             </DialogTitle>
           </DialogHeader>
           <div className="py-2">
@@ -363,7 +364,7 @@ export default function EditPolicyTemplatePage() {
               />
             ) : (
               <div className="space-y-2">
-                <Label>Configuration (JSON)</Label>
+                <Label>{t("configurationJson")}</Label>
                 <Textarea
                   value={jsonFallback}
                   onChange={(e) => setJsonFallback(e.target.value)}
@@ -375,9 +376,9 @@ export default function EditPolicyTemplatePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingPlugin(null)}>
-              Cancel
+              {tc("cancel")}
             </Button>
-            <Button onClick={handleSavePlugin}>Apply</Button>
+            <Button onClick={handleSavePlugin}>{t("apply")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

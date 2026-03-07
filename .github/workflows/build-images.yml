@@ -9,8 +9,11 @@ on:
 
 env:
   REGISTRY: docker.io
-  BACKEND_IMAGE: klinux/fuseone-api-gateway-backend
-  FRONTEND_IMAGE: klinux/fuseone-api-gateway-frontend
+  BACKEND_IMAGE:          devopsfuseone/fuseone-api-gateway-backend
+  FRONTEND_IMAGE:         devopsfuseone/fuseone-api-gateway-frontend
+  APISIX_IMAGE:           devopsfuseone/apisix
+  DEVELOPER_PORTAL_IMAGE: devopsfuseone/fuseone-developer-portal
+  EVENT_GATEWAY_IMAGE:    devopsfuseone/fuseone-event-gateway
 
 jobs:
   # ---------- Backend ----------
@@ -107,6 +110,146 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=
 
+  # ---------- Custom APISIX ----------
+  build-apisix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.APISIX_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push custom APISIX
+        uses: docker/build-push-action@v6
+        with:
+          context: ./custom-plugins/apisix
+          file: ./custom-plugins/apisix/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  # ---------- Developer Portal ----------
+  build-developer-portal:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DEVELOPER_PORTAL_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push developer portal
+        uses: docker/build-push-action@v6
+        with:
+          context: ./developer-portal
+          file: ./developer-portal/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            NEXT_PUBLIC_API_URL=
+
+  # ---------- Event Gateway ----------
+  build-event-gateway:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.EVENT_GATEWAY_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push event gateway
+        uses: docker/build-push-action@v6
+        with:
+          context: ./event-gateway
+          file: ./event-gateway/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
   # ---------- Helm lint ----------
   helm-lint:
     runs-on: ubuntu-latest
@@ -116,6 +259,12 @@ jobs:
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
+
+      - name: Sync extra plugin files
+        run: |
+          cp custom-plugins/apisix/plugins/api-composition.lua charts/fuseone/files/plugins/
+          cp custom-plugins/apisix/plugins/fuseone-timing.lua  charts/fuseone/files/plugins/
+          cp custom-plugins/apisix/plugins/opentelemetry.lua   charts/fuseone/files/plugins/
 
       - name: Update chart dependencies
         run: |

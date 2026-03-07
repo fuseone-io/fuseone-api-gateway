@@ -1,8 +1,10 @@
 "use client"
 
 import { useSearchParams, useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import {
   Activity,
+  Bot,
   CircleUser,
   Sliders,
   Users,
@@ -27,25 +29,27 @@ import OAuthContent from "./oauth/page"
 import TracingContent from "./tracing/page"
 import BackupContent from "./backup/page"
 import ProfileContent from "./profile/page"
+import AIProvidersContent from "./ai-providers/page"
 
 interface SettingsSection {
   id: string
-  title: string
+  titleKey: string
   icon: React.ComponentType<{ className?: string }>
   ready: boolean
 }
 
 const settingsSections: SettingsSection[] = [
-  { id: "general", title: "General", icon: Sliders, ready: true },
-  { id: "profile", title: "Profile", icon: CircleUser, ready: true },
-  { id: "environments", title: "Environments", icon: Layers, ready: true },
-  { id: "connection", title: "Gateway Connection", icon: KeyRound, ready: true },
-  { id: "users", title: "Users", icon: Users, ready: true },
-  { id: "roles", title: "Roles & Permissions", icon: ShieldCheck, ready: true },
-  { id: "oauth", title: "Authentication", icon: Globe, ready: true },
-  { id: "notifications", title: "Notifications", icon: Bell, ready: true },
-  { id: "tracing", title: "Request Monitoring", icon: Activity, ready: true },
-  { id: "backup", title: "Backup & Restore", icon: Database, ready: true },
+  { id: "general", titleKey: "general", icon: Sliders, ready: true },
+  { id: "profile", titleKey: "profile", icon: CircleUser, ready: true },
+  { id: "environments", titleKey: "environments", icon: Layers, ready: true },
+  { id: "connection", titleKey: "connection", icon: KeyRound, ready: true },
+  { id: "users", titleKey: "users", icon: Users, ready: true },
+  { id: "roles", titleKey: "roles", icon: ShieldCheck, ready: true },
+  { id: "oauth", titleKey: "oauth", icon: Globe, ready: true },
+  { id: "notifications", titleKey: "notifications", icon: Bell, ready: true },
+  { id: "tracing", titleKey: "tracing", icon: Activity, ready: true },
+  { id: "backup", titleKey: "backup", icon: Database, ready: true },
+  { id: "ai-providers", titleKey: "aiProviders", icon: Bot, ready: true },
 ]
 
 const DEFAULT_TAB = "general"
@@ -54,6 +58,7 @@ const validTabs = new Set(settingsSections.map((s) => s.id))
 export default function SettingsPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const t = useTranslations("settings")
 
   const tabParam = searchParams.get("tab")
   const activeTab = tabParam && validTabs.has(tabParam) ? tabParam : DEFAULT_TAB
@@ -73,8 +78,8 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <PageHeader
         icon={<Settings className="h-5 w-5" />}
-        title="Settings"
-        description="Manage your account and application settings"
+        title={t("title")}
+        description={t("description")}
       />
 
       <Separator />
@@ -88,7 +93,7 @@ export default function SettingsPage() {
               className="w-full justify-start gap-2.5 px-3 py-2 text-sm"
             >
               <section.icon className="h-4 w-4 shrink-0" />
-              <span className="truncate text-left">{section.title}</span>
+              <span className="truncate text-left">{t("tabs." + section.titleKey)}</span>
             </TabsTrigger>
           ))}
 
@@ -105,6 +110,7 @@ export default function SettingsPage() {
           <TabsContent value="oauth"><OAuthContent /></TabsContent>
           <TabsContent value="tracing"><TracingContent /></TabsContent>
           <TabsContent value="backup"><BackupContent /></TabsContent>
+          <TabsContent value="ai-providers"><AIProvidersContent /></TabsContent>
         </div>
       </Tabs>
     </div>

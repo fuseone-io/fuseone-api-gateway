@@ -66,9 +66,6 @@ func (h *DashboardHandler) Summary(c *gin.Context) {
 			defer wg.Done()
 			result, err := client.List(ctx, name)
 			if err != nil {
-				mu.Lock()
-				summary.APISIXStatus = "degraded"
-				mu.Unlock()
 				return
 			}
 			mu.Lock()

@@ -3,8 +3,8 @@
 # =============================================================================
 # Deployment modes:
 #   1. Full Platform  : all enabled (default)
-#   2. Gateway Only   : backend/frontend/postgresql disabled, apisix enabled
-#   3. Console Only   : apisix disabled, point backend to remote gateway(s)
+#   2. Gateway Only   : backend/frontend/postgresql disabled, apisix+etcd enabled
+#   3. Console Only   : apisix+etcd disabled, point backend to remote gateway(s)
 # =============================================================================
 
 global:
@@ -22,7 +22,7 @@ backend:
   enabled: true
 
   image:
-    repository: klinux/fuseone-api-gateway-backend
+    repository: devopsfuseone/fuseone-api-gateway-backend
     tag: "latest"
     pullPolicy: IfNotPresent
 
@@ -51,7 +51,6 @@ backend:
     #    hosts:
     #      - api.fuseone.local
 
-  # Application config (mapped to env vars)
   config:
     serverPort: "8080"
     dbName: "fuseone_gateway"
@@ -62,11 +61,10 @@ backend:
     debugEnabled: "false"
     debugRetentionHours: "48"
     debugMaxRows: "50000"
-    # Override these if apisix.enabled=false (console-only mode)
+    # Override when apisix.enabled=false (console-only mode)
     apisixAdminURL: ""
     apisixControlURL: ""
 
-  # Secrets
   secrets:
     dbUser: "gateway"
     dbPassword: "gateway"
@@ -76,11 +74,7 @@ backend:
   nodeSelector: {}
   tolerations: []
   affinity: {}
-
-  # Extra environment variables
   extraEnv: []
-  #  - name: CUSTOM_VAR
-  #    value: "custom-value"
 
 # =============================================================================
 # Frontend Dashboard (Next.js)
@@ -89,7 +83,7 @@ frontend:
   enabled: true
 
   image:
-    repository: klinux/fuseone-api-gateway-frontend
+    repository: devopsfuseone/fuseone-api-gateway-frontend
     tag: "latest"
     pullPolicy: IfNotPresent
 
@@ -114,13 +108,9 @@ frontend:
     annotations: {}
     host: console.fuseone.local
     tls: []
-    #  - secretName: console-tls
-    #    hosts:
-    #      - console.fuseone.local
 
   env:
-    # Backend API URL (auto-detected if backend.enabled)
-    apiURL: ""
+    apiURL: ""    # auto-detected when backend.enabled=true
 
   nodeSelector: {}
   tolerations: []
@@ -151,7 +141,6 @@ postgresql:
     storageClass: ""
     accessMode: ReadWriteOnce
 
-  # Used when postgresql.enabled=false
   external:
     host: ""
     port: "5432"
@@ -161,73 +150,277 @@ postgresql:
   affinity: {}
 
 # =============================================================================
-# Apache APISIX (sub-chart)
+# Event Gateway (Go) - Kafka protocol mediator
+# =============================================================================
+eventGateway:
+  enabled: false
+
+  image:
+    repository: devopsfuseone/fuseone-event-gateway
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  replicas: 2
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  service:
+    type: ClusterIP
+    port: 8090
+    annotations: {}
+
+  config:
+    serverPort: "8090"
+    dbName: ""
+    dbSSLMode: ""
+
+  secrets:
+    dbUser: ""
+    dbPassword: ""
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  extraEnv: []
+
+# =============================================================================
+# etcd — distributed key-value store for APISIX
+#
+# Uses the local charts/etcd chart (quay.io/coreos/etcd — NOT Bitnami).
+# The etcd Service name follows Helm standard convention:
+#   <release-name>-etcd  (e.g. "fuseone-etcd" when release = "fuseone")
+#
+# APISIX externalEtcd.host below must match this service.
+# If you install with a custom release name, override:
+#   --set apisix.externalEtcd.host[0]=http://MYRELEASE-etcd:2379
+# =============================================================================
+etcd:
+  enabled: true
+
+  replicaCount: 3
+
+  image:
+    repository: quay.io/coreos/etcd
+    tag: v3.5.21
+    pullPolicy: IfNotPresent
+
+  storage:
+    size: 25Gi
+    storageClassName: ""
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  affinity: {}
+  tolerations: []
+  nodeSelector: {}
+
+# =============================================================================
+# Apache APISIX (sub-chart: charts/fuseone/charts/apisix-2.13.0.tgz)
+#
+# The Bitnami etcd bundled inside the APISIX chart is DISABLED.
+# We use the independent etcd sub-chart above instead.
 # =============================================================================
 apisix:
   enabled: true
 
-  # Values passed to the APISIX sub-chart
-  # See charts/apisix/values.yaml for full reference
+  # Disable the Bitnami etcd that ships inside the apisix chart
+  etcd:
+    enabled: false
+
+  # Connect APISIX to our etcd service
+  # Default: release name "fuseone" → service "fuseone-etcd"
+  externalEtcd:
+    host:
+      - http://fuseone-etcd:2379
+    user: ""
+    password: ""
+
   apisix:
     image:
       repository: apache/apisix
-      tag: 3.15.0-debian
+      tag: "3.15.0-debian"
+      pullPolicy: IfNotPresent
+
     admin:
       enabled: true
       credentials:
         admin: "fuseone-gateway-admin-key"
+      allow:
+        ipList:
+          - 0.0.0.0/0
+
+    # Complete plugin list — mirrors apisix-config.yaml.
+    # Entries from customPlugins.plugins[].name are appended automatically.
+    plugins:
+      - real-ip
+      - client-control
+      - proxy-control
+      - request-id
+      - zipkin
+      - ext-plugin-pre-req
+      - fault-injection
+      - mocking
+      - serverless-pre-function
+      - cors
+      - ip-restriction
+      - ua-restriction
+      - referer-restriction
+      - csrf
+      - uri-blocker
+      - request-validation
+      - multi-auth
+      - openid-connect
+      - authz-keycloak
+      - authz-casdoor
+      - wolf-rbac
+      - ldap-auth
+      - hmac-auth
+      - basic-auth
+      - jwt-auth
+      - key-auth
+      - consumer-restriction
+      - forward-auth
+      - opa
+      - authz-casbin
+      - cas-auth
+      - limit-conn
+      - limit-count
+      - limit-req
+      - gzip
+      - server-info
+      - traffic-split
+      - redirect
+      - response-rewrite
+      - grpc-transcode
+      - grpc-web
+      - public-api
+      - prometheus
+      - datadog
+      - elasticsearch-logger
+      - echo
+      - loggly
+      - http-logger
+      - skywalking-logger
+      - google-cloud-logging
+      - sls-logger
+      - tcp-logger
+      - kafka-logger
+      - rocketmq-logger
+      - syslog
+      - udp-logger
+      - file-logger
+      - clickhouse-logger
+      - tencent-cloud-cls
+      - inspect
+      - example-plugin
+      - api-breaker
+      - proxy-mirror
+      - proxy-cache
+      - proxy-rewrite
+      - workflow
+      - opentelemetry
+      - body-transformer
+      - ext-plugin-post-req
+      - ext-plugin-post-resp
+      - serverless-post-function
+      - degraphql
+      - graphql-depth-limit
+      - graphql-complexity
+      - graphql-allowlist
+      - graphql-introspection-guard
+
+    pluginAttrs:
+      prometheus:
+        export_addr:
+          ip: "0.0.0.0"
+          port: 9091
+      opentelemetry:
+        resource:
+          service.name: "fuseone-gateway"
+        batch_span_processor:
+          max_export_batch_size: 64
+          inactive_timeout: 2
+        trace_id_source: x-request-id
+        set_ngx_var: true
+        collector:
+          # Assumes release "fuseone"; update if using a different release name
+          address: "fuseone-backend:8080"
+          request_timeout: 3
+          request_headers:
+            Content-Type: application/x-protobuf
+
     customPlugins:
       enabled: true
+      luaPath: "/opts/custom_plugins/?.lua"
       plugins:
-        - name: http-callout
+        # --- bundled inside the apisix .tgz (apisix/files/) ---
+        - name: "http-callout"
+          attrs: {}
           configMap:
-            name: ""  # auto-created
+            name: "fuseone-custom-plugins"
             mounts:
-              - key: http-callout.lua
-                path: /opt/apisix/plugins/http-callout.lua
-        - name: data-masking
+              - key: "http-callout.lua"
+                path: "/opts/custom_plugins/apisix/plugins/http-callout.lua"
+        - name: "data-masking"
+          attrs: {}
           configMap:
-            name: ""
+            name: "fuseone-custom-plugins"
             mounts:
-              - key: data-masking.lua
-                path: /opt/apisix/plugins/data-masking.lua
-        - name: threat-protection
+              - key: "data-masking.lua"
+                path: "/opts/custom_plugins/apisix/plugins/data-masking.lua"
+        - name: "threat-protection"
+          attrs: {}
           configMap:
-            name: ""
+            name: "fuseone-custom-plugins"
             mounts:
-              - key: threat-protection.lua
-                path: /opt/apisix/plugins/threat-protection.lua
+              - key: "threat-protection.lua"
+                path: "/opts/custom_plugins/apisix/plugins/threat-protection.lua"
+        # --- from fuseone-extra-plugins ConfigMap (charts/fuseone/templates/) ---
+        # NOTE: api-composition and fuseone-timing share the same ConfigMap volume.
+        # Only one entry is needed; both files are mounted via the mounts list.
+        - name: "api-composition"
+          attrs: {}
+          configMap:
+            name: "fuseone-extra-plugins"
+            mounts:
+              - key: "api-composition.lua"
+                path: "/opts/custom_plugins/apisix/plugins/api-composition.lua"
+              - key: "fuseone-timing.lua"
+                path: "/opts/custom_plugins/apisix/plugins/fuseone-timing.lua"
+              - key: "opentelemetry.lua"
+                path: "/opts/custom_plugins/apisix/plugins/opentelemetry.lua"
 
   service:
     type: NodePort
-
-  etcd:
-    enabled: true
-    replicaCount: 3
 
 # =============================================================================
 # ClickHouse (Analytics) - Optional
 # =============================================================================
 clickhouse:
-  enabled: false  # opt-in: set to true to deploy ClickHouse
-
-  # ClickHouse Operator must be installed first
-  # Run: scripts/install-clickhouse-operator.sh
-  # Or: kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-bundle.yaml
+  enabled: false
 
   image:
     repository: clickhouse/clickhouse-server
     tag: "24.8"
 
-  # ---------- ClickHouse Keeper (replaces ZooKeeper) ----------
   keeper:
     enabled: true
     replicas: 3
-
     image:
       repository: clickhouse/clickhouse-keeper
       tag: "24.8"
-
     resources:
       requests:
         cpu: 200m
@@ -235,22 +428,18 @@ clickhouse:
       limits:
         cpu: 1
         memory: 1Gi
-
     persistence:
       enabled: true
       size: 10Gi
       storageClass: ""
 
-  # ---------- ClickHouse Cluster ----------
   cluster:
     name: fuseone
     shards: 2
     replicas: 2
-
     storage:
       size: 50Gi
       storageClass: ""
-
     resources:
       requests:
         cpu: 500m
@@ -259,13 +448,11 @@ clickhouse:
         cpu: 2
         memory: 4Gi
 
-  # ---------- Auth ----------
   auth:
     username: fuseone
-    password: ""  # auto-generated if empty
+    password: ""
     database: fuseone_analytics
 
-  # ---------- Settings ----------
   settings:
     maxConnections: 4096
     maxConcurrentQueries: 100
@@ -276,5 +463,4 @@ clickhouse:
 # =============================================================================
 migrations:
   enabled: true
-  # Uses the backend image with migration command
   backoffLimit: 3

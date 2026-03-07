@@ -2,43 +2,43 @@ import type { DocCategory } from "./types"
 
 export const segurancaCategory: DocCategory = {
   slug: "seguranca",
-  title: "Seguranca",
+  title: "Segurança",
   description:
-    "Proteja suas APIs com autenticacao, SSL, protecao contra ameacas e gerenciamento seguro de credenciais.",
+    "Proteja suas APIs com autenticação, SSL, proteção contra ameaças e gerenciamento seguro de credenciais.",
   icon: "Shield",
   articles: [
-    // ── 1. Autenticacao de APIs ─────────────────────────────────────────
+    // ── 1. Autenticação de APIs ─────────────────────────────────────────
     {
       slug: "autenticacao-apis",
-      title: "Autenticacao de APIs",
+      title: "Autenticação de APIs",
       description:
-        "Metodos de autenticacao disponiveis, quando usar cada um e como combinar com politicas baseadas em consumers.",
+        "Métodos de autenticação disponíveis, quando usar cada um e como combinar com políticas baseadas em consumers.",
       icon: "KeyRound",
-      tags: ["autenticacao", "jwt", "api-key", "oauth"],
+      tags: ["autenticação", "jwt", "api-key", "oauth"],
       content: [
         {
           id: "visao-geral-auth",
-          title: "Visao Geral",
-          body: `O API Gateway oferece multiplos metodos de autenticacao que podem ser aplicados individualmente ou combinados em cada rota. A autenticacao e feita via plugins, permitindo flexibilidade total na configuracao.
+          title: "Visão Geral",
+          body: `O API Gateway oferece múltiplos métodos de autenticação que podem ser aplicados individualmente ou combinados em cada rota. A autenticação é feita via plugins, permitindo flexibilidade total na configuração.
 
-Quando uma requisicao chega ao gateway, o plugin de autenticacao:
+Quando uma requisição chega ao gateway, o plugin de autenticação:
 
-1. Extrai a credencial da requisicao (header, query param, cookie, etc.)
+1. Extrai a credencial da requisição (header, query param, cookie, etc.)
 2. Valida a credencial contra o provedor configurado
-3. Identifica o **consumer** associado a credencial
-4. Permite ou rejeita a requisicao com base na validacao
+3. Identifica o **consumer** associado à credencial
+4. Permite ou rejeita a requisição com base na validação
 
-A identificacao do consumer e fundamental porque permite aplicar politicas diferenciadas por cliente: rate limits, cotas, permissoes de acesso e tracking de metricas.
+A identificação do consumer é fundamental porque permite aplicar políticas diferenciadas por cliente: rate limits, cotas, permissões de acesso e tracking de métricas.
 
-> **Nota:** Voce pode habilitar multiplos plugins de autenticacao na mesma rota. Neste caso, a requisicao e aceita se **qualquer um** dos metodos validar com sucesso (logica OR). Para exigir multiplos metodos simultaneamente, use o plugin \`consumer-restriction\`.`,
+> **Nota:** Você pode habilitar múltiplos plugins de autenticação na mesma rota. Neste caso, a requisição é aceita se **qualquer um** dos métodos validar com sucesso (lógica OR). Para exigir múltiplos métodos simultaneamente, use o plugin \`consumer-restriction\`.`,
         },
         {
           id: "api-key",
           title: "API Key",
-          body: `A autenticacao por API Key e o metodo mais simples e amplamente utilizado. Cada consumer recebe uma chave unica que deve ser enviada em todas as requisicoes.
+          body: `A autenticação por API Key é o método mais simples e amplamente utilizado. Cada consumer recebe uma chave única que deve ser enviada em todas as requisições.
 
 ### Como Funciona
-O consumer envia a chave no header \`apikey\` (padrao) ou em outro local configuravel:
+O consumer envia a chave no header \`apikey\` (padrão) ou em outro local configurável:
 
 \`\`\`
 GET /api/v1/produtos HTTP/1.1
@@ -47,15 +47,15 @@ apikey: sua-chave-aqui-abc123
 \`\`\`
 
 ### Quando Usar
-- APIs internas entre servicos (service-to-service)
-- Integracao com parceiros de confianca
-- Cenarios simples onde nao e necessario login interativo
-- Prototipacao e desenvolvimento
+- APIs internas entre serviços (service-to-service)
+- Integração com parceiros de confiança
+- Cenários simples onde não é necessário login interativo
+- Prototipação e desenvolvimento
 
-### Configuracao
-No plugin \`key-auth\`, voce pode configurar:
+### Configuração
+No plugin \`key-auth\`, você pode configurar:
 
-- \`header\` — Nome do header que contem a chave (padrao: \`apikey\`)
+- \`header\` — Nome do header que contém a chave (padrão: \`apikey\`)
 - \`query\` — Alternativamente, aceitar a chave como query parameter
 - \`hide_credentials\` — Remover a chave antes de encaminhar ao upstream (recomendado)
 
@@ -64,53 +64,53 @@ No plugin \`key-auth\`, voce pode configurar:
         {
           id: "jwt-auth",
           title: "JWT (JSON Web Token)",
-          body: `A autenticacao JWT permite validar tokens assinados sem necessidade de consultar um servidor de autorizacao em cada requisicao. O gateway verifica a assinatura e as claims do token localmente.
+          body: `A autenticação JWT permite validar tokens assinados sem necessidade de consultar um servidor de autorização em cada requisição. O gateway verifica a assinatura e as claims do token localmente.
 
 ### Como Funciona
-1. O cliente obtem um JWT do seu servidor de autorizacao (IdP)
+1. O cliente obtém um JWT do seu servidor de autorização (IdP)
 2. Envia o token no header \`Authorization: Bearer <token>\`
-3. O gateway valida a assinatura usando a chave publica/secret configurada
+3. O gateway valida a assinatura usando a chave pública/secret configurada
 4. Extrai as claims do token para identificar o consumer
 
 ### Quando Usar
-- APIs publicas com autenticacao de usuarios
-- Microservicos que ja utilizam JWT internamente
-- Cenarios que exigem informacoes adicionais no token (roles, scopes, etc.)
-- Integracao com provedores OAuth2/OpenID Connect
+- APIs públicas com autenticação de usuários
+- Microsserviços que já utilizam JWT internamente
+- Cenários que exigem informações adicionais no token (roles, scopes, etc.)
+- Integração com provedores OAuth2/OpenID Connect
 
-### Configuracao
+### Configuração
 O plugin \`jwt-auth\` suporta:
 
 - \`algorithm\` — Algoritmo de assinatura: HS256, HS384, HS512, RS256, RS384, RS512, ES256, ES384, ES512
-- \`secret\` / \`public_key\` — Chave para verificacao da assinatura
-- \`claims_to_verify\` — Claims obrigatorias (ex: \`exp\`, \`nbf\`)
-- \`consumer_claim\` — Claim usada para identificar o consumer (padrao: \`sub\`)
+- \`secret\` / \`public_key\` — Chave para verificação da assinatura
+- \`claims_to_verify\` — Claims obrigatórias (ex: \`exp\`, \`nbf\`)
+- \`consumer_claim\` — Claim usada para identificar o consumer (padrão: \`sub\`)
 
-> **Atencao:** Para algoritmos RS* e ES* (assimetricos), configure apenas a chave publica no gateway. Nunca armazene a chave privada no API Gateway.`,
+> **Atenção:** Para algoritmos RS* e ES* (assimétricos), configure apenas a chave pública no gateway. Nunca armazene a chave privada no API Gateway.`,
         },
         {
           id: "outros-metodos",
-          title: "Outros Metodos de Autenticacao",
-          body: `Alem de API Key e JWT, o API Gateway suporta os seguintes metodos:
+          title: "Outros Métodos de Autenticação",
+          body: `Além de API Key e JWT, o API Gateway suporta os seguintes métodos:
 
 ### Basic Auth
-Autenticacao HTTP basica com usuario e senha. Simples, porem menos seguro — use apenas sobre HTTPS. Configuravel via plugin \`basic-auth\`.
+Autenticação HTTP básica com usuário e senha. Simples, porém menos seguro — use apenas sobre HTTPS. Configurável via plugin \`basic-auth\`.
 
 ### HMAC Auth
-Autenticacao baseada em assinatura HMAC do request. Cada requisicao e assinada com uma chave secreta, garantindo integridade e autenticidade. Ideal para APIs que precisam de non-repudiation.
+Autenticação baseada em assinatura HMAC do request. Cada requisição é assinada com uma chave secreta, garantindo integridade e autenticidade. Ideal para APIs que precisam de non-repudiation.
 
 ### OpenID Connect
-Integre com provedores de identidade compativeis com OIDC (Keycloak, Auth0, Azure AD, Google). O gateway realiza a validacao do token diretamente com o provedor. Suporta fluxos Authorization Code, Implicit e Client Credentials.
+Integre com provedores de identidade compatíveis com OIDC (Keycloak, Auth0, Azure AD, Google). O gateway realiza a validação do token diretamente com o provedor. Suporta fluxos Authorization Code, Implicit e Client Credentials.
 
 ### Forward Auth
-Delega a decisao de autenticacao para um servico externo. O gateway envia um request ao servico de auth e, com base na resposta (2xx = permitido, 4xx = negado), aceita ou rejeita a requisicao original. Util para logica de autorizacao customizada.
+Delega a decisão de autenticação para um serviço externo. O gateway envia um request ao serviço de auth e, com base na resposta (2xx = permitido, 4xx = negado), aceita ou rejeita a requisição original. Útil para lógica de autorização customizada.
 
 ### LDAP
-Valida credenciais contra um servidor LDAP/Active Directory. Ideal para integracao com diretorio corporativo existente.
+Valida credenciais contra um servidor LDAP/Active Directory. Ideal para integração com diretório corporativo existente.
 
-> **Dica:** Para cenarios corporativos complexos, combine OpenID Connect (autenticacao) com \`consumer-restriction\` (autorizacao) para controle granular de acesso baseado em groups e scopes do token.
+> **Dica:** Para cenários corporativos complexos, combine OpenID Connect (autenticação) com \`consumer-restriction\` (autorização) para controle granular de acesso baseado em groups e scopes do token.
 
-Cada metodo possui trade-offs entre simplicidade, seguranca e flexibilidade. Escolha com base nos requisitos do seu cenario especifico.`,
+Cada método possui trade-offs entre simplicidade, segurança e flexibilidade. Escolha com base nos requisitos do seu cenário específico.`,
         },
       ],
     },
@@ -127,57 +127,57 @@ Cada metodo possui trade-offs entre simplicidade, seguranca e flexibilidade. Esc
         {
           id: "gerenciando-certificados",
           title: "Gerenciando Certificados",
-          body: `O API Gateway gerencia certificados SSL/TLS para terminar conexoes HTTPS nas rotas configuradas. A terminacao SSL no gateway centraliza o gerenciamento de certificados e simplifica a configuracao dos upstreams.
+          body: `O API Gateway gerencia certificados SSL/TLS para terminar conexões HTTPS nas rotas configuradas. A terminação SSL no gateway centraliza o gerenciamento de certificados e simplifica a configuração dos upstreams.
 
-Para adicionar um certificado, acesse **Configuracoes > SSL/TLS > Certificados** e clique em **Novo Certificado**. Voce precisara fornecer:
+Para adicionar um certificado, acesse **Configurações > SSL/TLS > Certificados** e clique em **Novo Certificado**. Você precisará fornecer:
 
-- **Certificado (PEM)** — O certificado publico no formato PEM (inclua a cadeia completa se necessario)
+- **Certificado (PEM)** — O certificado público no formato PEM (inclua a cadeia completa se necessário)
 - **Chave privada (PEM)** — A chave privada correspondente no formato PEM
-- **SNIs** — Lista de Server Name Indications (dominios) que utilizarao este certificado
+- **SNIs** — Lista de Server Name Indications (domínios) que utilizarão este certificado
 
 Exemplo de upload via interface:
 
-1. Cole o conteudo do certificado (incluindo \`-----BEGIN CERTIFICATE-----\` e \`-----END CERTIFICATE-----\`)
+1. Cole o conteúdo do certificado (incluindo \`-----BEGIN CERTIFICATE-----\` e \`-----END CERTIFICATE-----\`)
 2. Cole a chave privada
-3. Adicione os dominios: \`api.exemplo.com\`, \`*.exemplo.com\` (wildcards sao suportados)
+3. Adicione os domínios: \`api.exemplo.com\`, \`*.exemplo.com\` (wildcards são suportados)
 
-> **Atencao:** A chave privada e armazenada de forma segura e encriptada. Mesmo assim, limite o acesso ao gerenciamento de certificados apenas a administradores de confianca via permissoes RBAC.`,
+> **Atenção:** A chave privada é armazenada de forma segura e encriptada. Mesmo assim, limite o acesso ao gerenciamento de certificados apenas a administradores de confiança via permissões RBAC.`,
         },
         {
           id: "sni-configuracao",
-          title: "SNI e Multiplos Dominios",
-          body: `O Server Name Indication (SNI) permite que o API Gateway sirva certificados diferentes para dominios diferentes na mesma porta (443). Isso e essencial quando voce gerencia multiplas APIs em dominios distintos.
+          title: "SNI e Múltiplos Domínios",
+          body: `O Server Name Indication (SNI) permite que o API Gateway sirva certificados diferentes para domínios diferentes na mesma porta (443). Isso é essencial quando você gerencia múltiplas APIs em domínios distintos.
 
 ### Como o SNI Funciona
-Quando o cliente inicia uma conexao TLS, ele envia o nome do servidor (hostname) no handshake. O gateway usa essa informacao para selecionar o certificado correto antes de completar a conexao.
+Quando o cliente inicia uma conexão TLS, ele envia o nome do servidor (hostname) no handshake. O gateway usa essa informação para selecionar o certificado correto antes de completar a conexão.
 
-### Configuracao de SNI
+### Configuração de SNI
 Cada certificado pode estar associado a um ou mais SNIs:
 
-- **Dominio exato** — \`api.exemplo.com\` (corresponde apenas a este dominio)
-- **Wildcard** — \`*.exemplo.com\` (corresponde a qualquer subdominio de exemplo.com)
+- **Domínio exato** — \`api.exemplo.com\` (corresponde apenas a este domínio)
+- **Wildcard** — \`*.exemplo.com\` (corresponde a qualquer subdomínio de exemplo.com)
 
-Prioridade de resolucao:
+Prioridade de resolução:
 
-1. Dominio exato tem prioridade sobre wildcard
-2. Se nenhum certificado corresponder ao SNI solicitado, o gateway usa o certificado padrao (se configurado) ou rejeita a conexao
+1. Domínio exato tem prioridade sobre wildcard
+2. Se nenhum certificado corresponder ao SNI solicitado, o gateway usa o certificado padrão (se configurado) ou rejeita a conexão
 
 ### Certificados por Ambiente
-Uma pratica comum e usar certificados diferentes para cada ambiente:
+Uma prática comum é usar certificados diferentes para cada ambiente:
 
 - \`api.dev.exemplo.com\` — Certificado de desenvolvimento (pode ser self-signed)
 - \`api.staging.exemplo.com\` — Certificado de staging
-- \`api.exemplo.com\` — Certificado de producao (emitido por CA publica)
+- \`api.exemplo.com\` — Certificado de produção (emitido por CA pública)
 
-> **Dica:** Para simplificar o gerenciamento, use certificados wildcard (\`*.exemplo.com\`) quando possivel. Isso reduz o numero de certificados a gerenciar e renovar.`,
+> **Dica:** Para simplificar o gerenciamento, use certificados wildcard (\`*.exemplo.com\`) quando possível. Isso reduz o número de certificados a gerenciar e renovar.`,
         },
         {
           id: "forcando-https",
-          title: "Forcando HTTPS",
-          body: `E uma pratica de seguranca essencial forcar o uso de HTTPS em todas as rotas de producao. O API Gateway oferece duas abordagens para garantir que clientes nao acessem APIs via HTTP inseguro:
+          title: "Forçando HTTPS",
+          body: `É uma prática de segurança essencial forçar o uso de HTTPS em todas as rotas de produção. O API Gateway oferece duas abordagens para garantir que clientes não acessem APIs via HTTP inseguro:
 
 ### Redirecionamento HTTP para HTTPS
-Configure o gateway para redirecionar automaticamente requisicoes HTTP (porta 80) para HTTPS (porta 443):
+Configure o gateway para redirecionar automaticamente requisições HTTP (porta 80) para HTTPS (porta 443):
 
 O plugin \`redirect\` pode ser configurado na rota com:
 
@@ -188,10 +188,10 @@ O plugin \`redirect\` pode ser configurado na rota com:
 }
 \`\`\`
 
-Isso retorna um HTTP 301 (redirecionamento permanente) com o header \`Location\` apontando para a versao HTTPS da URL.
+Isso retorna um HTTP 301 (redirecionamento permanente) com o header \`Location\` apontando para a versão HTTPS da URL.
 
 ### HSTS (HTTP Strict Transport Security)
-Alem do redirecionamento, configure o header HSTS para instruir navegadores a sempre usar HTTPS:
+Além do redirecionamento, configure o header HSTS para instruir navegadores a sempre usar HTTPS:
 
 \`\`\`
 Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
@@ -199,57 +199,57 @@ Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
 
 O plugin \`response-rewrite\` pode ser utilizado para adicionar este header automaticamente a todas as respostas.
 
-> **Nota:** O HSTS so funciona apos a primeira visita HTTPS. Para protecao desde a primeira requisicao, considere registrar seu dominio na lista HSTS Preload dos navegadores.
+> **Nota:** O HSTS só funciona após a primeira visita HTTPS. Para proteção desde a primeira requisição, considere registrar seu domínio na lista HSTS Preload dos navegadores.
 
-### Comunicacao Gateway-Upstream
-Alem de forcar HTTPS no lado do cliente, voce pode configurar o upstream para usar HTTPS na comunicacao entre o gateway e o servidor de destino. Configure o esquema \`https\` no upstream e, se necessario, desabilite a verificacao de certificado para upstreams com certificados self-signed.`,
+### Comunicação Gateway-Upstream
+Além de forçar HTTPS no lado do cliente, você pode configurar o upstream para usar HTTPS na comunicação entre o gateway e o servidor de destino. Configure o esquema \`https\` no upstream e, se necessário, desabilite a verificação de certificado para upstreams com certificados self-signed.`,
         },
         {
           id: "monitoramento-validade",
           title: "Monitoramento de Validade",
-          body: `Certificados SSL expirados causam interrupcoes severas — navegadores e clientes rejeitam conexoes com certificados invalidos. O FuseOne monitora a validade dos seus certificados e alerta antes da expiracao.
+          body: `Certificados SSL expirados causam interrupções severas — navegadores e clientes rejeitam conexões com certificados inválidos. O FuseOne monitora a validade dos seus certificados e alerta antes da expiração.
 
 ### Dashboard de Certificados
-A pagina **Configuracoes > SSL/TLS** exibe todos os certificados com:
+A página **Configurações > SSL/TLS** exibe todos os certificados com:
 
-- **Dominio(s)** — SNIs associados
+- **Domínio(s)** — SNIs associados
 - **Emissor** — Autoridade certificadora que emitiu o certificado
-- **Valido ate** — Data de expiracao com indicador visual:
+- **Válido até** — Data de expiração com indicador visual:
   - Verde: mais de 30 dias para expirar
   - Amarelo: menos de 30 dias para expirar
-  - Vermelho: menos de 7 dias ou ja expirado
+  - Vermelho: menos de 7 dias ou já expirado
 
-### Alertas Automaticos
-O sistema envia alertas automaticos quando certificados estao proximos da expiracao:
+### Alertas Automáticos
+O sistema envia alertas automáticos quando certificados estão próximos da expiração:
 
-- **30 dias antes** — Notificacao informativa (severidade baixa)
-- **14 dias antes** — Notificacao de aviso (severidade media)
-- **7 dias antes** — Notificacao urgente (severidade alta)
-- **Expirado** — Notificacao critica diaria ate que o certificado seja renovado
+- **30 dias antes** — Notificação informativa (severidade baixa)
+- **14 dias antes** — Notificação de aviso (severidade média)
+- **7 dias antes** — Notificação urgente (severidade alta)
+- **Expirado** — Notificação crítica diária até que o certificado seja renovado
 
-As notificacoes sao enviadas pelos canais configurados em **Configuracoes > Notificacoes**.
+As notificações são enviadas pelos canais configurados em **Configurações > Notificações**.
 
-> **Dica:** Para evitar preocupacoes com expiracao, considere usar certificados de provedores que oferecem renovacao automatica via ACME/Let's Encrypt. O gateway pode ser configurado para suportar renovacao automatica em ambientes compativeis.`,
+> **Dica:** Para evitar preocupações com expiração, considere usar certificados de provedores que oferecem renovação automática via ACME/Let's Encrypt. O gateway pode ser configurado para suportar renovação automática em ambientes compatíveis.`,
         },
       ],
     },
 
-    // ── 3. Protecao contra Ameacas ──────────────────────────────────────
+    // ── 3. Proteção contra Ameaças ──────────────────────────────────────
     {
       slug: "protecao-apis",
-      title: "Protecao contra Ameacas",
+      title: "Proteção contra Ameaças",
       description:
-        "IP restriction, CORS, CSRF, limitacao de body, protecao contra SQL injection e mascaramento de dados.",
+        "IP restriction, CORS, CSRF, limitação de body, proteção contra SQL injection e mascaramento de dados.",
       icon: "ShieldAlert",
       tags: ["ip-restriction", "cors", "threat-protection", "data-masking"],
       content: [
         {
           id: "ip-restriction",
-          title: "Restricao por IP",
-          body: `O plugin \`ip-restriction\` permite controlar quais enderecos IP podem acessar suas rotas. Voce pode configurar listas de permissao (whitelist) ou bloqueio (blacklist).
+          title: "Restrição por IP",
+          body: `O plugin \`ip-restriction\` permite controlar quais endereços IP podem acessar suas rotas. Você pode configurar listas de permissão (whitelist) ou bloqueio (blacklist).
 
-### Whitelist (Lista de Permissao)
-Apenas os IPs listados podem acessar a rota. Todos os demais sao bloqueados com HTTP 403:
+### Whitelist (Lista de Permissão)
+Apenas os IPs listados podem acessar a rota. Todos os demais são bloqueados com HTTP 403:
 
 \`\`\`json
 {
@@ -279,17 +279,17 @@ Formatos suportados:
 - CIDR: \`10.0.0.0/8\`
 - IPv6: \`::1\`, \`fe80::/10\`
 
-> **Nota:** Quando o gateway esta atras de um load balancer ou CDN, certifique-se de configurar o header \`X-Forwarded-For\` ou \`X-Real-IP\` corretamente para que o IP real do cliente seja utilizado na restricao, e nao o IP do load balancer.
+> **Nota:** Quando o gateway está atrás de um load balancer ou CDN, certifique-se de configurar o header \`X-Forwarded-For\` ou \`X-Real-IP\` corretamente para que o IP real do cliente seja utilizado na restrição, e não o IP do load balancer.
 
-Use whitelist para APIs internas que devem ser acessiveis apenas de redes confiavies. Use blacklist para bloquear IPs conhecidos como maliciosos.`,
+Use whitelist para APIs internas que devem ser acessíveis apenas de redes confiáveis. Use blacklist para bloquear IPs conhecidos como maliciosos.`,
         },
         {
           id: "cors-csrf",
           title: "CORS e CSRF",
           body: `### CORS (Cross-Origin Resource Sharing)
-O plugin \`cors\` configura os headers necessarios para permitir que aplicacoes web em um dominio acessem APIs em outro dominio. Sem CORS configurado, navegadores bloqueiam requisicoes cross-origin.
+O plugin \`cors\` configura os headers necessários para permitir que aplicações web em um domínio acessem APIs em outro domínio. Sem CORS configurado, navegadores bloqueiam requisições cross-origin.
 
-Configuracao tipica:
+Configuração típica:
 
 \`\`\`json
 {
@@ -304,25 +304,25 @@ Configuracao tipica:
 
 Campos importantes:
 
-- \`allow_origins\` — Dominios permitidos (use \`*\` apenas em desenvolvimento)
-- \`allow_methods\` — Metodos HTTP permitidos
+- \`allow_origins\` — Domínios permitidos (use \`*\` apenas em desenvolvimento)
+- \`allow_methods\` — Métodos HTTP permitidos
 - \`allow_headers\` — Headers que o cliente pode enviar
 - \`allow_credential\` — Permite envio de cookies cross-origin
 
 ### CSRF (Cross-Site Request Forgery)
-O plugin \`csrf\` protege contra ataques CSRF gerando e validando tokens anti-falsificacao. Ele e especialmente importante para APIs que aceitam requisicoes de navegadores com cookies de sessao.
+O plugin \`csrf\` protege contra ataques CSRF gerando e validando tokens anti-falsificação. Ele é especialmente importante para APIs que aceitam requisições de navegadores com cookies de sessão.
 
-O plugin injeta um token CSRF em um cookie e valida que requisicoes POST/PUT/DELETE incluam esse token em um header customizado.
+O plugin injeta um token CSRF em um cookie e valida que requisições POST/PUT/DELETE incluam esse token em um header customizado.
 
-> **Atencao:** Nunca use \`allow_origins: "*"\` com \`allow_credential: true\` em producao. Essa combinacao e insegura e bloqueada pelos navegadores. Sempre especifique os dominios permitidos explicitamente.`,
+> **Atenção:** Nunca use \`allow_origins: "*"\` com \`allow_credential: true\` em produção. Essa combinação é insegura e bloqueada pelos navegadores. Sempre especifique os domínios permitidos explicitamente.`,
         },
         {
           id: "threat-protection",
-          title: "Protecao contra Ameacas",
-          body: `O API Gateway oferece plugins dedicados para proteger suas APIs contra ameacas comuns:
+          title: "Proteção contra Ameaças",
+          body: `O API Gateway oferece plugins dedicados para proteger suas APIs contra ameaças comuns:
 
 ### URI Blocker
-O plugin \`uri-blocker\` bloqueia requisicoes para URIs que correspondam a padroes perigosos:
+O plugin \`uri-blocker\` bloqueia requisições para URIs que correspondam a padrões perigosos:
 
 \`\`\`json
 {
@@ -335,38 +335,38 @@ O plugin \`uri-blocker\` bloqueia requisicoes para URIs que correspondam a padro
 }
 \`\`\`
 
-Util para bloquear tentativas de acesso a recursos administrativos, arquivos sensiveis ou caminhos conhecidos de ataques automatizados.
+Útil para bloquear tentativas de acesso a recursos administrativos, arquivos sensíveis ou caminhos conhecidos de ataques automatizados.
 
-### Limitacao de Tamanho do Body
-Configure o tamanho maximo do corpo da requisicao para prevenir ataques de payload excessivamente grande (denial of service):
+### Limitação de Tamanho do Body
+Configure o tamanho máximo do corpo da requisição para prevenir ataques de payload excessivamente grande (denial of service):
 
-O plugin \`request-body-limit\` rejeita requisicoes cujo body exceda o limite configurado (ex: 10 MB) com HTTP 413 Payload Too Large.
+O plugin \`request-body-limit\` rejeita requisições cujo body exceda o limite configurado (ex: 10 MB) com HTTP 413 Payload Too Large.
 
-### Protecao contra SQL Injection
-O plugin de inspecao de payload analisa parametros de query string e body em busca de padroes comuns de SQL injection, como:
+### Proteção contra SQL Injection
+O plugin de inspeção de payload analisa parâmetros de query string e body em busca de padrões comuns de SQL injection, como:
 
-- Instrucoes SQL (\`SELECT\`, \`UNION\`, \`DROP\`, \`DELETE\`)
-- Comentarios SQL (\`--\`, \`/**/\`)
+- Instruções SQL (\`SELECT\`, \`UNION\`, \`DROP\`, \`DELETE\`)
+- Comentários SQL (\`--\`, \`/**/\`)
 - Caracteres especiais em contextos suspeitos (\`' OR 1=1\`)
 
-> **Nota:** A protecao contra SQL injection no gateway e uma camada adicional de defesa. Ela nao substitui boas praticas no backend como prepared statements e validacao de entrada.
+> **Nota:** A proteção contra SQL injection no gateway é uma camada adicional de defesa. Ela não substitui boas práticas no backend como prepared statements e validação de entrada.
 
-Combine multiplas camadas de protecao para uma defesa em profundidade eficaz.`,
+Combine múltiplas camadas de proteção para uma defesa em profundidade eficaz.`,
         },
         {
           id: "data-masking",
           title: "Mascaramento de Dados (Data Masking)",
-          body: `O plugin \`data-mask\` permite redatar informacoes sensiveis (PII — Personally Identifiable Information) nas respostas das suas APIs antes de envia-las ao cliente. Isso e util para cumprir regulamentacoes como LGPD e GDPR.
+          body: `O plugin \`data-mask\` permite redatar informações sensíveis (PII — Personally Identifiable Information) nas respostas das suas APIs antes de enviá-las ao cliente. Isso é útil para cumprir regulamentações como LGPD e GDPR.
 
 ### Como Funciona
 O plugin intercepta a resposta do upstream e aplica regras de mascaramento antes de enviar ao cliente:
 
 1. Analisa o body da resposta (JSON)
-2. Identifica campos que correspondem as regras configuradas
-3. Substitui os valores por versoes mascaradas
+2. Identifica campos que correspondem às regras configuradas
+3. Substitui os valores por versões mascaradas
 4. Envia a resposta modificada ao cliente
 
-### Configuracao de Regras
+### Configuração de Regras
 Defina quais campos devem ser mascarados e como:
 
 \`\`\`json
@@ -398,12 +398,12 @@ Neste exemplo:
 
 - CPF \`123.456.789-09\` seria exibido como \`*********-09\`
 - Email \`usuario@email.com\` seria exibido como \`us*************\`
-- Cartao de credito seria completamente substituido por \`****\`
+- Cartão de crédito seria completamente substituído por \`****\`
 
 ### Tipos de Mascaramento
-- **partial** — Mascara parte do valor, preservando inicio e/ou fim
+- **partial** — Mascara parte do valor, preservando início e/ou fim
 - **full** — Substitui o valor inteiro por uma string fixa
-- **hash** — Substitui por um hash irreversivel (util para correlacao sem exposicao)
+- **hash** — Substitui por um hash irreversível (útil para correlação sem exposição)
 
 > **Dica:** O mascaramento pode ser aplicado condicionalmente com base no consumer. Por exemplo, consumidores internos veem os dados completos, enquanto consumidores externos recebem dados mascarados. Configure isso combinando \`data-mask\` com \`consumer-restriction\`.`,
         },
@@ -415,55 +415,55 @@ Neste exemplo:
       slug: "secrets-management",
       title: "Gerenciamento de Secrets",
       description:
-        "Armazene credenciais com seguranca e referencie-as nas configuracoes de plugins.",
+        "Armazene credenciais com segurança e referencie-as nas configurações de plugins.",
       icon: "KeySquare",
-      tags: ["secrets", "credenciais", "seguranca"],
+      tags: ["secrets", "credenciais", "segurança"],
       content: [
         {
           id: "o-que-sao-secrets",
-          title: "O que sao Secrets",
-          body: `Secrets sao credenciais e valores sensiveis que precisam ser utilizados nas configuracoes de plugins mas nao devem ser armazenados em texto plano. Exemplos comuns incluem:
+          title: "O que são Secrets",
+          body: `Secrets são credenciais e valores sensíveis que precisam ser utilizados nas configurações de plugins mas não devem ser armazenados em texto plano. Exemplos comuns incluem:
 
 - Chaves de API de provedores de IA (OpenAI, Anthropic, etc.)
-- Credenciais de autenticacao de upstreams
-- Tokens de acesso a servicos externos
+- Credenciais de autenticação de upstreams
+- Tokens de acesso a serviços externos
 - Chaves de assinatura JWT
 - Senhas de banco de dados para plugins que acessam dados
 
-O gerenciador de secrets do FuseOne permite armazenar esses valores de forma segura e referencia-los nas configuracoes de plugins usando a sintaxe \`\${{secrets.NOME_DA_SECRET}}\`. No momento da execucao, o gateway substitui a referencia pelo valor real da secret.
+O gerenciador de secrets do FuseOne permite armazenar esses valores de forma segura e referenciá-los nas configurações de plugins usando a sintaxe \`\${{secrets.NOME_DA_SECRET}}\`. No momento da execução, o gateway substitui a referência pelo valor real da secret.
 
-### Beneficios
-- **Seguranca** — Secrets sao encriptadas em repouso e em transito
-- **Auditoria** — Todas as operacoes em secrets sao registradas no log de auditoria
-- **Rotacao** — Atualize o valor de uma secret sem reconfigurar os plugins que a utilizam
-- **Separacao de responsabilidades** — Desenvolvedores configuram plugins sem acesso aos valores reais
+### Benefícios
+- **Segurança** — Secrets são encriptadas em repouso e em trânsito
+- **Auditoria** — Todas as operações em secrets são registradas no log de auditoria
+- **Rotação** — Atualize o valor de uma secret sem reconfigurar os plugins que a utilizam
+- **Separação de responsabilidades** — Desenvolvedores configuram plugins sem acesso aos valores reais
 
-> **Nota:** Mesmo administradores nao podem visualizar o valor de uma secret apos criacao. A interface mostra apenas os metadados (nome, descricao, data de criacao).`,
+> **Nota:** Mesmo administradores não podem visualizar o valor de uma secret após criação. A interface mostra apenas os metadados (nome, descrição, data de criação).`,
         },
         {
           id: "criando-secrets",
           title: "Criando e Gerenciando Secrets",
-          body: `Para gerenciar secrets, acesse **Configuracoes > Secrets**. A pagina exibe todas as secrets cadastradas com nome, descricao e data da ultima atualizacao.
+          body: `Para gerenciar secrets, acesse **Configurações > Secrets**. A página exibe todas as secrets cadastradas com nome, descrição e data da última atualização.
 
 ### Criando uma Secret
 Clique em **Nova Secret** e preencha:
 
-- **Nome** — Identificador unico em UPPER_SNAKE_CASE (ex: \`OPENAI_API_KEY\`, \`UPSTREAM_DB_PASSWORD\`)
-- **Valor** — O conteudo sensivel da secret
-- **Descricao** — Texto descritivo para identificar o proposito da secret (opcional)
+- **Nome** — Identificador único em UPPER_SNAKE_CASE (ex: \`OPENAI_API_KEY\`, \`UPSTREAM_DB_PASSWORD\`)
+- **Valor** — O conteúdo sensível da secret
+- **Descrição** — Texto descritivo para identificar o propósito da secret (opcional)
 
-Apos salvar, o valor nao pode mais ser visualizado — apenas atualizado.
+Após salvar, o valor não pode mais ser visualizado — apenas atualizado.
 
 ### Atualizando uma Secret
-Clique na secret e selecione **Atualizar Valor**. Digite o novo valor e confirme. A atualizacao e propagada automaticamente para todos os plugins que referenciam essa secret.
+Clique na secret e selecione **Atualizar Valor**. Digite o novo valor e confirme. A atualização é propagada automaticamente para todos os plugins que referenciam essa secret.
 
 ### Removendo uma Secret
-Antes de remover uma secret, verifique se ela nao esta sendo referenciada por nenhum plugin. O FuseOne exibe um aviso se detectar referencias existentes, mas a remocao nao e bloqueada — plugins que referenciam uma secret removida recebem um erro na execucao.
+Antes de remover uma secret, verifique se ela não está sendo referenciada por nenhum plugin. O FuseOne exibe um aviso se detectar referências existentes, mas a remoção não é bloqueada — plugins que referenciam uma secret removida recebem um erro na execução.
 
-> **Atencao:** A remocao de uma secret e irreversivel. Certifique-se de que nenhuma rota ativa depende dela antes de proceder.
+> **Atenção:** A remoção de uma secret é irreversível. Certifique-se de que nenhuma rota ativa depende dela antes de proceder.
 
 ### Referenciando Secrets
-Use a sintaxe de referencia nos campos de configuracao de plugins:
+Use a sintaxe de referência nos campos de configuração de plugins:
 
 \`\`\`json
 {
@@ -475,64 +475,64 @@ Use a sintaxe de referencia nos campos de configuracao de plugins:
         {
           id: "backends-secrets",
           title: "Backends de Secrets",
-          body: `O FuseOne suporta diferentes backends para armazenamento de secrets, permitindo integrar com a infraestrutura de gerenciamento de credenciais que voce ja utiliza.
+          body: `O FuseOne suporta diferentes backends para armazenamento de secrets, permitindo integrar com a infraestrutura de gerenciamento de credenciais que você já utiliza.
 
-### Backend Interno (Padrao)
-As secrets sao armazenadas no banco de dados do FuseOne, encriptadas com AES-256-GCM. A chave de encriptacao e derivada da configuracao do servidor. Este e o backend padrao e nao requer configuracao adicional.
+### Backend Interno (Padrão)
+As secrets são armazenadas no banco de dados do FuseOne, encriptadas com AES-256-GCM. A chave de encriptação é derivada da configuração do servidor. Este é o backend padrão e não requer configuração adicional.
 
 ### HashiCorp Vault
 Integre com o HashiCorp Vault para gerenciamento centralizado de secrets:
 
-- Configure a URL do Vault e o metodo de autenticacao em **Configuracoes > Secrets > Backend**
-- As secrets sao lidas diretamente do Vault no momento da execucao
-- Suporta autenticacao via Token, AppRole e Kubernetes
+- Configure a URL do Vault e o método de autenticação em **Configurações > Secrets > Backend**
+- As secrets são lidas diretamente do Vault no momento da execução
+- Suporta autenticação via Token, AppRole e Kubernetes
 
 ### AWS Secrets Manager
 Integre com o AWS Secrets Manager para ambientes AWS:
 
-- Configure a regiao e credenciais de acesso
-- As secrets sao referenciadas pelo ARN ou nome no AWS Secrets Manager
-- Suporta rotacao automatica de secrets via AWS
+- Configure a região e credenciais de acesso
+- As secrets são referenciadas pelo ARN ou nome no AWS Secrets Manager
+- Suporta rotação automática de secrets via AWS
 
-### Variaveis de Ambiente
-Para cenarios simples, secrets podem ser injetadas via variaveis de ambiente do servidor:
+### Variáveis de Ambiente
+Para cenários simples, secrets podem ser injetadas via variáveis de ambiente do servidor:
 
-- Defina a variavel no ambiente onde o gateway executa
+- Defina a variável no ambiente onde o gateway executa
 - Referencie com a sintaxe \`$ENV.NOME_DA_VARIAVEL\`
 
-> **Dica:** Para ambientes de producao com requisitos de compliance, recomendamos o uso do HashiCorp Vault ou AWS Secrets Manager, que oferecem rotacao automatica, auditoria detalhada e controle de acesso granular.`,
+> **Dica:** Para ambientes de produção com requisitos de compliance, recomendamos o uso do HashiCorp Vault ou AWS Secrets Manager, que oferecem rotação automática, auditoria detalhada e controle de acesso granular.`,
         },
         {
           id: "boas-praticas-secrets",
-          title: "Boas Praticas",
-          body: `Siga estas recomendacoes para gerenciar secrets de forma segura no FuseOne:
+          title: "Boas Práticas",
+          body: `Siga estas recomendações para gerenciar secrets de forma segura no FuseOne:
 
 ### Nomenclatura Consistente
-Adote uma convencao de nomes clara e consistente para suas secrets:
+Adote uma convenção de nomes clara e consistente para suas secrets:
 
 - Use UPPER_SNAKE_CASE: \`OPENAI_API_KEY\`, \`DB_PASSWORD\`
 - Inclua o contexto no nome: \`PROD_STRIPE_SECRET\`, \`DEV_SMTP_PASSWORD\`
-- Agrupe por provedor ou servico: \`AWS_ACCESS_KEY\`, \`AWS_SECRET_KEY\`
+- Agrupe por provedor ou serviço: \`AWS_ACCESS_KEY\`, \`AWS_SECRET_KEY\`
 
-### Rotacao Regular
-Estabeleca uma politica de rotacao de secrets:
+### Rotação Regular
+Estabeleça uma política de rotação de secrets:
 
 - **Chaves de API** — Rotacione a cada 90 dias
 - **Senhas de banco** — Rotacione a cada 60 dias
-- **Tokens de servico** — Rotacione a cada 30 dias
-- **Apos incidentes** — Rotacione imediatamente todas as secrets que possam ter sido comprometidas
+- **Tokens de serviço** — Rotacione a cada 30 dias
+- **Após incidentes** — Rotacione imediatamente todas as secrets que possam ter sido comprometidas
 
-### Principio do Menor Privilegio
-- Crie secrets especificas para cada ambiente (dev, staging, producao)
-- Nao compartilhe a mesma secret entre ambientes diferentes
+### Princípio do Menor Privilégio
+- Crie secrets específicas para cada ambiente (dev, staging, produção)
+- Não compartilhe a mesma secret entre ambientes diferentes
 - Limite o acesso ao gerenciamento de secrets apenas a roles que realmente necessitam
 
 ### Monitoramento
-- Revise periodicamente o log de auditoria para detectar acessos nao autorizados a secrets
-- Configure alertas para operacoes sensiveis (criacao, atualizacao, remocao de secrets)
+- Revise periodicamente o log de auditoria para detectar acessos não autorizados a secrets
+- Configure alertas para operações sensíveis (criação, atualização, remoção de secrets)
 - Monitore tentativas de acesso a secrets inexistentes (pode indicar tentativa de ataque)
 
-> **Atencao:** Nunca armazene secrets em codigo-fonte, arquivos de configuracao versionados ou variaveis de ambiente expostas em logs. Sempre utilize o gerenciador de secrets do FuseOne ou um backend externo dedicado.`,
+> **Atenção:** Nunca armazene secrets em código-fonte, arquivos de configuração versionados ou variáveis de ambiente expostas em logs. Sempre utilize o gerenciador de secrets do FuseOne ou um backend externo dedicado.`,
         },
       ],
     },

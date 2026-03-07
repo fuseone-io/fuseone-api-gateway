@@ -284,10 +284,30 @@ func (tc *TraceCollector) groupSpans(spans []*tracepb.Span, serviceName string) 
 	return result
 }
 
+// luaPluginTiming matches the JSON objects emitted by fuseone-timing.lua:
+//
+//	[{"n":"key-auth","o":5000,"d":8200}, ...]
+//
+// n = plugin name, o = offset_µs from ft_t0, d = duration_µs.
+// Values are in microseconds (µs) for sub-ms precision; Go converts to ns via * 1000.
+type luaPluginTiming struct {
+	N string `json:"n"`
+	O int64  `json:"o"` // offset in µs from request start (ft_t0)
+	D int64  `json:"d"` // duration in µs
+}
+
 // enrichTraceSpans decomposes a single-span trace into synthetic child spans
 // using nginx timing variables that APISIX sends as span attributes.
-// This creates a meaningful waterfall (gateway vs upstream breakdown) without
-// any custom APISIX plugin — zero overhead on the gateway.
+//
+// Three enrichment tiers (best to least detail):
+//
+//  1. Per-plugin timing (fuseone.plugin_timing present):
+//     Individual span per plugin, accurately positioned on the timeline.
+//
+//  2. Per-phase timing (fuseone.rewrite_ms etc. present, no plugin JSON):
+//     Auth & Rewrite / Auth & Policies / Response Processing aggregates.
+//
+//  3. Legacy: single "Gateway Processing" + upstream breakdown.
 func enrichTraceSpans(trace *model.RequestTrace) {
 	if len(trace.Spans) != 1 || trace.RootSpanID == "" {
 		return // only enrich single-span traces
@@ -319,13 +339,6 @@ func enrichTraceSpans(trace *model.RequestTrace) {
 		upstreamResponseNs = totalNs
 	}
 
-	gatewayNs := totalNs - upstreamResponseNs
-
-	// Timeline: |-- gateway pre --|-- upstream connect --|-- upstream TTFB --|-- upstream transfer --|
-	gatewayEnd := root.StartTimeNs + gatewayNs
-	upstreamStart := gatewayEnd
-	upstreamEnd := upstreamStart + upstreamResponseNs
-
 	// Build upstream metadata for child spans
 	upstreamAttrs := map[string]string{"synthetic": "true"}
 	if upstreamAddr != "" {
@@ -337,90 +350,283 @@ func enrichTraceSpans(trace *model.RequestTrace) {
 
 	childSpans := []model.TraceSpan{}
 
-	// 1. Gateway Processing (auth, rate limiting, proxy-rewrite, etc.)
-	if gatewayNs > 0 {
-		childSpans = append(childSpans, model.TraceSpan{
-			SpanID:       root.SpanID + "01",
-			ParentSpanID: root.SpanID,
-			Name:         "Gateway Processing",
-			Kind:         "internal",
-			StartTimeNs:  root.StartTimeNs,
-			EndTimeNs:    gatewayEnd,
-			DurationNs:   gatewayNs,
-			StatusCode:   "OK",
-			Attributes:   map[string]string{"synthetic": "true"},
-		})
+	// Parse per-plugin timing JSON if present.
+	var pluginTimings []luaPluginTiming
+	if ptJSON := attrs["fuseone.plugin_timing"]; ptJSON != "" {
+		_ = json.Unmarshal([]byte(ptJSON), &pluginTimings)
 	}
 
-	// 2. Upstream Connect (TCP handshake)
-	if upstreamConnectNs > 0 {
-		childSpans = append(childSpans, model.TraceSpan{
-			SpanID:       root.SpanID + "02",
-			ParentSpanID: root.SpanID,
-			Name:         "Upstream Connect",
-			Kind:         "client",
-			StartTimeNs:  upstreamStart,
-			EndTimeNs:    upstreamStart + upstreamConnectNs,
-			DurationNs:   upstreamConnectNs,
-			StatusCode:   "OK",
-			Attributes:   upstreamAttrs,
-		})
+	// Parse per-phase timing attributes.
+	rewriteNs := parseMs(attrs["fuseone.rewrite_ms"])
+	accessPlusUpstreamNs := parseMs(attrs["fuseone.access_plus_upstream_ms"])
+	headerFilterNs := parseMs(attrs["fuseone.header_filter_ms"])
+	hasFuseOneTiming := rewriteNs > 0 || accessPlusUpstreamNs > 0
+
+	// Helper: append upstream sub-spans starting at upstreamStart.
+	addUpstreamSpans := func(upstreamStart int64, idBase string) int64 {
+		upstreamEnd := upstreamStart + upstreamResponseNs
+
+		if upstreamConnectNs > 0 {
+			childSpans = append(childSpans, model.TraceSpan{
+				SpanID:       root.SpanID + idBase + "c",
+				ParentSpanID: root.SpanID,
+				Name:         "Upstream Connect",
+				Kind:         "client",
+				StartTimeNs:  upstreamStart,
+				EndTimeNs:    upstreamStart + upstreamConnectNs,
+				DurationNs:   upstreamConnectNs,
+				StatusCode:   "OK",
+				Attributes:   upstreamAttrs,
+			})
+		}
+		if upstreamHeaderNs > upstreamConnectNs {
+			ttfbNs := upstreamHeaderNs - upstreamConnectNs
+			ttfbStart := upstreamStart + upstreamConnectNs
+			childSpans = append(childSpans, model.TraceSpan{
+				SpanID:       root.SpanID + idBase + "t",
+				ParentSpanID: root.SpanID,
+				Name:         "Upstream TTFB",
+				Kind:         "client",
+				StartTimeNs:  ttfbStart,
+				EndTimeNs:    ttfbStart + ttfbNs,
+				DurationNs:   ttfbNs,
+				StatusCode:   "OK",
+				Attributes:   upstreamAttrs,
+			})
+		}
+		if upstreamResponseNs > upstreamHeaderNs {
+			transferNs := upstreamResponseNs - upstreamHeaderNs
+			transferStart := upstreamStart + upstreamHeaderNs
+			childSpans = append(childSpans, model.TraceSpan{
+				SpanID:       root.SpanID + idBase + "r",
+				ParentSpanID: root.SpanID,
+				Name:         "Upstream Transfer",
+				Kind:         "client",
+				StartTimeNs:  transferStart,
+				EndTimeNs:    transferStart + transferNs,
+				DurationNs:   transferNs,
+				StatusCode:   "OK",
+				Attributes:   upstreamAttrs,
+			})
+		} else if upstreamConnectNs == 0 && upstreamHeaderNs == 0 {
+			// No breakdown — single upstream span
+			childSpans = append(childSpans, model.TraceSpan{
+				SpanID:       root.SpanID + idBase + "r",
+				ParentSpanID: root.SpanID,
+				Name:         "Upstream Response",
+				Kind:         "client",
+				StartTimeNs:  upstreamStart,
+				EndTimeNs:    upstreamEnd,
+				DurationNs:   upstreamResponseNs,
+				StatusCode:   "OK",
+				Attributes:   upstreamAttrs,
+			})
+		}
+		return upstreamEnd
 	}
 
-	// 3. Upstream TTFB (waiting for first byte after connect)
-	if upstreamHeaderNs > upstreamConnectNs {
-		ttfbNs := upstreamHeaderNs - upstreamConnectNs
-		ttfbStart := upstreamStart + upstreamConnectNs
-		childSpans = append(childSpans, model.TraceSpan{
-			SpanID:       root.SpanID + "03",
-			ParentSpanID: root.SpanID,
-			Name:         "Upstream TTFB",
-			Kind:         "client",
-			StartTimeNs:  ttfbStart,
-			EndTimeNs:    ttfbStart + ttfbNs,
-			DurationNs:   ttfbNs,
-			StatusCode:   "OK",
-			Attributes:   upstreamAttrs,
-		})
-	}
+	if len(pluginTimings) > 0 {
+		// ── Tier 1: Per-plugin spans ──────────────────────────────────────────
+		// Each plugin entry carries an offset_ms from ft_t0 (≈ request start)
+		// and a duration_ms, giving accurate waterfall positioning.
+		//
+		// Upstream spans are interleaved at their natural position
+		// (after access-phase plugins, before header_filter plugins).
+		//
+		// Timeline:
+		//   [rewrite plugins] [access plugins] [upstream] [header_filter plugins]
 
-	// 4. Upstream Transfer (receiving response body)
-	if upstreamResponseNs > upstreamHeaderNs {
-		transferNs := upstreamResponseNs - upstreamHeaderNs
-		transferStart := upstreamStart + upstreamHeaderNs
-		childSpans = append(childSpans, model.TraceSpan{
-			SpanID:       root.SpanID + "04",
-			ParentSpanID: root.SpanID,
-			Name:         "Upstream Transfer",
-			Kind:         "client",
-			StartTimeNs:  transferStart,
-			EndTimeNs:    transferStart + transferNs,
-			DurationNs:   transferNs,
-			StatusCode:   "OK",
-			Attributes:   upstreamAttrs,
-		})
-	}
+		accessPlusUpstreamNs2 := accessPlusUpstreamNs // may be 0 if not captured
+		_ = accessPlusUpstreamNs2
 
-	// If only connect+header data produced upstream connect+TTFB but no header timing,
-	// create a single "Upstream Response" span covering the whole upstream time.
-	if len(childSpans) == 1 && gatewayNs > 0 {
-		// Only gateway span was created — add a single upstream span
-		childSpans = append(childSpans, model.TraceSpan{
-			SpanID:       root.SpanID + "05",
-			ParentSpanID: root.SpanID,
-			Name:         "Upstream Response",
-			Kind:         "client",
-			StartTimeNs:  upstreamStart,
-			EndTimeNs:    upstreamEnd,
-			DurationNs:   upstreamResponseNs,
-			StatusCode:   "OK",
-			Attributes:   upstreamAttrs,
-		})
+		// Compute where upstream starts relative to root.StartTimeNs.
+		// Upstream begins at the end of the access phase:
+		//   upstreamStart = root.StartTimeNs + rewriteNs + accessNs
+		// where accessNs = accessPlusUpstreamNs - upstreamResponseNs.
+		accessNs := accessPlusUpstreamNs - upstreamResponseNs
+		if accessNs < 0 {
+			accessNs = 0
+		}
+		upstreamStart := root.StartTimeNs + rewriteNs + accessNs
+
+		// Emit plugin spans.  Separate header_filter plugins (o >= upstream end)
+		// from pre-upstream plugins (rewrite + access phase) so we can interleave
+		// the upstream spans in the correct chronological position.
+		upstreamEndNs := upstreamStart + upstreamResponseNs
+
+		// Threshold: offset_µs at which a plugin is considered post-upstream.
+		// Use accessPlusUpstreamNs as the cutoff (rewrite + access_plus_upstream), converted to µs.
+		postUpstreamOffsetUs := (rewriteNs + accessPlusUpstreamNs) / 1_000
+
+		preUpstream := []luaPluginTiming{}
+		postUpstream := []luaPluginTiming{}
+		for _, pt := range pluginTimings {
+			if pt.D <= 0 {
+				continue
+			}
+			if pt.O >= postUpstreamOffsetUs {
+				postUpstream = append(postUpstream, pt)
+			} else {
+				preUpstream = append(preUpstream, pt)
+			}
+		}
+
+		for idx, pt := range preUpstream {
+			startNs := root.StartTimeNs + pt.O*1_000 // µs → ns
+			durNs := pt.D * 1_000                    // µs → ns
+			childSpans = append(childSpans, model.TraceSpan{
+				SpanID:       root.SpanID + "p" + strconv.Itoa(idx),
+				ParentSpanID: root.SpanID,
+				Name:         pt.N,
+				Kind:         "internal",
+				StartTimeNs:  startNs,
+				EndTimeNs:    startNs + durNs,
+				DurationNs:   durNs,
+				StatusCode:   "OK",
+				Attributes:   map[string]string{"synthetic": "true", "fuseone.plugin": "true"},
+			})
+		}
+
+		upstreamEndNs = addUpstreamSpans(upstreamStart, "u")
+
+		for idx, pt := range postUpstream {
+			startNs := root.StartTimeNs + pt.O*1_000 // µs → ns
+			// Clamp start to at least upstreamEnd so header_filter spans don't overlap upstream.
+			if startNs < upstreamEndNs {
+				startNs = upstreamEndNs
+			}
+			durNs := pt.D * 1_000 // µs → ns
+			childSpans = append(childSpans, model.TraceSpan{
+				SpanID:       root.SpanID + "q" + strconv.Itoa(idx),
+				ParentSpanID: root.SpanID,
+				Name:         pt.N,
+				Kind:         "internal",
+				StartTimeNs:  startNs,
+				EndTimeNs:    startNs + durNs,
+				DurationNs:   durNs,
+				StatusCode:   "OK",
+				Attributes:   map[string]string{"synthetic": "true", "fuseone.plugin": "true"},
+			})
+		}
+
+	} else if hasFuseOneTiming {
+		// ── Tier 2: Phase-level spans ─────────────────────────────────────────
+		// access_plus_upstream_ms includes both access-phase plugins and upstream.
+		// Pure access time = access_plus_upstream_ms - upstream_response_ms.
+		accessNs := accessPlusUpstreamNs - upstreamResponseNs
+		if accessNs < 0 {
+			accessNs = 0
+		}
+
+		cursor := root.StartTimeNs
+
+		// 1. Auth & Rewrite (rewrite phase)
+		if rewriteNs > 0 {
+			childSpans = append(childSpans, model.TraceSpan{
+				SpanID:       root.SpanID + "01",
+				ParentSpanID: root.SpanID,
+				Name:         "Auth & Rewrite",
+				Kind:         "internal",
+				StartTimeNs:  cursor,
+				EndTimeNs:    cursor + rewriteNs,
+				DurationNs:   rewriteNs,
+				StatusCode:   "OK",
+				Attributes:   map[string]string{"synthetic": "true", "phase": "rewrite"},
+			})
+			cursor += rewriteNs
+		}
+
+		// 2. Auth & Policies (access phase)
+		if accessNs > 0 {
+			childSpans = append(childSpans, model.TraceSpan{
+				SpanID:       root.SpanID + "02",
+				ParentSpanID: root.SpanID,
+				Name:         "Auth & Policies",
+				Kind:         "internal",
+				StartTimeNs:  cursor,
+				EndTimeNs:    cursor + accessNs,
+				DurationNs:   accessNs,
+				StatusCode:   "OK",
+				Attributes:   map[string]string{"synthetic": "true", "phase": "access"},
+			})
+			cursor += accessNs
+		}
+
+		// 3–5. Upstream spans
+		upstreamEnd := addUpstreamSpans(cursor, "0")
+
+		// 6. Response Processing (header_filter)
+		if headerFilterNs > 0 {
+			childSpans = append(childSpans, model.TraceSpan{
+				SpanID:       root.SpanID + "06",
+				ParentSpanID: root.SpanID,
+				Name:         "Response Processing",
+				Kind:         "internal",
+				StartTimeNs:  upstreamEnd,
+				EndTimeNs:    upstreamEnd + headerFilterNs,
+				DurationNs:   headerFilterNs,
+				StatusCode:   "OK",
+				Attributes:   map[string]string{"synthetic": "true", "phase": "header_filter"},
+			})
+		}
+
+	} else {
+		// ── Tier 3: Legacy path ───────────────────────────────────────────────
+		gatewayNs := totalNs - upstreamResponseNs
+		gatewayEnd := root.StartTimeNs + gatewayNs
+		upstreamStart := gatewayEnd
+
+		// 1. Gateway Processing
+		if gatewayNs > 0 {
+			childSpans = append(childSpans, model.TraceSpan{
+				SpanID:       root.SpanID + "01",
+				ParentSpanID: root.SpanID,
+				Name:         "Gateway Processing",
+				Kind:         "internal",
+				StartTimeNs:  root.StartTimeNs,
+				EndTimeNs:    gatewayEnd,
+				DurationNs:   gatewayNs,
+				StatusCode:   "OK",
+				Attributes:   map[string]string{"synthetic": "true"},
+			})
+		}
+
+		prevLen := len(childSpans)
+		addUpstreamSpans(upstreamStart, "l")
+
+		// If no upstream breakdown was possible, add a single upstream span.
+		if len(childSpans) == prevLen && gatewayNs > 0 {
+			upstreamEnd := upstreamStart + upstreamResponseNs
+			childSpans = append(childSpans, model.TraceSpan{
+				SpanID:       root.SpanID + "05",
+				ParentSpanID: root.SpanID,
+				Name:         "Upstream Response",
+				Kind:         "client",
+				StartTimeNs:  upstreamStart,
+				EndTimeNs:    upstreamEnd,
+				DurationNs:   upstreamResponseNs,
+				StatusCode:   "OK",
+				Attributes:   upstreamAttrs,
+			})
+		}
 	}
 
 	if len(childSpans) > 0 {
 		trace.Spans = append(trace.Spans, childSpans...)
 	}
+}
+
+// parseMs parses an integer millisecond string (e.g. "42") and returns nanoseconds.
+// Returns 0 if the string is empty or invalid.
+func parseMs(s string) int64 {
+	if s == "" {
+		return 0
+	}
+	v, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return v * 1_000_000
 }
 
 // parseSeconds parses a string like "0.825" (seconds) to float64.

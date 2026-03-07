@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { useTranslations } from "next-intl"
 import Link from "next/link"
 import {
   AlertTriangle,
@@ -59,6 +60,8 @@ function getDiscoveryStatusColor(status: string): string {
 }
 
 export default function MeshPage() {
+  const t = useTranslations("mesh")
+  const tc = useTranslations("common")
   const {
     overview,
     overviewLoading,
@@ -81,7 +84,7 @@ export default function MeshPage() {
     fetchOverview()
     fetchServices()
     fetchDiscoveryStatus()
-    toast.success("Dados atualizados")
+    toast.success(t("dataRefreshed"))
   }
 
   const isLoading = overviewLoading && !overview
@@ -89,14 +92,15 @@ export default function MeshPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Service Mesh"
-        description="Visualize e monitore os servicos registrados no API Gateway"
+        title={t("title")}
+        description={t("description")}
+        icon={<Network className="h-6 w-6" />}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" asChild>
               <Link href="/mesh/topology">
                 <Network className="mr-2 h-4 w-4" />
-                Ver Topologia
+                {t("viewTopology")}
               </Link>
             </Button>
             <Button
@@ -131,7 +135,7 @@ export default function MeshPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-muted-foreground">
-                      Total de Servicos
+                      {t("totalServices")}
                     </p>
                     <p className="text-2xl font-bold mt-1">
                       {overview?.total_services ?? 0}
@@ -149,7 +153,7 @@ export default function MeshPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-muted-foreground">
-                      Nodes Saudaveis
+                      {t("healthyNodes")}
                     </p>
                     <p className="text-2xl font-bold text-emerald-600 mt-1">
                       {overview?.healthy_nodes ?? 0}
@@ -167,7 +171,7 @@ export default function MeshPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-muted-foreground">
-                      Nodes com Problema
+                      {t("unhealthyNodes")}
                     </p>
                     <p className="text-2xl font-bold text-red-600 mt-1">
                       {overview?.unhealthy_nodes ?? 0}
@@ -185,7 +189,7 @@ export default function MeshPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-muted-foreground">
-                      Tipos de Discovery
+                      {t("discoveryTypes")}
                     </p>
                     <p className="text-2xl font-bold mt-1">
                       {overview?.discovery_types?.length ?? 0}
@@ -205,7 +209,7 @@ export default function MeshPage() {
       {!discoveryLoading && discoveryStatus.length > 0 && (
         <div>
           <h2 className="text-sm font-semibold text-muted-foreground mb-3">
-            Status de Discovery
+            {t("discoveryStatus")}
           </h2>
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {discoveryStatus.map((ds) => (
@@ -220,15 +224,15 @@ export default function MeshPage() {
                         {ds.type}
                       </Badge>
                       <span className="text-sm font-medium">
-                        {ds.count} {ds.count === 1 ? "servico" : "servicos"}
+                        {ds.count} {ds.count === 1 ? t("service") : t("services")}
                       </span>
                     </div>
                     <Badge className={getDiscoveryStatusColor(ds.status)}>
                       {ds.status === "active"
-                        ? "Ativo"
+                        ? t("statusActive")
                         : ds.status === "error"
-                          ? "Erro"
-                          : "Desconhecido"}
+                          ? t("statusError")
+                          : t("statusUnknown")}
                     </Badge>
                   </div>
                   {ds.details && (
@@ -246,10 +250,10 @@ export default function MeshPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Network className="h-5 w-5 text-primary" />
-            Servicos
+            {t("servicesTitle")}
           </CardTitle>
           <CardDescription>
-            Lista de todos os servicos registrados no mesh
+            {t("servicesDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -264,23 +268,22 @@ export default function MeshPage() {
           ) : services.length === 0 ? (
             <div className="p-12 text-center">
               <Heart className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-              <p className="text-lg font-medium">Nenhum servico encontrado</p>
+              <p className="text-lg font-medium">{t("noServicesFound")}</p>
               <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-                Os servicos aparecerao aqui quando upstreams forem configurados com
-                service discovery ou nodes estaticos.
+                {t("noServicesDescription")}
               </p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Discovery</TableHead>
-                  <TableHead className="text-center">Nodes</TableHead>
-                  <TableHead className="text-center">Saudaveis</TableHead>
-                  <TableHead className="text-center">Com Problema</TableHead>
-                  <TableHead className="text-center">Rotas</TableHead>
-                  <TableHead className="text-right">Acoes</TableHead>
+                  <TableHead>{tc("name")}</TableHead>
+                  <TableHead>{t("discovery")}</TableHead>
+                  <TableHead className="text-center">{t("nodes")}</TableHead>
+                  <TableHead className="text-center">{t("healthy")}</TableHead>
+                  <TableHead className="text-center">{t("unhealthy")}</TableHead>
+                  <TableHead className="text-center">{t("routes")}</TableHead>
+                  <TableHead className="text-right">{tc("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

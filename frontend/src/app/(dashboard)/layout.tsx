@@ -14,6 +14,8 @@ import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { EnvironmentSwitcher } from "@/components/environment-switcher"
 import { api } from "@/lib/api-client"
 import { useUIStore } from "@/stores/ui-store"
+import { AIChatButton } from "@/components/ai-assistant/AIChatButton"
+import { AIChatPanel } from "@/components/ai-assistant/AIChatPanel"
 import type { User } from "@/types/auth"
 
 export default function DashboardLayout({
@@ -65,6 +67,8 @@ export default function DashboardLayout({
           {children}
         </main>
       </SidebarInset>
+      <AIChatButton />
+      <AIChatPanel />
     </SidebarProvider>
   )
 }

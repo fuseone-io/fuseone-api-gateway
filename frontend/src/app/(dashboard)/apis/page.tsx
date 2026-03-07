@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import {
   Activity,
@@ -19,6 +20,7 @@ import {
   Cable,
   Download,
   Copy,
+  Workflow,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -70,20 +72,22 @@ import {
 import type { ApiDefRecord, ApiDeployment } from "@/types/api"
 
 const SYNC_BADGE: Record<string, { label: string; className: string }> = {
-  draft: { label: "Draft", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
-  synced: { label: "Synced", className: "bg-green-500/15 text-green-600 border-green-500/30" },
-  out_of_sync: { label: "Out of Sync", className: "bg-orange-500/15 text-orange-600 border-orange-500/30" },
+  draft: { label: "draft", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
+  synced: { label: "synced", className: "bg-green-500/15 text-green-600 border-green-500/30" },
+  out_of_sync: { label: "outOfSync", className: "bg-orange-500/15 text-orange-600 border-orange-500/30" },
 }
 
 const LIFECYCLE_BADGE: Record<string, { label: string; className: string }> = {
-  draft: { label: "Draft", className: "bg-slate-500/15 text-slate-600 border-slate-500/30" },
-  active: { label: "Active", className: "bg-green-500/15 text-green-600 border-green-500/30" },
-  deprecated: { label: "Deprecated", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
-  retired: { label: "Retired", className: "bg-red-500/15 text-red-600 border-red-500/30" },
+  draft: { label: "draft", className: "bg-slate-500/15 text-slate-600 border-slate-500/30" },
+  active: { label: "active", className: "bg-green-500/15 text-green-600 border-green-500/30" },
+  deprecated: { label: "deprecated", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
+  retired: { label: "retired", className: "bg-red-500/15 text-red-600 border-red-500/30" },
 }
 
 export default function ApisPage() {
   const router = useRouter()
+  const t = useTranslations("apis")
+  const tc = useTranslations("common")
   const [records, setRecords] = useState<ApiDefRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -106,7 +110,7 @@ export default function ApisPage() {
       const result = await api.listApis(params)
       setRecords(result.data || [])
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load APIs")
+      toast.error(err instanceof Error ? err.message : t("toasts.failedLoad"))
     } finally {
       setLoading(false)
     }
@@ -146,11 +150,11 @@ export default function ApisPage() {
     if (!deleteTarget) return
     try {
       await api.deleteApi(deleteTarget.id)
-      toast.success("API deleted")
+      toast.success(t("toasts.deleted"))
       setDeleteTarget(null)
       loadApis()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete API")
+      toast.error(err instanceof Error ? err.message : t("toasts.failedDelete"))
     }
   }
 
@@ -158,10 +162,10 @@ export default function ApisPage() {
     setDeploying(record.id)
     try {
       await api.deployApi(record.id)
-      toast.success("API deployed")
+      toast.success(t("toasts.deployed"))
       loadApis()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to deploy API")
+      toast.error(err instanceof Error ? err.message : t("toasts.failedDeploy"))
     } finally {
       setDeploying(null)
     }
@@ -170,10 +174,10 @@ export default function ApisPage() {
   const handleClone = async (record: ApiDefRecord) => {
     try {
       const cloned = await api.cloneApi(record.id)
-      toast.success(`Cloned to ${cloned.version}`)
+      toast.success(t("toasts.cloned", { version: cloned.version }))
       router.push(`/apis/${cloned.id}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to clone API")
+      toast.error(err instanceof Error ? err.message : t("toasts.failedClone"))
     }
   }
 
@@ -206,13 +210,14 @@ export default function ApisPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="APIs"
-        description="Manage your API definitions with visual flow design"
+        title={t("title")}
+        description={t("description")}
+        icon={<Workflow className="h-6 w-6" />}
         actions={
           <Button asChild>
             <Link href="/apis/new">
               <Plus className="mr-2 h-4 w-4" />
-              Create API
+              {t("createApi")}
             </Link>
           </Button>
         }
@@ -223,7 +228,7 @@ export default function ApisPage() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search APIs..."
+            placeholder={t("searchPlaceholder")}
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -234,9 +239,9 @@ export default function ApisPage() {
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="enabled">Enabled</SelectItem>
-            <SelectItem value="disabled">Disabled</SelectItem>
+            <SelectItem value="all">{t("allStatus")}</SelectItem>
+            <SelectItem value="enabled">{t("status.enabled")}</SelectItem>
+            <SelectItem value="disabled">{t("status.disabled")}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={syncFilter} onValueChange={setSyncFilter}>
@@ -244,10 +249,10 @@ export default function ApisPage() {
             <SelectValue placeholder="Sync Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Sync</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="synced">Synced</SelectItem>
-            <SelectItem value="out_of_sync">Out of Sync</SelectItem>
+            <SelectItem value="all">{t("allSync")}</SelectItem>
+            <SelectItem value="draft">{t("status.draft")}</SelectItem>
+            <SelectItem value="synced">{t("status.synced")}</SelectItem>
+            <SelectItem value="out_of_sync">{t("status.outOfSync")}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={lifecycleFilter} onValueChange={setLifecycleFilter}>
@@ -255,11 +260,11 @@ export default function ApisPage() {
             <SelectValue placeholder="Lifecycle" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Lifecycle</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="deprecated">Deprecated</SelectItem>
-            <SelectItem value="retired">Retired</SelectItem>
+            <SelectItem value="all">{t("allLifecycle")}</SelectItem>
+            <SelectItem value="draft">{t("status.draft")}</SelectItem>
+            <SelectItem value="active">{t("status.active")}</SelectItem>
+            <SelectItem value="deprecated">{t("status.deprecated")}</SelectItem>
+            <SelectItem value="retired">{t("status.retired")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -270,19 +275,19 @@ export default function ApisPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <p className="text-lg font-medium text-muted-foreground mb-2">
               {search || syncFilter !== "all" || statusFilter !== "all" || lifecycleFilter !== "all"
-                ? "No APIs match your filters"
-                : "No APIs created yet"}
+                ? t("noApisMatchFilters")
+                : t("noApisCreated")}
             </p>
             <p className="text-sm text-muted-foreground mb-4">
               {search || syncFilter !== "all" || statusFilter !== "all" || lifecycleFilter !== "all"
-                ? "Try adjusting your search or filters"
-                : "Create your first API to get started with the visual flow designer"}
+                ? t("adjustFilters")
+                : t("createFirstApi")}
             </p>
             {!search && syncFilter === "all" && statusFilter === "all" && lifecycleFilter === "all" && (
               <Button asChild>
                 <Link href="/apis/new">
                   <Plus className="mr-2 h-4 w-4" />
-                  Create API
+                  {t("createApi")}
                 </Link>
               </Button>
             )}
@@ -293,14 +298,14 @@ export default function ApisPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead className="w-[60px] text-center">Version</TableHead>
-                <TableHead>URI</TableHead>
-                <TableHead className="w-[80px] text-center">Flows</TableHead>
-                <TableHead className="w-[90px] text-center">Policies</TableHead>
-                <TableHead className="w-[100px] text-center">Lifecycle</TableHead>
-                <TableHead className="w-[110px] text-center">Sync</TableHead>
-                {multiEnv && <TableHead className="w-[80px] text-center">Envs</TableHead>}
+                <TableHead>{t("tableHeaders.name")}</TableHead>
+                <TableHead className="w-[60px] text-center">{t("tableHeaders.version")}</TableHead>
+                <TableHead>{t("tableHeaders.uri")}</TableHead>
+                <TableHead className="w-[80px] text-center">{t("tableHeaders.flows")}</TableHead>
+                <TableHead className="w-[90px] text-center">{t("tableHeaders.policies")}</TableHead>
+                <TableHead className="w-[100px] text-center">{t("tableHeaders.lifecycle")}</TableHead>
+                <TableHead className="w-[110px] text-center">{t("tableHeaders.sync")}</TableHead>
+                {multiEnv && <TableHead className="w-[80px] text-center">{t("tableHeaders.envs")}</TableHead>}
                 <TableHead className="w-[60px]" />
               </TableRow>
             </TableHeader>
@@ -332,7 +337,7 @@ export default function ApisPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <p className="font-medium truncate" title={record.name}>
-                              {record.name || "Untitled API"}
+                              {record.name || t("untitledApi")}
                             </p>
                             {hasDebugActive(record) && (
                               <Badge variant="outline" className="text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/30 gap-1 shrink-0">
@@ -374,12 +379,12 @@ export default function ApisPage() {
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="outline" className={`text-[10px] ${lifecycleInfo.className}`}>
-                        {lifecycleInfo.label}
+                        {t(`status.${lifecycleInfo.label}`)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="outline" className={`text-[10px] ${syncInfo.className}`}>
-                        {syncInfo.label}
+                        {t(`status.${syncInfo.label}`)}
                       </Badge>
                     </TableCell>
                     {multiEnv && (
@@ -416,7 +421,7 @@ export default function ApisPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}`)}>
-                            <Eye className="mr-2 h-3.5 w-3.5" /> View
+                            <Eye className="mr-2 h-3.5 w-3.5" /> {t("actions.view")}
                           </DropdownMenuItem>
                           {(record.sync_status === "draft" || record.sync_status === "out_of_sync") && (
                             <DropdownMenuItem
@@ -424,38 +429,38 @@ export default function ApisPage() {
                               disabled={deploying === record.id}
                             >
                               <Rocket className="mr-2 h-3.5 w-3.5" />
-                              {deploying === record.id ? "Deploying..." : "Deploy"}
+                              {deploying === record.id ? t("actions.deploying") : t("actions.deploy")}
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem onClick={() => handleClone(record)}>
-                            <Copy className="mr-2 h-3.5 w-3.5" /> Clone to New Version
+                            <Copy className="mr-2 h-3.5 w-3.5" /> {t("actions.cloneToNewVersion")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => record.definition && exportAsFuseOneJson(record.definition)}>
-                            <Download className="mr-2 h-3.5 w-3.5" /> Export JSON
+                            <Download className="mr-2 h-3.5 w-3.5" /> {t("actions.exportJson")}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => record.definition && exportAsOpenAPIYaml(record.definition)}>
-                            <Download className="mr-2 h-3.5 w-3.5" /> Export OpenAPI
+                            <Download className="mr-2 h-3.5 w-3.5" /> {t("actions.exportOpenApi")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}/analytics`)}>
-                            <BarChart3 className="mr-2 h-3.5 w-3.5" /> Analytics
+                            <BarChart3 className="mr-2 h-3.5 w-3.5" /> {t("actions.analytics")}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}/health`)}>
-                            <Heart className="mr-2 h-3.5 w-3.5" /> Health Check
+                            <Heart className="mr-2 h-3.5 w-3.5" /> {t("actions.healthCheck")}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}/traces`)}>
-                            <Activity className="mr-2 h-3.5 w-3.5" /> Traces
+                            <Activity className="mr-2 h-3.5 w-3.5" /> {t("actions.traces")}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => router.push(`/apis/${record.id}/debug`)}>
-                            <Bug className="mr-2 h-3.5 w-3.5" /> Debug
+                            <Bug className="mr-2 h-3.5 w-3.5" /> {t("actions.debug")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive"
                             onClick={() => setDeleteTarget(record)}
                           >
-                            <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                            <Trash2 className="mr-2 h-3.5 w-3.5" /> {t("actions.delete")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -472,16 +477,16 @@ export default function ApisPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete API</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this API definition
-              {deleteTarget?.sync_status === "synced" && " and remove it from the API Gateway"}.
-              This action cannot be undone.
+              {t("deleteDialog.description")}
+              {deleteTarget?.sync_status === "synced" && t("deleteDialog.descriptionSynced")}
+              {t("deleteDialog.cannotUndo")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+            <AlertDialogCancel>{t("deleteDialog.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{t("deleteDialog.confirm")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import {
   Plus,
   Pencil,
@@ -58,6 +59,8 @@ function slugify(name: string): string {
 }
 
 export default function EnvironmentsContent() {
+  const t = useTranslations("settings.environments")
+  const tc = useTranslations("common")
   const { environments, fetchEnvironments } = useEnvironmentStore()
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -150,7 +153,7 @@ export default function EnvironmentsContent() {
       setDialogOpen(false)
       load()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to save environment")
+      alert(err instanceof Error ? err.message : t("failedToSave"))
     } finally {
       setSaving(false)
     }
@@ -163,7 +166,7 @@ export default function EnvironmentsContent() {
       setDeleteTarget(null)
       load()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to delete environment")
+      alert(err instanceof Error ? err.message : t("failedToDelete"))
     }
   }
 
@@ -172,7 +175,7 @@ export default function EnvironmentsContent() {
       await api.setDefaultEnvironment(id)
       load()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to set default")
+      alert(err instanceof Error ? err.message : t("failedToSetDefault"))
     }
   }
 
@@ -193,14 +196,14 @@ export default function EnvironmentsContent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Environments</h3>
+          <h3 className="text-lg font-semibold">{t("title")}</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure multiple API Gateway environments (dev, staging, production)
+            {t("subtitle")}
           </p>
         </div>
         <Button size="sm" onClick={openCreate}>
           <Plus className="h-4 w-4 mr-1" />
-          Add Environment
+          {t("addEnvironment")}
         </Button>
       </div>
 
@@ -210,8 +213,8 @@ export default function EnvironmentsContent() {
         </div>
       ) : environments.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-          <p>No environments configured yet.</p>
-          <p className="text-sm">Create your first environment to get started.</p>
+          <p>{t("noEnvironments")}</p>
+          <p className="text-sm">{t("createFirstEnvironment")}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -230,7 +233,7 @@ export default function EnvironmentsContent() {
                   <span className="text-xs text-muted-foreground font-mono">{env.slug}</span>
                   {env.is_default && (
                     <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600">
-                      Default
+                      {tc("default")}
                     </Badge>
                   )}
                 </div>
@@ -259,7 +262,7 @@ export default function EnvironmentsContent() {
                   className="h-8 w-8"
                   onClick={() => handleTestConnection(env.id)}
                   disabled={testing === env.id}
-                  title="Test connection"
+                  title={t("testConnection")}
                 >
                   {testing === env.id ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -273,7 +276,7 @@ export default function EnvironmentsContent() {
                     size="icon"
                     className="h-8 w-8"
                     onClick={() => handleSetDefault(env.id)}
-                    title="Set as default"
+                    title={t("setAsDefault")}
                   >
                     <Star className="h-4 w-4" />
                   </Button>
@@ -283,7 +286,7 @@ export default function EnvironmentsContent() {
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => openEdit(env)}
-                  title="Edit"
+                  title={tc("edit")}
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
@@ -293,7 +296,7 @@ export default function EnvironmentsContent() {
                     size="icon"
                     className="h-8 w-8 text-destructive hover:text-destructive"
                     onClick={() => setDeleteTarget(env)}
-                    title="Delete"
+                    title={tc("delete")}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -308,16 +311,16 @@ export default function EnvironmentsContent() {
       <Sheet open={dialogOpen} onOpenChange={setDialogOpen}>
         <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
           <SheetHeader>
-            <SheetTitle>{editing ? "Edit Environment" : "New Environment"}</SheetTitle>
+            <SheetTitle>{editing ? t("editEnvironment") : t("newEnvironment")}</SheetTitle>
             <SheetDescription>
               {editing
-                ? "Update the environment configuration."
-                : "Add a new API Gateway environment."}
+                ? t("editEnvironmentDescription")
+                : t("newEnvironmentDescription")}
             </SheetDescription>
           </SheetHeader>
           <div className="flex-1 overflow-y-auto space-y-4 px-4">
             <div className="grid gap-2">
-              <Label htmlFor="env-name">Name</Label>
+              <Label htmlFor="env-name">{t("name")}</Label>
               <Input
                 id="env-name"
                 placeholder="e.g. Production"
@@ -329,7 +332,7 @@ export default function EnvironmentsContent() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="env-slug">Slug</Label>
+              <Label htmlFor="env-slug">{t("slug")}</Label>
               <Input
                 id="env-slug"
                 placeholder="e.g. production"
@@ -341,7 +344,7 @@ export default function EnvironmentsContent() {
               />
             </div>
             <div className="grid gap-2">
-              <Label>Color</Label>
+              <Label>{t("color")}</Label>
               <div className="flex gap-2">
                 {ENV_COLORS.map((c) => (
                   <button
@@ -358,17 +361,17 @@ export default function EnvironmentsContent() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="env-desc">Description</Label>
+              <Label htmlFor="env-desc">{tc("description")}</Label>
               <Input
                 id="env-desc"
-                placeholder="Optional description"
+                placeholder={t("optionalDescription")}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
             <Separator />
             <div className="grid gap-2">
-              <Label htmlFor="env-admin-url">Admin API URL</Label>
+              <Label htmlFor="env-admin-url">{t("adminUrl")}</Label>
               <Input
                 id="env-admin-url"
                 placeholder="http://apisix:9180"
@@ -378,7 +381,7 @@ export default function EnvironmentsContent() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="env-api-key">
-                API Key {editing && <span className="text-muted-foreground">(leave empty to keep current)</span>}
+                {t("apiKey")} {editing && <span className="text-muted-foreground">({t("leaveEmptyToKeep")})</span>}
               </Label>
               <Input
                 id="env-api-key"
@@ -389,7 +392,7 @@ export default function EnvironmentsContent() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="env-control-url">Control API URL (optional)</Label>
+              <Label htmlFor="env-control-url">{t("controlUrl")}</Label>
               <Input
                 id="env-control-url"
                 placeholder="http://apisix:9090"
@@ -398,7 +401,7 @@ export default function EnvironmentsContent() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="env-metrics-url">Metrics URL (optional)</Label>
+              <Label htmlFor="env-metrics-url">{t("metricsUrl")}</Label>
               <Input
                 id="env-metrics-url"
                 placeholder="http://apisix:9091"
@@ -409,11 +412,11 @@ export default function EnvironmentsContent() {
           </div>
           <SheetFooter className="border-t pt-4">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
+              {tc("cancel")}
             </Button>
             <Button onClick={handleSave} disabled={saving || !name || !adminUrl}>
               {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              {editing ? "Save Changes" : "Create Environment"}
+              {editing ? tc("saveChanges") : t("createEnvironment")}
             </Button>
           </SheetFooter>
         </SheetContent>
@@ -423,16 +426,15 @@ export default function EnvironmentsContent() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete environment?</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteEnvironment")}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the &quot;{deleteTarget?.name}&quot; environment.
-              APIs deployed to this environment will no longer be accessible through it.
+              {t("deleteConfirmMessage", { name: deleteTarget?.name || "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+              {tc("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

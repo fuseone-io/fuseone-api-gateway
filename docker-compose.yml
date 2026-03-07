@@ -91,23 +91,26 @@ services:
       timeout: 10s
       retries: 5
 
-  kafka-bridge:
-    image: quay.io/strimzi/kafka-bridge:0.29.0
+  event-gateway:
+    build: ./event-gateway
     profiles: [kafka]
     depends_on:
+      postgres:
+        condition: service_healthy
       kafka:
         condition: service_healthy
     ports:
-      - "8082:8080"
-    command:
-      - /opt/strimzi/bin/kafka_bridge_run.sh
-      - --config-file=/opt/strimzi/config/application.properties
+      - "8090:8090"
     environment:
-      KAFKA_BRIDGE_ID: bridge-01
-    volumes:
-      - ./kafka-bridge.properties:/opt/strimzi/config/application.properties:ro
+      SERVER_PORT: 8090
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: fuseone_gateway
+      DB_USER: gateway
+      DB_PASSWORD: gateway
+      DB_SSLMODE: disable
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/healthy"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/health"]
       interval: 10s
       timeout: 5s
       retries: 5

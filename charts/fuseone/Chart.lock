@@ -2,5 +2,8 @@ dependencies:
 - name: apisix
   repository: file://../apisix
   version: 2.13.0
-digest: sha256:2893b0c0fbf326f134822218eece1e04b70cfb36ca0f0e61dbdfeb1867caecdf
-generated: "2026-03-04T18:26:52.265041579-03:00"
+- name: etcd
+  repository: file://../etcd
+  version: 0.1.0
+digest: sha256:7608f56be9249a83047d36415bfe35bdcb867d267bd9908b2777e9a968dd7162
+generated: "2026-03-06T23:56:38.665926111-03:00"

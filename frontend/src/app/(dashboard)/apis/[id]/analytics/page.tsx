@@ -31,6 +31,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { AIInsightButton } from "@/components/ai-assistant/AIInsightButton"
 import {
   Card,
   CardContent,
@@ -64,11 +65,15 @@ import type { TimeSeriesPoint, MetricsSummary, TopRoute, DateRangeValue } from "
 import type { ApiDefRecord } from "@/types/api"
 import type { AlertRule } from "@/types/alert"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
+import { PageHeader } from "@/components/page-header"
 
 const AUTO_REFRESH_INTERVAL = 30_000
 const SYNC_ID = "api-analytics"
 
 export default function ApiAnalyticsPage() {
+  const t = useTranslations("apis")
+  const tc = useTranslations("common")
   const params = useParams()
   const apiId = params.id as string
 
@@ -101,7 +106,7 @@ export default function ApiAnalyticsPage() {
         setRecord(rec)
         if (rec.name) sessionStorage.setItem(`breadcrumb:${apiId}`, rec.name)
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to load API")
+        toast.error(err instanceof Error ? err.message : tc("failedToLoad", { resource: "API" }))
       } finally {
         setLoadingApi(false)
       }
@@ -143,7 +148,7 @@ export default function ApiAnalyticsPage() {
       setLastRefresh(new Date())
     } catch (err) {
       if (!autoRefresh) {
-        toast.error(err instanceof Error ? err.message : "Failed to fetch metrics")
+        toast.error(err instanceof Error ? err.message : tc("failedToLoad", { resource: "metrics" }))
       }
     } finally {
       setLoading(false)
@@ -223,18 +228,12 @@ export default function ApiAnalyticsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-primary shrink-0" />
-            <h1 className="text-2xl font-bold tracking-tight truncate">{record?.name || "API"}</h1>
-            {record?.version && (
-              <Badge variant="outline" className="text-[10px] font-mono shrink-0">v{record.version}</Badge>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground mt-0.5">Traffic analytics and performance metrics</p>
-        </div>
-      </div>
+      <PageHeader
+        title={record?.name || "API"}
+        description={t("detail.trafficAnalytics")}
+        icon={<BarChart3 className="h-5 w-5" />}
+        badge={record?.version ? <Badge variant="outline" className="text-[10px] font-mono shrink-0">v{record.version}</Badge> : undefined}
+      />
 
       {/* Controls */}
       <div className="flex items-center justify-between">
@@ -254,9 +253,17 @@ export default function ApiAnalyticsPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <AIInsightButton
+            buildPrompt={() => {
+              const s = summary
+              const apiName = record?.name ?? "this API"
+              if (!s) return `Analyze the performance of API "${apiName}" and suggest improvements.`
+              return `Analyze the performance metrics for API "${apiName}":\n- Total requests: ${s.total_requests}\n- Avg latency: ${s.avg_latency_ms.toFixed(1)}ms\n- Error rate: ${(s.error_rate * 100).toFixed(2)}%\n- Status breakdown: ${s.status_2xx} 2xx, ${s.status_4xx} 4xx, ${s.status_5xx} 5xx\n\nAre there performance issues, high error rates, or traffic patterns I should be concerned about?`
+            }}
+          />
           <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchData() }} disabled={loading}>
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+            {tc("refresh")}
           </Button>
         </div>
       </div>
@@ -268,7 +275,7 @@ export default function ApiAnalyticsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Total Requests</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("detail.totalRequests")}</p>
                   <p className="text-2xl font-bold mt-1">{formatNumber(summary.total_requests)}</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
@@ -281,7 +288,7 @@ export default function ApiAnalyticsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Avg Latency</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("detail.avgLatency")}</p>
                   <p className="text-2xl font-bold mt-1">{formatLatency(summary.avg_latency_ms)}</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
@@ -294,7 +301,7 @@ export default function ApiAnalyticsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Error Rate</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("detail.errorRate")}</p>
                   <p className={`text-2xl font-bold mt-1 ${summary.error_rate > 0.05 ? "text-red-600" : "text-emerald-600"}`}>
                     {formatErrorRate(summary.error_rate)}
                   </p>
@@ -313,7 +320,7 @@ export default function ApiAnalyticsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Bandwidth</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("detail.bandwidth")}</p>
                   <p className="text-2xl font-bold mt-1">
                     {formatBytes(summary.total_bandwidth_ingress + summary.total_bandwidth_egress)}
                   </p>
@@ -333,9 +340,9 @@ export default function ApiAnalyticsPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <Bell className="h-5 w-5 text-red-500" />
-              Active Alerts ({activeAlerts.length})
+              {t("detail.activeAlerts", { count: activeAlerts.length })}
             </CardTitle>
-            <CardDescription>Alert rules firing or acknowledged for this API&apos;s routes</CardDescription>
+            <CardDescription>{t("detail.activeAlertsDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -369,9 +376,9 @@ export default function ApiAnalyticsPage() {
         <Card>
           <CardContent className="py-16 text-center">
             <Activity className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm font-medium">Deploy this API to start collecting metrics</p>
+            <p className="text-sm font-medium">{t("detail.deployToCollect")}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Analytics data will appear here once the API is deployed and receiving traffic.
+              {t("detail.deployToCollectDescription")}
             </p>
           </CardContent>
         </Card>
@@ -379,10 +386,9 @@ export default function ApiAnalyticsPage() {
         <Card>
           <CardContent className="py-16 text-center">
             <Activity className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm font-medium">No traffic data yet</p>
+            <p className="text-sm font-medium">{t("detail.noTrafficYet")}</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-              Metrics will appear here once this API receives traffic.
-              The scraper collects data every 15 seconds and flushes every minute.
+              {t("detail.noTrafficDescription")}
             </p>
           </CardContent>
         </Card>
@@ -391,8 +397,8 @@ export default function ApiAnalyticsPage() {
           {/* Requests Over Time */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Requests Over Time</CardTitle>
-              <CardDescription>Drag on any chart to select a time range</CardDescription>
+              <CardTitle className="text-base">{t("detail.requestsOverTime")}</CardTitle>
+              <CardDescription>{t("detail.dragToSelect")}</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
@@ -413,8 +419,8 @@ export default function ApiAnalyticsPage() {
           {/* Latency Percentiles */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Latency Percentiles</CardTitle>
-              <CardDescription>Response time distribution (ms)</CardDescription>
+              <CardTitle className="text-base">{t("detail.latencyPercentiles")}</CardTitle>
+              <CardDescription>{t("detail.latencyDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
@@ -441,8 +447,8 @@ export default function ApiAnalyticsPage() {
           {/* Status Code Distribution */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Status Code Distribution</CardTitle>
-              <CardDescription>HTTP response status codes over time</CardDescription>
+              <CardTitle className="text-base">{t("detail.statusCodeDistribution")}</CardTitle>
+              <CardDescription>{t("detail.statusCodeDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
@@ -470,8 +476,8 @@ export default function ApiAnalyticsPage() {
             {topRoutes.length > 1 && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Traffic by Flow</CardTitle>
-                  <CardDescription>Request distribution across flows</CardDescription>
+                  <CardTitle className="text-base">{t("detail.trafficByFlow")}</CardTitle>
+                  <CardDescription>{t("detail.requestDistribution")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={Math.max(200, topRoutes.length * 36)}>
@@ -501,8 +507,8 @@ export default function ApiAnalyticsPage() {
             {summary && summary.total_requests > 0 && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Status Distribution</CardTitle>
-                  <CardDescription>HTTP response status breakdown</CardDescription>
+                  <CardTitle className="text-base">{t("detail.statusDistribution")}</CardTitle>
+                  <CardDescription>{t("detail.statusBreakdown")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
@@ -548,18 +554,18 @@ export default function ApiAnalyticsPage() {
           {topRoutes.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Per-Flow Breakdown</CardTitle>
-                <CardDescription>Traffic distribution across this API&apos;s flows</CardDescription>
+                <CardTitle className="text-base">{t("detail.perFlowBreakdown")}</CardTitle>
+                <CardDescription>{t("detail.perFlowDescription")}</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Flow / Route</TableHead>
-                      <TableHead className="text-right">Requests</TableHead>
-                      <TableHead className="text-right">Avg Latency</TableHead>
-                      <TableHead className="text-right">Error Rate</TableHead>
-                      <TableHead className="text-right">Bandwidth</TableHead>
+                      <TableHead>{t("detail.tableHeaders.flowRoute")}</TableHead>
+                      <TableHead className="text-right">{t("detail.tableHeaders.requests")}</TableHead>
+                      <TableHead className="text-right">{t("detail.tableHeaders.avgLatency")}</TableHead>
+                      <TableHead className="text-right">{t("detail.tableHeaders.errorRate")}</TableHead>
+                      <TableHead className="text-right">{t("detail.tableHeaders.bandwidth")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

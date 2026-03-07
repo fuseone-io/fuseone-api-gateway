@@ -156,6 +156,38 @@ func main() {
 	kafkaConnRepo := repository.NewKafkaConnectionRepository(pool)
 	kafkaHandler := handler.NewKafkaHandler(kafkaConnRepo, auditLogger, logger)
 
+	// Event APIs
+	eventApiRepo := repository.NewEventApiRepository(pool)
+	eventApiDeployer := service.NewEventApiDeployer(eventApiRepo, registry, logger)
+	eventApiHandler := handler.NewEventApiHandler(eventApiRepo, eventApiDeployer, auditLogger)
+
+	// Webhooks
+	webhookRepo := repository.NewWebhookRepository(pool)
+	webhookHandler := handler.NewWebhookHandler(webhookRepo, auditLogger)
+
+	// Event API Permissions
+	permRepo := repository.NewEventApiPermissionRepository(pool)
+	permHandler := handler.NewEventApiPermissionHandler(permRepo, auditLogger)
+
+	// LLM (AI Assistant)
+	llmRepo := repository.NewLLMRepository(pool)
+	llmSvc := service.NewLLMService(llmRepo, cryptoService, logger)
+	llmHandler := handler.NewLLMHandler(llmRepo, llmSvc, cryptoService, auditLogger)
+
+	// Event Gateway Metrics
+	egMetricsHandler := handler.NewEGMetricsHandler(pool, logger)
+	if cfg.Kafka.EventGatewayURL != "" {
+		egScraper := service.NewEGMetricsScraper(pool, cfg.Kafka.EventGatewayURL, logger)
+		go egScraper.Start(context.Background(), 60*time.Second)
+	}
+
+	// Consumer Groups (proxy to Event Gateway)
+	cgHandler := handler.NewConsumerGroupsHandler(cfg.Kafka.EventGatewayURL, logger)
+
+	// Event Schemas
+	eventSchemaRepo := repository.NewEventSchemaRepository(pool)
+	eventSchemaHandler := handler.NewEventSchemaHandler(eventSchemaRepo)
+
 	// Backup & Restore
 	backupService := service.NewBackupService(settingsRepo, registry.Fallback(), cryptoService, logger)
 	backupHandler := handler.NewBackupHandler(backupService, settingsRepo, cryptoService, auditLogger, logger)
@@ -279,13 +311,18 @@ func main() {
 		api.GET("/metrics/top-routes", middleware.RequirePermission("monitoring:read"), metricsHandler.TopRoutes)
 		api.GET("/metrics/top-consumers", middleware.RequirePermission("monitoring:read"), metricsHandler.TopConsumers)
 
-		// AI Metrics
+		// AI Metrics + Assistant
 		ai := api.Group("/ai")
 		{
 			ai.GET("/metrics/timeseries", middleware.RequirePermission("ai_metrics:read"), aiMetricsHandler.TimeSeries)
 			ai.GET("/metrics/summary", middleware.RequirePermission("ai_metrics:read"), aiMetricsHandler.Summary)
 			ai.GET("/metrics/top-providers", middleware.RequirePermission("ai_metrics:read"), aiMetricsHandler.TopProviders)
 			ai.GET("/metrics/top-models", middleware.RequirePermission("ai_metrics:read"), aiMetricsHandler.TopModels)
+			// AI Assistant (any authenticated user)
+			ai.GET("/status", llmHandler.GetStatus)
+			ai.POST("/chat", llmHandler.Chat)
+			ai.POST("/chat/stream", llmHandler.ChatStream)
+			ai.POST("/generate-api", llmHandler.GenerateAPI)
 		}
 
 		// Tracing
@@ -395,6 +432,15 @@ func main() {
 			roles.POST("", middleware.RequirePermission("users:write"), roleHandler.Create)
 			roles.PUT("/:id", middleware.RequirePermission("users:write"), roleHandler.Update)
 			roles.DELETE("/:id", middleware.RequirePermission("users:write"), roleHandler.Delete)
+		}
+
+		// LLM Provider Configuration
+		llmConfigs := api.Group("/settings/llm-configs")
+		{
+			llmConfigs.GET("", middleware.RequirePermission("settings:read"), llmHandler.ListConfigs)
+			llmConfigs.GET("/usage", middleware.RequirePermission("settings:read"), llmHandler.GetUsageSummary)
+			llmConfigs.PUT("/:provider", middleware.RequirePermission("settings:write"), llmHandler.UpsertConfig)
+			llmConfigs.DELETE("/:provider", middleware.RequirePermission("settings:write"), llmHandler.DeleteConfig)
 		}
 
 		// System Settings
@@ -538,6 +584,48 @@ func main() {
 			kafka.GET("/:connectionId/topics/:topicName", middleware.RequirePermission("kafka:read"), kafkaHandler.GetTopic)
 			kafka.POST("/:connectionId/topics/:topicName/produce", middleware.RequirePermission("kafka:write"), kafkaHandler.ProduceMessage)
 			kafka.POST("/:connectionId/topics/:topicName/consume", middleware.RequirePermission("kafka:read"), kafkaHandler.ConsumeMessages)
+
+			// Event APIs
+			eventApis := kafka.Group("/event-apis")
+			{
+				eventApis.GET("", middleware.RequirePermission("kafka:read"), eventApiHandler.List)
+				eventApis.GET("/:id", middleware.RequirePermission("kafka:read"), eventApiHandler.Get)
+				eventApis.POST("", middleware.RequirePermission("kafka:write"), eventApiHandler.Create)
+				eventApis.PUT("/:id", middleware.RequirePermission("kafka:write"), eventApiHandler.Update)
+				eventApis.DELETE("/:id", middleware.RequirePermission("kafka:write"), eventApiHandler.Delete)
+				eventApis.POST("/:id/deploy", middleware.RequirePermission("kafka:write"), eventApiHandler.Deploy)
+				eventApis.POST("/:id/undeploy", middleware.RequirePermission("kafka:write"), eventApiHandler.Undeploy)
+
+				// Webhook subscriptions
+				eventApis.GET("/:id/webhooks", middleware.RequirePermission("kafka:read"), webhookHandler.List)
+				eventApis.GET("/:id/webhooks/:whId", middleware.RequirePermission("kafka:read"), webhookHandler.Get)
+				eventApis.POST("/:id/webhooks", middleware.RequirePermission("kafka:write"), webhookHandler.Create)
+				eventApis.PUT("/:id/webhooks/:whId", middleware.RequirePermission("kafka:write"), webhookHandler.Update)
+				eventApis.DELETE("/:id/webhooks/:whId", middleware.RequirePermission("kafka:write"), webhookHandler.Delete)
+				eventApis.GET("/:id/webhooks/:whId/deliveries", middleware.RequirePermission("kafka:read"), webhookHandler.ListDeliveries)
+				eventApis.POST("/:id/webhooks/:whId/reset-circuit", middleware.RequirePermission("kafka:write"), webhookHandler.ResetCircuitBreaker)
+				eventApis.POST("/:id/webhooks/:whId/deliveries/:dlvId/retry", middleware.RequirePermission("kafka:write"), webhookHandler.RetryDelivery)
+
+				// Event Gateway Metrics
+				eventApis.GET("/:id/metrics", middleware.RequirePermission("kafka:read"), egMetricsHandler.TimeSeries)
+				eventApis.GET("/:id/metrics/summary", middleware.RequirePermission("kafka:read"), egMetricsHandler.Summary)
+
+				// Consumer Groups (proxy to Event Gateway)
+				eventApis.GET("/:id/consumer-groups", middleware.RequirePermission("kafka:read"), cgHandler.List)
+				eventApis.GET("/:id/consumer-groups/:groupId", middleware.RequirePermission("kafka:read"), cgHandler.Describe)
+				eventApis.POST("/:id/consumer-groups/:groupId/reset", middleware.RequirePermission("kafka:write"), cgHandler.ResetOffsets)
+
+				// Event Schemas
+				eventApis.GET("/:id/schemas", middleware.RequirePermission("kafka:read"), eventSchemaHandler.List)
+				eventApis.GET("/:id/schemas/:version", middleware.RequirePermission("kafka:read"), eventSchemaHandler.GetVersion)
+				eventApis.POST("/:id/schemas", middleware.RequirePermission("kafka:write"), eventSchemaHandler.Create)
+				eventApis.DELETE("/:id/schemas/:version", middleware.RequirePermission("kafka:write"), eventSchemaHandler.Deactivate)
+
+				// Access Control (per-topic permissions)
+				eventApis.GET("/:id/permissions", middleware.RequirePermission("kafka:read"), permHandler.List)
+				eventApis.POST("/:id/permissions", middleware.RequirePermission("kafka:write"), permHandler.Upsert)
+				eventApis.DELETE("/:id/permissions/:permId", middleware.RequirePermission("kafka:write"), permHandler.Delete)
+			}
 		}
 
 		// Secret Managers (external: Vault, AWS, GCP)

@@ -13,16 +13,22 @@ keywords:
   - clickhouse
   - analytics
 
-home: https://github.com/klinux/fuseone-api-gateway
+home: https://github.com/devopsfuseone/fuseone-api-gateway
 
 maintainers:
-  - name: klinux
-    url: https://github.com/klinux
+  - name: devopsfuseone
+    url: https://github.com/devopsfuseone
 
 dependencies:
   - name: apisix
     version: "2.13.0"
     repository: "file://../apisix"
     condition: apisix.enabled
+    tags:
+      - gateway
+  - name: etcd
+    version: "0.1.0"
+    repository: "file://../etcd"
+    condition: etcd.enabled
     tags:
       - gateway

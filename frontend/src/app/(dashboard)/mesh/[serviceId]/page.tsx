@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
+import { useTranslations } from "next-intl"
 import Link from "next/link"
 import {
   ArrowLeft,
@@ -46,19 +47,19 @@ const discoveryTypeColors: Record<string, string> = {
 
 const nodeStatusConfig = {
   healthy: {
-    label: "Saudavel",
+    labelKey: "serviceDetail.nodeStatus.healthy" as const,
     color: "text-emerald-600",
     bg: "bg-emerald-500",
     icon: CheckCircle2,
   },
   unhealthy: {
-    label: "Com Problema",
+    labelKey: "serviceDetail.nodeStatus.unhealthy" as const,
     color: "text-red-600",
     bg: "bg-red-500",
     icon: XCircle,
   },
   unknown: {
-    label: "Desconhecido",
+    labelKey: "serviceDetail.nodeStatus.unknown" as const,
     color: "text-muted-foreground",
     bg: "bg-muted-foreground",
     icon: Server,
@@ -70,6 +71,8 @@ function getDiscoveryTypeColor(type: string): string {
 }
 
 export default function MeshServiceDetailPage() {
+  const t = useTranslations("mesh")
+  const tc = useTranslations("common")
   const params = useParams()
   const serviceId = params.serviceId as string
   const fetchService = useMeshStore((s) => s.fetchService)
@@ -91,7 +94,7 @@ export default function MeshServiceDetailPage() {
 
   const handleRefresh = () => {
     loadService()
-    toast.success("Dados do servico atualizados")
+    toast.success(t("serviceDetail.dataRefreshed"))
   }
 
   if (loading) {
@@ -126,18 +129,18 @@ export default function MeshServiceDetailPage() {
   if (!service) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Servico nao encontrado" />
+        <PageHeader title={t("serviceDetail.notFound")} />
         <Card>
           <CardContent className="p-12 text-center">
             <Network className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-            <p className="text-lg font-medium">Servico nao encontrado</p>
+            <p className="text-lg font-medium">{t("serviceDetail.notFound")}</p>
             <p className="text-sm text-muted-foreground mt-1">
-              O servico com ID &quot;{serviceId}&quot; nao foi encontrado no mesh.
+              {t("serviceDetail.notFoundDescription", { id: serviceId })}
             </p>
             <Button variant="outline" className="mt-4" asChild>
               <Link href="/mesh">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar para Service Mesh
+                {t("serviceDetail.backToMesh")}
               </Link>
             </Button>
           </CardContent>
@@ -150,13 +153,13 @@ export default function MeshServiceDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={service.name}
-        description={`Detalhes do servico ${service.name}`}
+        description={t("serviceDetail.description", { name: service.name })}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" asChild>
               <Link href="/mesh">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar
+                {tc("back")}
               </Link>
             </Button>
             <Button
@@ -174,7 +177,7 @@ export default function MeshServiceDetailPage() {
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs font-medium text-muted-foreground mb-1">Tipo de Discovery</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">{t("serviceDetail.discoveryType")}</p>
             <Badge
               variant="outline"
               className={`text-xs ${getDiscoveryTypeColor(service.discovery_type)}`}
@@ -185,13 +188,13 @@ export default function MeshServiceDetailPage() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs font-medium text-muted-foreground mb-1">Upstream ID</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">{t("serviceDetail.upstreamId")}</p>
             <p className="text-sm font-mono">{service.upstream_id}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs font-medium text-muted-foreground mb-1">ID do Servico</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">{t("serviceDetail.serviceId")}</p>
             <p className="text-sm font-mono">{service.id}</p>
           </CardContent>
         </Card>
@@ -203,7 +206,7 @@ export default function MeshServiceDetailPage() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Total de Nodes</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("serviceDetail.totalNodes")}</p>
                 <p className="text-2xl font-bold mt-1">{service.total_count}</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/50">
@@ -216,7 +219,7 @@ export default function MeshServiceDetailPage() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Saudaveis</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("healthy")}</p>
                 <p className="text-2xl font-bold text-emerald-600 mt-1">{service.healthy_count}</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
@@ -229,7 +232,7 @@ export default function MeshServiceDetailPage() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Com Problema</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("unhealthy")}</p>
                 <p className="text-2xl font-bold text-red-600 mt-1">{service.unhealthy_count}</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10">
@@ -245,30 +248,30 @@ export default function MeshServiceDetailPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Server className="h-5 w-5 text-primary" />
-            Nodes
+            {t("nodes")}
           </CardTitle>
           <CardDescription>
-            Lista de nodes registrados neste servico
+            {t("serviceDetail.nodesDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {service.nodes.length === 0 ? (
             <div className="p-12 text-center">
               <Server className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm font-medium">Nenhum node registrado</p>
+              <p className="text-sm font-medium">{t("serviceDetail.noNodes")}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Nodes aparecerao aqui quando forem registrados pelo service discovery.
+                {t("serviceDetail.noNodesDescription")}
               </p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Host:Porta</TableHead>
-                  <TableHead className="text-center">Peso</TableHead>
-                  <TableHead className="text-center">Prioridade</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Metadados</TableHead>
+                  <TableHead>{t("serviceDetail.tableHeaders.hostPort")}</TableHead>
+                  <TableHead className="text-center">{t("serviceDetail.tableHeaders.weight")}</TableHead>
+                  <TableHead className="text-center">{t("serviceDetail.tableHeaders.priority")}</TableHead>
+                  <TableHead>{tc("status")}</TableHead>
+                  <TableHead>{t("serviceDetail.tableHeaders.metadata")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -291,7 +294,7 @@ export default function MeshServiceDetailPage() {
                           <span className={`h-2 w-2 rounded-full ${statusCfg.bg}`} />
                           <span className={`text-sm ${statusCfg.color}`}>
                             <StatusIcon className="h-3.5 w-3.5 inline mr-1" />
-                            {statusCfg.label}
+                            {t(statusCfg.labelKey)}
                           </span>
                         </div>
                       </TableCell>
@@ -322,10 +325,10 @@ export default function MeshServiceDetailPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Network className="h-5 w-5 text-primary" />
-            Rotas Associadas
+            {t("serviceDetail.associatedRoutes")}
           </CardTitle>
           <CardDescription>
-            Rotas que utilizam este servico como upstream
+            {t("serviceDetail.associatedRoutesDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -333,7 +336,7 @@ export default function MeshServiceDetailPage() {
             <div className="py-8 text-center">
               <Network className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">
-                Nenhuma rota associada a este servico
+                {t("serviceDetail.noAssociatedRoutes")}
               </p>
             </div>
           ) : (

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { useTranslations } from "next-intl"
 import Link from "next/link"
 import { ArrowLeft, Network, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,8 @@ import { useMeshStore } from "@/stores/mesh-store"
 import { toast } from "sonner"
 
 export default function MeshTopologyPage() {
+  const t = useTranslations("mesh.topology")
+  const tc = useTranslations("common")
   const {
     topology,
     topologyLoading,
@@ -24,20 +27,20 @@ export default function MeshTopologyPage() {
 
   const handleRefresh = () => {
     fetchTopology()
-    toast.success("Topologia atualizada")
+    toast.success(t("topologyRefreshed"))
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Topologia do Mesh"
-        description="Visualizacao interativa dos servicos e suas dependencias"
+        title={t("title")}
+        description={t("description")}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" asChild>
               <Link href="/mesh">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar
+                {tc("back")}
               </Link>
             </Button>
             <Button
@@ -56,19 +59,19 @@ export default function MeshTopologyPage() {
       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <div className="w-6 h-0.5 bg-primary" />
-          <span>Rota (animada)</span>
+          <span>{t("legendRoute")}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-6 h-0.5 border-t border-dashed border-muted-foreground" />
-          <span>Referencia de plugin</span>
+          <span>{t("legendPluginRef")}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded border-2 border-emerald-500/60" />
-          <span>Todos saudaveis</span>
+          <span>{t("legendAllHealthy")}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded border-2 border-red-500/60" />
-          <span>Com problemas</span>
+          <span>{t("legendWithIssues")}</span>
         </div>
       </div>
 
@@ -83,15 +86,14 @@ export default function MeshTopologyPage() {
         <Card>
           <CardContent className="p-12 text-center">
             <Network className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-            <p className="text-lg font-medium">Nenhum servico na topologia</p>
+            <p className="text-lg font-medium">{t("noTopologyTitle")}</p>
             <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-              A topologia sera exibida quando houver servicos registrados com
-              dependencias configuradas no mesh.
+              {t("noTopologyDescription")}
             </p>
             <Button variant="outline" className="mt-4" asChild>
               <Link href="/mesh">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar para Service Mesh
+                {t("backToMesh")}
               </Link>
             </Button>
           </CardContent>
@@ -109,13 +111,13 @@ export default function MeshTopologyPage() {
           <Card>
             <CardContent className="p-4 text-center">
               <p className="text-2xl font-bold">{topology.services.length}</p>
-              <p className="text-xs text-muted-foreground">Servicos</p>
+              <p className="text-xs text-muted-foreground">{t("services")}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4 text-center">
               <p className="text-2xl font-bold">{topology.dependencies.length}</p>
-              <p className="text-xs text-muted-foreground">Dependencias</p>
+              <p className="text-xs text-muted-foreground">{t("dependencies")}</p>
             </CardContent>
           </Card>
           <Card>
@@ -123,7 +125,7 @@ export default function MeshTopologyPage() {
               <p className="text-2xl font-bold">
                 {topology.dependencies.filter((d) => d.type === "route").length}
               </p>
-              <p className="text-xs text-muted-foreground">Conexoes de Rota</p>
+              <p className="text-xs text-muted-foreground">{t("routeConnections")}</p>
             </CardContent>
           </Card>
         </div>

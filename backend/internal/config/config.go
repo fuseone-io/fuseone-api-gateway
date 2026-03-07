@@ -55,8 +55,8 @@ type TracingConfig struct {
 }
 
 type KafkaConfig struct {
-	Enabled       bool   `mapstructure:"enabled"`
-	DefaultBridge string `mapstructure:"default_bridge_url"`
+	Enabled         bool   `mapstructure:"enabled"`
+	EventGatewayURL string `mapstructure:"event_gateway_url"` // e.g. http://event-gateway:8090
 }
 
 type TestingConfig struct {
@@ -237,9 +237,8 @@ func Load() (*Config, error) {
 
 	// Kafka defaults
 	v.SetDefault("kafka.enabled", false)
-	v.SetDefault("kafka.default_bridge_url", "http://localhost:8082")
+	v.SetDefault("kafka.event_gateway_url", "http://event-gateway:8090")
 	v.BindEnv("kafka.enabled", "KAFKA_ENABLED")
-	v.BindEnv("kafka.default_bridge_url", "KAFKA_DEFAULT_BRIDGE_URL")
 
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {

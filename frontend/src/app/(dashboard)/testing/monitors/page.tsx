@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import {
   Activity,
   AlertTriangle,
@@ -66,16 +67,6 @@ import { api } from "@/lib/api-client"
 import type { SyntheticMonitor } from "@/types/testing"
 import type { NotificationContact } from "@/types/notification-contact"
 
-const STATUS_CONFIG: Record<
-  SyntheticMonitor["last_status"],
-  { label: string; color: string; icon: typeof CheckCircle2 }
-> = {
-  up: { label: "Online", color: "text-emerald-500", icon: CheckCircle2 },
-  down: { label: "Offline", color: "text-red-500", icon: XCircle },
-  degraded: { label: "Degradado", color: "text-amber-500", icon: AlertTriangle },
-  unknown: { label: "Desconhecido", color: "text-slate-400", icon: Activity },
-}
-
 const LOCATIONS = [
   { value: "us-east-1", label: "US East (Virginia)" },
   { value: "us-west-2", label: "US West (Oregon)" },
@@ -83,19 +74,6 @@ const LOCATIONS = [
   { value: "sa-east-1", label: "South America (Sao Paulo)" },
   { value: "ap-southeast-1", label: "Asia Pacific (Singapore)" },
 ]
-
-function formatRelativeTime(dateStr: string): string {
-  const now = new Date()
-  const date = new Date(dateStr)
-  const diffMs = now.getTime() - date.getTime()
-  const diffMin = Math.floor(diffMs / 60000)
-  if (diffMin < 1) return "agora"
-  if (diffMin < 60) return `${diffMin}min atras`
-  const diffHours = Math.floor(diffMin / 60)
-  if (diffHours < 24) return `${diffHours}h atras`
-  const diffDays = Math.floor(diffHours / 24)
-  return `${diffDays}d atras`
-}
 
 function formatInterval(sec: number): string {
   if (sec < 60) return `${sec}s`
@@ -127,11 +105,15 @@ function MonitorForm({
   contacts,
   formState,
   setFormState,
+  t,
+  tc,
 }: {
   suites: { id: string; name: string }[]
   contacts: NotificationContact[]
   formState: MonitorFormState
   setFormState: (s: MonitorFormState) => void
+  t: ReturnType<typeof useTranslations<"testing">>
+  tc: ReturnType<typeof useTranslations<"common">>
 }) {
   const toggleLocation = (loc: string) => {
     setFormState({
@@ -154,26 +136,26 @@ function MonitorForm({
   return (
     <div className="space-y-4 py-2">
       <div className="space-y-2">
-        <Label>Nome</Label>
+        <Label>{tc("name")}</Label>
         <Input
-          placeholder="Ex: Health Check - API Usuarios"
+          placeholder={t("monitorsPage.form.namePlaceholder")}
           value={formState.name}
           onChange={(e) => setFormState({ ...formState, name: e.target.value })}
         />
       </div>
       <div className="space-y-2">
-        <Label>Descricao</Label>
+        <Label>{tc("description")}</Label>
         <Textarea
-          placeholder="Descricao do monitor..."
+          placeholder={t("monitorsPage.form.descriptionPlaceholder")}
           value={formState.description}
           onChange={(e) => setFormState({ ...formState, description: e.target.value })}
         />
       </div>
       <div className="space-y-2">
-        <Label>Suite de Teste</Label>
+        <Label>{t("monitorsPage.form.testSuite")}</Label>
         <Select value={formState.suite_id} onValueChange={(v) => setFormState({ ...formState, suite_id: v })}>
           <SelectTrigger>
-            <SelectValue placeholder="Selecione uma suite" />
+            <SelectValue placeholder={t("monitorsPage.form.selectSuite")} />
           </SelectTrigger>
           <SelectContent>
             {suites.map((s) => (
@@ -185,23 +167,23 @@ function MonitorForm({
         </Select>
       </div>
       <div className="space-y-2">
-        <Label>Intervalo</Label>
+        <Label>{t("monitorsPage.form.interval")}</Label>
         <Select value={formState.interval} onValueChange={(v) => setFormState({ ...formState, interval: v })}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="30">30 segundos</SelectItem>
-            <SelectItem value="60">1 minuto</SelectItem>
-            <SelectItem value="300">5 minutos</SelectItem>
-            <SelectItem value="600">10 minutos</SelectItem>
-            <SelectItem value="1800">30 minutos</SelectItem>
-            <SelectItem value="3600">1 hora</SelectItem>
+            <SelectItem value="30">{t("monitorsPage.form.seconds30")}</SelectItem>
+            <SelectItem value="60">{t("monitorsPage.form.minute1")}</SelectItem>
+            <SelectItem value="300">{t("monitorsPage.form.minutes5")}</SelectItem>
+            <SelectItem value="600">{t("monitorsPage.form.minutes10")}</SelectItem>
+            <SelectItem value="1800">{t("monitorsPage.form.minutes30")}</SelectItem>
+            <SelectItem value="3600">{t("monitorsPage.form.hour1")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
       <div className="space-y-2">
-        <Label>Localizacoes</Label>
+        <Label>{t("monitorsPage.form.locations")}</Label>
         <div className="flex flex-wrap gap-2">
           {LOCATIONS.map((loc) => (
             <Badge
@@ -220,14 +202,14 @@ function MonitorForm({
       <div className="space-y-2">
         <Label className="flex items-center gap-1.5">
           <Bell className="h-3.5 w-3.5" />
-          Canais de Notificacao
+          {t("monitorsPage.notificationChannels")}
         </Label>
         <p className="text-[11px] text-muted-foreground">
-          Selecione os canais que serao notificados quando o monitor falhar ou recuperar.
+          {t("monitorsPage.notificationChannelsHint")}
         </p>
         {contacts.length === 0 ? (
           <p className="text-xs text-muted-foreground italic">
-            Nenhum canal configurado. Configure em Configuracoes &rarr; Notificacoes.
+            {t("monitorsPage.noChannels")}
           </p>
         ) : (
           <div className="space-y-1.5">
@@ -248,7 +230,7 @@ function MonitorForm({
                 <span className="text-sm truncate">{contact.name}</span>
                 {!contact.enabled && (
                   <Badge variant="outline" className="text-[10px] text-muted-foreground ml-auto shrink-0">
-                    Desativado
+                    {tc("disabled")}
                   </Badge>
                 )}
               </label>
@@ -261,6 +243,9 @@ function MonitorForm({
 }
 
 export default function SyntheticMonitorsPage() {
+  const t = useTranslations("testing")
+  const tc = useTranslations("common")
+
   const {
     monitors,
     monitorsLoading,
@@ -272,6 +257,16 @@ export default function SyntheticMonitorsPage() {
     toggleMonitor,
     deleteMonitor,
   } = useTestingStore()
+
+  const STATUS_CONFIG: Record<
+    SyntheticMonitor["last_status"],
+    { label: string; color: string; icon: typeof CheckCircle2 }
+  > = {
+    up: { label: t("monitorsPage.status.up"), color: "text-emerald-500", icon: CheckCircle2 },
+    down: { label: t("monitorsPage.status.down"), color: "text-red-500", icon: XCircle },
+    degraded: { label: t("monitorsPage.status.degraded"), color: "text-amber-500", icon: AlertTriangle },
+    unknown: { label: t("monitorsPage.status.unknown"), color: "text-slate-400", icon: Activity },
+  }
 
   const [contacts, setContacts] = useState<NotificationContact[]>([])
   const [createOpen, setCreateOpen] = useState(false)
@@ -288,6 +283,19 @@ export default function SyntheticMonitorsPage() {
     fetchSuites()
     api.listNotificationContacts().then(setContacts).catch(() => {})
   }, [fetchMonitors, fetchSuites])
+
+  function formatRelativeTime(dateStr: string): string {
+    const now = new Date()
+    const date = new Date(dateStr)
+    const diffMs = now.getTime() - date.getTime()
+    const diffMin = Math.floor(diffMs / 60000)
+    if (diffMin < 1) return t("overview.timeAgo.now")
+    if (diffMin < 60) return t("overview.timeAgo.minutesAgo", { min: diffMin })
+    const diffHours = Math.floor(diffMin / 60)
+    if (diffHours < 24) return t("overview.timeAgo.hoursAgo", { hours: diffHours })
+    const diffDays = Math.floor(diffHours / 24)
+    return t("overview.timeAgo.daysAgo", { days: diffDays })
+  }
 
   // Filter monitors by search
   const filteredMonitors = useMemo(() => {
@@ -332,10 +340,10 @@ export default function SyntheticMonitorsPage() {
         locations: formState.locations,
         notify_contact_ids: formState.notify_contact_ids,
       })
-      toast.success("Monitor criado com sucesso")
+      toast.success(t("monitorsPage.toasts.created"))
       setCreateOpen(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao criar monitor")
+      toast.error(err instanceof Error ? err.message : t("monitorsPage.toasts.failedCreate"))
     } finally {
       setSubmitting(false)
     }
@@ -353,10 +361,10 @@ export default function SyntheticMonitorsPage() {
         locations: formState.locations,
         notify_contact_ids: formState.notify_contact_ids,
       })
-      toast.success("Monitor atualizado com sucesso")
+      toast.success(t("monitorsPage.toasts.updated"))
       setEditTarget(null)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao atualizar monitor")
+      toast.error(err instanceof Error ? err.message : t("monitorsPage.toasts.failedUpdate"))
     } finally {
       setSubmitting(false)
     }
@@ -365,9 +373,9 @@ export default function SyntheticMonitorsPage() {
   const handleToggle = async (id: string, enabled: boolean) => {
     try {
       await toggleMonitor(id, enabled)
-      toast.success(enabled ? "Monitor ativado" : "Monitor desativado")
+      toast.success(enabled ? t("monitorsPage.toasts.enabled") : t("monitorsPage.toasts.disabled"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao alterar monitor")
+      toast.error(err instanceof Error ? err.message : t("monitorsPage.toasts.failedToggle"))
     }
   }
 
@@ -375,10 +383,10 @@ export default function SyntheticMonitorsPage() {
     if (!deleteTarget) return
     try {
       await deleteMonitor(deleteTarget.id)
-      toast.success("Monitor excluido")
+      toast.success(t("monitorsPage.toasts.deleted"))
       setDeleteTarget(null)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao excluir monitor")
+      toast.error(err instanceof Error ? err.message : t("monitorsPage.toasts.failedDelete"))
     }
   }
 
@@ -403,12 +411,12 @@ export default function SyntheticMonitorsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Monitores Sinteticos"
-        description="Execute suites de teste automaticamente em intervalos regulares"
+        title={t("monitorsPage.title")}
+        description={t("monitorsPage.description")}
         actions={
           <Button onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" />
-            Novo Monitor
+            {t("monitorsPage.newMonitor")}
           </Button>
         }
       />
@@ -418,7 +426,7 @@ export default function SyntheticMonitorsPage() {
         <div className="relative max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar monitores..."
+            placeholder={t("monitorsPage.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -432,20 +440,20 @@ export default function SyntheticMonitorsPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <MonitorCheck className="h-12 w-12 text-muted-foreground/30 mb-4" />
             <p className="text-lg font-medium text-muted-foreground mb-2">
-              Nenhum monitor configurado
+              {t("monitorsPage.noMonitors")}
             </p>
             <p className="text-sm text-muted-foreground mb-4">
-              Crie um monitor sintetico para verificar suas APIs automaticamente
+              {t("monitorsPage.noMonitorsDescription")}
             </p>
             <Button onClick={openCreate}>
               <Plus className="mr-2 h-4 w-4" />
-              Novo Monitor
+              {t("monitorsPage.newMonitor")}
             </Button>
           </CardContent>
         </Card>
       ) : filteredMonitors.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-8">
-          Nenhum monitor encontrado para &ldquo;{search}&rdquo;
+          {t("monitorsPage.noMonitorsFound", { search })}
         </p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -482,7 +490,7 @@ export default function SyntheticMonitorsPage() {
                   {/* Uptime */}
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">Uptime</span>
+                      <span className="text-muted-foreground">{t("monitorsPage.uptime")}</span>
                       <span className="font-medium">
                         {monitor.uptime_pct.toFixed(2)}%
                       </span>
@@ -504,11 +512,11 @@ export default function SyntheticMonitorsPage() {
                   {/* Stats */}
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="bg-muted/50 rounded px-2 py-1.5">
-                      <span className="text-muted-foreground block">Intervalo</span>
+                      <span className="text-muted-foreground block">{t("monitorsPage.interval")}</span>
                       <span className="font-medium">{formatInterval(monitor.interval_sec)}</span>
                     </div>
                     <div className="bg-muted/50 rounded px-2 py-1.5">
-                      <span className="text-muted-foreground block">Falhas Consecutivas</span>
+                      <span className="text-muted-foreground block">{t("monitorsPage.consecutiveFails")}</span>
                       <span
                         className={`font-medium ${
                           monitor.consecutive_fail > 0 ? "text-red-600" : "text-emerald-600"
@@ -543,7 +551,7 @@ export default function SyntheticMonitorsPage() {
                             </Badge>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="text-xs">{notifyCount} canal(is) de notificacao configurado(s)</p>
+                            <p className="text-xs">{t("monitorsPage.notificationCount", { count: notifyCount })}</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -556,7 +564,7 @@ export default function SyntheticMonitorsPage() {
                       <Clock className="h-3 w-3" />
                       {monitor.last_run_at
                         ? formatRelativeTime(monitor.last_run_at)
-                        : "Nunca executado"}
+                        : t("monitorsPage.neverRun")}
                     </span>
                     <div className="flex items-center gap-1">
                       <Button
@@ -566,7 +574,7 @@ export default function SyntheticMonitorsPage() {
                         onClick={() => openEdit(monitor)}
                       >
                         <Pencil className="h-3 w-3 mr-1" />
-                        Editar
+                        {tc("edit")}
                       </Button>
                       <Button
                         variant="ghost"
@@ -575,7 +583,7 @@ export default function SyntheticMonitorsPage() {
                         onClick={() => setDeleteTarget(monitor)}
                       >
                         <Trash2 className="h-3 w-3 mr-1" />
-                        Excluir
+                        {tc("delete")}
                       </Button>
                     </div>
                   </div>
@@ -590,9 +598,9 @@ export default function SyntheticMonitorsPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-[520px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Novo Monitor Sintetico</DialogTitle>
+            <DialogTitle>{t("monitorsPage.createDialog.title")}</DialogTitle>
             <DialogDescription>
-              Configure um monitor que executa uma suite de teste periodicamente.
+              {t("monitorsPage.createDialog.description")}
             </DialogDescription>
           </DialogHeader>
           <MonitorForm
@@ -600,13 +608,15 @@ export default function SyntheticMonitorsPage() {
             contacts={contacts}
             formState={formState}
             setFormState={setFormState}
+            t={t}
+            tc={tc}
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
-              Cancelar
+              {tc("cancel")}
             </Button>
             <Button onClick={handleCreate} disabled={submitting || !isFormValid}>
-              {submitting ? "Criando..." : "Criar Monitor"}
+              {submitting ? t("monitorsPage.creating") : t("monitorsPage.createMonitor")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -616,9 +626,9 @@ export default function SyntheticMonitorsPage() {
       <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
         <DialogContent className="sm:max-w-[520px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar Monitor</DialogTitle>
+            <DialogTitle>{t("monitorsPage.editDialog.title")}</DialogTitle>
             <DialogDescription>
-              Altere as configuracoes do monitor sintetico.
+              {t("monitorsPage.editDialog.description")}
             </DialogDescription>
           </DialogHeader>
           <MonitorForm
@@ -626,13 +636,15 @@ export default function SyntheticMonitorsPage() {
             contacts={contacts}
             formState={formState}
             setFormState={setFormState}
+            t={t}
+            tc={tc}
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditTarget(null)}>
-              Cancelar
+              {tc("cancel")}
             </Button>
             <Button onClick={handleUpdate} disabled={submitting || !isFormValid}>
-              {submitting ? "Salvando..." : "Salvar"}
+              {submitting ? tc("saving") : tc("save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -642,15 +654,14 @@ export default function SyntheticMonitorsPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Monitor</AlertDialogTitle>
+            <AlertDialogTitle>{t("monitorsPage.deleteDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o monitor &ldquo;{deleteTarget?.name}&rdquo;?
-              Esta acao nao pode ser desfeita.
+              {t("monitorsPage.deleteDialog.description", { name: deleteTarget?.name || "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Excluir</AlertDialogAction>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{tc("delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

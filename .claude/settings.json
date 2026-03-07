@@ -185,7 +185,21 @@
       "Bash(pnpm add qrcode.react)",
       "Bash(pnpm dlx shadcn@latest add progress)",
       "Bash(pnpm exec tsc --noEmit)",
-      "Bash(head -300 /home/kleber/Dados/fuseone-api-gateway/frontend/src/app/\\\\\\(dashboard\\\\\\)/apis/[id]/page.tsx)"
+      "Bash(head -300 /home/kleber/Dados/fuseone-api-gateway/frontend/src/app/\\\\\\(dashboard\\\\\\)/apis/[id]/page.tsx)",
+      "Bash(pnpm add next-intl)",
+      "Bash(node -e \"JSON.parse\\(require\\(''fs''\\).readFileSync\\(''/home/kleber/Dados/fuseone-api-gateway/frontend/src/i18n/messages/en.json'', ''utf8''\\)\\); console.log\\(''en.json: valid''\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\(''fs''\\).readFileSync\\(''/home/kleber/Dados/fuseone-api-gateway/frontend/src/i18n/messages/pt-BR.json'', ''utf8''\\)\\); console.log\\(''pt-BR.json: valid''\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\(''fs''\\).readFileSync\\(''frontend/src/i18n/messages/en.json'', ''utf8''\\)\\); console.log\\(''en.json: valid''\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\(''fs''\\).readFileSync\\(''frontend/src/i18n/messages/pt-BR.json'', ''utf8''\\)\\); console.log\\(''pt-BR.json: valid''\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\(''fs''\\).readFileSync\\(''src/i18n/messages/en.json'', ''utf8''\\)\\); console.log\\(''en.json: valid''\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\(''fs''\\).readFileSync\\(''src/i18n/messages/pt-BR.json'', ''utf8''\\)\\); console.log\\(''pt-BR.json: valid''\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\(''fs''\\).readFileSync\\(''src/i18n/messages/en.json'', ''utf8''\\)\\); console.log\\(''en.json is valid JSON''\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\(''fs''\\).readFileSync\\(''src/i18n/messages/pt-BR.json'', ''utf8''\\)\\); console.log\\(''pt-BR.json is valid JSON''\\)\")",
+      "Bash(node -e \":*)",
+      "Bash(node sync-i18n.cjs)",
+      "Bash(while IFS: read file rest)",
+      "Bash(do echo \"=== $file ===\")",
+      "Read(//home/kleber/Dados/fuseone-api-gateway/frontend/**)"
     ],
     "additionalDirectories": [
       "/home/kleber/Dados/fuseone-api-gateway/frontend/src/app/(dashboard)/apis/[id]",

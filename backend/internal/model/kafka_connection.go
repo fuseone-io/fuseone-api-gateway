@@ -16,7 +16,6 @@ type KafkaConnection struct {
 	SASLMechanism    *string    `json:"sasl_mechanism"`
 	SASLUsername     *string    `json:"sasl_username"`
 	SASLPassword     *string    `json:"sasl_password"`
-	BridgeURL        string     `json:"bridge_url"`
 	IsActive         bool       `json:"is_active"`
 	CreatedBy        *uuid.UUID `json:"created_by"`
 	CreatedAt        time.Time  `json:"created_at"`

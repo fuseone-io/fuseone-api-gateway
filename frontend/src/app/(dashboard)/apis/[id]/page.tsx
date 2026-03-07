@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import { Activity, ArrowRightLeft, BarChart3, Bug, Eye, Heart, Save, Rocket, Clock, Download, Copy, AlertTriangle, Ban, Globe, Route, X, PenLine, Users, Store, MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -61,17 +62,19 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-const LIFECYCLE_BADGE: Record<LifecycleStatus, { label: string; className: string }> = {
-  draft: { label: "Draft", className: "bg-slate-500/15 text-slate-600 border-slate-500/30" },
-  active: { label: "Active", className: "bg-green-500/15 text-green-600 border-green-500/30" },
-  deprecated: { label: "Deprecated", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
-  retired: { label: "Retired", className: "bg-red-500/15 text-red-600 border-red-500/30" },
-}
-
 export default function ApiDetailPage() {
+  const t = useTranslations("apis")
+  const tc = useTranslations("common")
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
+
+  const LIFECYCLE_BADGE: Record<LifecycleStatus, { label: string; className: string }> = {
+    draft: { label: t("status.draft"), className: "bg-slate-500/15 text-slate-600 border-slate-500/30" },
+    active: { label: t("status.active"), className: "bg-green-500/15 text-green-600 border-green-500/30" },
+    deprecated: { label: t("status.deprecated"), className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
+    retired: { label: t("status.retired"), className: "bg-red-500/15 text-red-600 border-red-500/30" },
+  }
 
   const [record, setRecord] = useState<ApiDefRecord | null>(null)
   const [apiDef, setApiDef] = useState<ApiDefinition | null>(null)
@@ -140,7 +143,7 @@ export default function ApiDetailPage() {
       // Load deployments
       loadDeployments()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load API")
+      toast.error(err instanceof Error ? err.message : t("detail.editor.toasts.failedLoad"))
     } finally {
       setLoading(false)
     }
@@ -158,9 +161,9 @@ export default function ApiDetailPage() {
       setRecord(updated)
       setApiDef(updated.definition)
       savedSnapshot.current = JSON.stringify(updated.definition)
-      toast.success("Changes saved")
+      toast.success(t("detail.editor.toasts.changesSaved"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save")
+      toast.error(err instanceof Error ? err.message : t("detail.editor.toasts.failedSave"))
     } finally {
       setSaving(false)
     }
@@ -177,7 +180,7 @@ export default function ApiDetailPage() {
           definition: apiDef,
         })
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to save before deploy")
+        toast.error(err instanceof Error ? err.message : t("detail.editor.toasts.failedSaveBeforeDeploy"))
         setSaving(false)
         return
       }
@@ -190,7 +193,7 @@ export default function ApiDetailPage() {
       setRecord(deployed)
       setApiDef(deployed.definition)
       savedSnapshot.current = JSON.stringify(deployed.definition)
-      toast.success(record.lifecycle_status !== "draft" ? "Changes applied to gateway" : "API deployed to gateway")
+      toast.success(record.lifecycle_status !== "draft" ? t("detail.editor.toasts.appliedToGateway") : t("detail.editor.toasts.deployed"))
       // Reload versions (lifecycle may have changed)
       try {
         const vers = await api.getApiVersions(record.id)
@@ -199,7 +202,7 @@ export default function ApiDetailPage() {
       // Reload deployments
       loadDeployments()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to deploy API")
+      toast.error(err instanceof Error ? err.message : t("detail.editor.toasts.failedDeploy"))
     } finally {
       setDeploying(false)
     }
@@ -209,10 +212,10 @@ export default function ApiDetailPage() {
     if (!record) return
     try {
       const cloned = await api.cloneApi(record.id)
-      toast.success(`Cloned to ${cloned.version}`)
+      toast.success(t("detail.editor.toasts.clonedToVersion", { version: cloned.version }))
       router.push(`/apis/${cloned.id}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to clone API")
+      toast.error(err instanceof Error ? err.message : t("detail.editor.toasts.failedClone"))
     }
   }
 
@@ -223,13 +226,13 @@ export default function ApiDetailPage() {
       setRecord(result)
       setShowDeprecateDialog(false)
       setSunsetDate("")
-      toast.success("API deprecated")
+      toast.success(t("detail.editor.toasts.apiDeprecated"))
       try {
         const vers = await api.getApiVersions(record.id)
         setVersions(vers || [])
       } catch {}
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to deprecate API")
+      toast.error(err instanceof Error ? err.message : t("detail.editor.toasts.failedDeprecate"))
     }
   }
 
@@ -239,13 +242,13 @@ export default function ApiDetailPage() {
       const result = await api.retireApi(record.id)
       setRecord(result)
       setShowRetireDialog(false)
-      toast.success("API retired — returning 410 Gone")
+      toast.success(t("detail.editor.toasts.apiRetired"))
       try {
         const vers = await api.getApiVersions(record.id)
         setVersions(vers || [])
       } catch {}
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to retire API")
+      toast.error(err instanceof Error ? err.message : t("detail.editor.toasts.failedRetire"))
     }
   }
 

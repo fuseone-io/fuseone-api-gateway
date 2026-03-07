@@ -1,10 +1,24 @@
 # =============================================================================
-# Production Values
-# Full platform with recommended production settings
+# Production Values — Full Platform
+# Apply on top of values.yaml:
+#   helm upgrade --install fuseone ./charts/fuseone \
+#     -f charts/fuseone/values.yaml \
+#     -f charts/fuseone/values-production.yaml \
+#     --set backend.secrets.dbPassword=CHANGEME \
+#     --set backend.secrets.jwtSecret=CHANGEME \
+#     --set backend.secrets.apisixApiKey=CHANGEME \
+#     --set clickhouse.auth.password=CHANGEME
 # =============================================================================
 
+# =============================================================================
+# Backend
+# =============================================================================
 backend:
   replicas: 3
+
+  image:
+    pullPolicy: Always
+
   resources:
     requests:
       cpu: 250m
@@ -12,23 +26,48 @@ backend:
     limits:
       cpu: 1
       memory: 1Gi
+
+  config:
+    dbSSLMode: "require"
+    corsOrigins: "https://console.fuseone.example.com"
+    debugEnabled: "false"
+
+  secrets:
+    dbPassword: ""      # --set backend.secrets.dbPassword=CHANGEME
+    jwtSecret: ""       # --set backend.secrets.jwtSecret=CHANGEME
+    apisixApiKey: ""    # --set backend.secrets.apisixApiKey=CHANGEME
+
   ingress:
     enabled: true
     className: nginx
     host: api.fuseone.example.com
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     tls:
       - secretName: api-fuseone-tls
         hosts:
           - api.fuseone.example.com
-  secrets:
-    dbPassword: ""      # CHANGE THIS
-    jwtSecret: ""       # CHANGE THIS
-    apisixApiKey: ""    # CHANGE THIS
 
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: backend
+            topologyKey: kubernetes.io/hostname
+
+# =============================================================================
+# Frontend
+# =============================================================================
 frontend:
   replicas: 3
+
+  image:
+    pullPolicy: Always
+
   resources:
     requests:
       cpu: 100m
@@ -36,6 +75,7 @@ frontend:
     limits:
       cpu: 500m
       memory: 512Mi
+
   ingress:
     enabled: true
     className: nginx
@@ -47,6 +87,19 @@ frontend:
         hosts:
           - console.fuseone.example.com
 
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: frontend
+            topologyKey: kubernetes.io/hostname
+
+# =============================================================================
+# PostgreSQL
+# =============================================================================
 postgresql:
   resources:
     requests:
@@ -55,23 +108,108 @@ postgresql:
     limits:
       cpu: 2
       memory: 2Gi
+
   persistence:
     size: 50Gi
 
+# =============================================================================
+# etcd (local sub-chart — quay.io/coreos/etcd)
+# 3 replicas spread across nodes: survives loss of 1 member.
+# =============================================================================
+etcd:
+  replicaCount: 3
+
+  image:
+    tag: v3.5.21    # always pin for stateful components — never use "latest"
+
+  storage:
+    size: 20Gi
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: etcd
+          topologyKey: kubernetes.io/hostname
+
+# =============================================================================
+# APISIX
+# externalEtcd.host must match release-name-etcd (default: fuseone-etcd).
+# Override if using a different release name:
+#   --set apisix.externalEtcd.host[0]=http://MYRELEASE-etcd:2379
+# =============================================================================
 apisix:
+  externalEtcd:
+    host:
+      - http://fuseone-etcd:2379
+
   apisix:
     replicaCount: 3
+
+    image:
+      pullPolicy: Always
+
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 2
+        memory: 2Gi
+
+    admin:
+      credentials:
+        admin: ""   # --set apisix.apisix.admin.credentials.admin=CHANGEME
+      # Restrict Admin API to internal CIDR in production:
+      # allow:
+      #   ipList:
+      #     - 10.0.0.0/8
+
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: apisix
+            topologyKey: kubernetes.io/hostname
+
   service:
     type: LoadBalancer
-  etcd:
-    replicaCount: 3
+    annotations: {}
+    # AWS NLB example:
+    #   service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    # GCP example:
+    #   cloud.google.com/load-balancer-type: External
 
+# =============================================================================
+# ClickHouse (Analytics)
+# =============================================================================
 clickhouse:
   enabled: true
+
   keeper:
     replicas: 3
     persistence:
       size: 20Gi
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 2Gi
+
   cluster:
     shards: 2
     replicas: 2
@@ -84,5 +222,6 @@ clickhouse:
       limits:
         cpu: 4
         memory: 8Gi
+
   auth:
-    password: ""  # CHANGE THIS
+    password: ""    # --set clickhouse.auth.password=CHANGEME

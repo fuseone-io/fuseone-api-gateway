@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
+import { useTranslations } from "next-intl"
 import {
   AlertTriangle,
   Bell,
@@ -56,46 +57,6 @@ import type { AlertRule, AlertEvent, CreateAlertRuleRequest } from "@/types/aler
 import type { NotificationContact } from "@/types/notification-contact"
 import { toast } from "sonner"
 
-const RULE_TYPE_LABELS: Record<string, string> = {
-  error_rate: "Error Rate",
-  latency_p99: "Latency (avg)",
-  traffic_drop: "Traffic Drop",
-  token_budget: "Token Budget",
-  cost_budget: "Cost Budget",
-}
-
-const SCOPE_TYPE_LABELS: Record<string, string> = {
-  global: "Global",
-  route: "Route",
-  consumer: "Application",
-}
-
-function StateBadge({ state }: { state: AlertRule["state"] }) {
-  switch (state) {
-    case "firing":
-      return (
-        <Badge variant="destructive" className="gap-1">
-          <AlertTriangle className="h-3 w-3" />
-          Firing
-        </Badge>
-      )
-    case "acknowledged":
-      return (
-        <Badge variant="secondary" className="gap-1 bg-amber-500/10 text-amber-600 border-amber-200">
-          <Clock className="h-3 w-3" />
-          Acknowledged
-        </Badge>
-      )
-    default:
-      return (
-        <Badge variant="secondary" className="gap-1 bg-emerald-500/10 text-emerald-600 border-emerald-200">
-          <Check className="h-3 w-3" />
-          OK
-        </Badge>
-      )
-  }
-}
-
 function formatThreshold(ruleType: string, value: number): string {
   if (ruleType === "error_rate" || ruleType === "traffic_drop") {
     return `${(value * 100).toFixed(1)}%`
@@ -110,6 +71,49 @@ function formatThreshold(ruleType: string, value: number): string {
 }
 
 export function AlertsTab() {
+  const t = useTranslations("monitoring")
+  const tc = useTranslations("common")
+
+  function StateBadge({ state }: { state: AlertRule["state"] }) {
+    switch (state) {
+      case "firing":
+        return (
+          <Badge variant="destructive" className="gap-1">
+            <AlertTriangle className="h-3 w-3" />
+            {t("alerts.state.firing")}
+          </Badge>
+        )
+      case "acknowledged":
+        return (
+          <Badge variant="secondary" className="gap-1 bg-amber-500/10 text-amber-600 border-amber-200">
+            <Clock className="h-3 w-3" />
+            {t("alerts.state.acknowledged")}
+          </Badge>
+        )
+      default:
+        return (
+          <Badge variant="secondary" className="gap-1 bg-emerald-500/10 text-emerald-600 border-emerald-200">
+            <Check className="h-3 w-3" />
+            {t("alerts.state.ok")}
+          </Badge>
+        )
+    }
+  }
+
+  const RULE_TYPE_LABELS: Record<string, string> = {
+    error_rate: t("alerts.ruleType.errorRate"),
+    latency_p99: t("alerts.ruleType.latency"),
+    traffic_drop: t("alerts.ruleType.trafficDrop"),
+    token_budget: t("alerts.ruleType.tokenBudget"),
+    cost_budget: t("alerts.ruleType.costBudget"),
+  }
+
+  const SCOPE_TYPE_LABELS: Record<string, string> = {
+    global: t("alerts.scopeType.global"),
+    route: t("alerts.scopeType.route"),
+    consumer: t("alerts.scopeType.consumer"),
+  }
+
   const [rules, setRules] = useState<AlertRule[]>([])
   const [events, setEvents] = useState<AlertEvent[]>([])
   const [loading, setLoading] = useState(true)
@@ -126,11 +130,11 @@ export function AlertsTab() {
       setRules(r)
       setEvents(e)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load alerts")
+      toast.error(err instanceof Error ? err.message : t("alerts.failedToLoad"))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     fetchData()
@@ -139,22 +143,22 @@ export function AlertsTab() {
   const handleAcknowledge = async (id: string) => {
     try {
       await api.acknowledgeAlert(id)
-      toast.success("Alert acknowledged")
+      toast.success(t("alerts.alertAcknowledged"))
       fetchData()
       refreshFiringCount()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to acknowledge")
+      toast.error(err instanceof Error ? err.message : t("alerts.failedToAcknowledge"))
     }
   }
 
   const handleDelete = async (id: string) => {
     try {
       await api.deleteAlertRule(id)
-      toast.success("Alert rule deleted")
+      toast.success(t("alerts.alertRuleDeleted"))
       fetchData()
       refreshFiringCount()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete")
+      toast.error(err instanceof Error ? err.message : t("alerts.failedToDelete"))
     }
   }
 
@@ -163,7 +167,7 @@ export function AlertsTab() {
       await api.updateAlertRule(rule.id, { enabled: !rule.enabled })
       fetchData()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update")
+      toast.error(err instanceof Error ? err.message : t("alerts.failedToUpdate"))
     }
   }
 
@@ -193,12 +197,12 @@ export function AlertsTab() {
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchData() }}>
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-            Refresh
+            {tc("refresh")}
           </Button>
         </div>
         <Button size="sm" onClick={() => setShowCreate(true)}>
           <Plus className="h-3.5 w-3.5 mr-1.5" />
-          New Rule
+          {t("alerts.newRule")}
         </Button>
       </div>
 
@@ -207,35 +211,35 @@ export function AlertsTab() {
         <Card>
           <CardContent className="py-16 text-center">
             <BellOff className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm font-medium">No alert rules configured</p>
+            <p className="text-sm font-medium">{t("alerts.noRulesConfigured")}</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-              Create alert rules to get notified when metrics exceed thresholds.
+              {t("alerts.noRulesDescription")}
             </p>
             <Button variant="outline" size="sm" className="mt-4" onClick={() => setShowCreate(true)}>
               <Plus className="h-3.5 w-3.5 mr-1.5" />
-              Create First Rule
+              {t("alerts.createFirstRule")}
             </Button>
           </CardContent>
         </Card>
       ) : (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Alert Rules</CardTitle>
-            <CardDescription>{rules.length} rule{rules.length !== 1 ? "s" : ""} configured</CardDescription>
+            <CardTitle className="text-base">{t("alerts.alertRules")}</CardTitle>
+            <CardDescription>{t("alerts.rulesConfigured", { count: rules.length })}</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Scope</TableHead>
-                  <TableHead>Threshold</TableHead>
-                  <TableHead>Window</TableHead>
-                  <TableHead>Channels</TableHead>
-                  <TableHead>State</TableHead>
-                  <TableHead>Enabled</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t("alerts.tableHeaders.name")}</TableHead>
+                  <TableHead>{t("alerts.tableHeaders.type")}</TableHead>
+                  <TableHead>{t("alerts.tableHeaders.scope")}</TableHead>
+                  <TableHead>{t("alerts.tableHeaders.threshold")}</TableHead>
+                  <TableHead>{t("alerts.tableHeaders.window")}</TableHead>
+                  <TableHead>{t("alerts.tableHeaders.channels")}</TableHead>
+                  <TableHead>{t("alerts.tableHeaders.state")}</TableHead>
+                  <TableHead>{t("alerts.tableHeaders.enabled")}</TableHead>
+                  <TableHead className="text-right">{t("alerts.tableHeaders.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -312,14 +316,14 @@ export function AlertsTab() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-base">Event History</CardTitle>
+                <CardTitle className="text-base">{t("alerts.eventHistory")}</CardTitle>
                 <CardDescription>
-                  {selectedRule ? "Filtered by selected rule" : "Recent alert events"}
+                  {selectedRule ? t("alerts.filteredByRule") : t("alerts.recentEvents")}
                 </CardDescription>
               </div>
               {selectedRule && (
                 <Button variant="ghost" size="sm" onClick={() => setSelectedRule(null)}>
-                  Clear filter
+                  {t("alerts.clearFilter")}
                 </Button>
               )}
             </div>
@@ -328,10 +332,10 @@ export function AlertsTab() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Event</TableHead>
-                  <TableHead>Message</TableHead>
-                  <TableHead className="text-right">Value</TableHead>
+                  <TableHead>{t("alerts.tableHeaders.time")}</TableHead>
+                  <TableHead>{t("alerts.tableHeaders.event")}</TableHead>
+                  <TableHead>{t("alerts.tableHeaders.message")}</TableHead>
+                  <TableHead className="text-right">{t("alerts.tableHeaders.value")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -363,7 +367,7 @@ export function AlertsTab() {
       )}
 
       {/* Create Rule Dialog */}
-      <CreateRuleDialog open={showCreate} onOpenChange={setShowCreate} onCreated={handleRuleCreated} />
+      <CreateRuleDialog open={showCreate} onOpenChange={setShowCreate} onCreated={handleRuleCreated} t={t} tc={tc} />
     </div>
   )
 }
@@ -402,10 +406,14 @@ function CreateRuleDialog({
   open,
   onOpenChange,
   onCreated,
+  t,
+  tc,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: () => void
+  t: ReturnType<typeof useTranslations<"monitoring">>
+  tc: ReturnType<typeof useTranslations<"common">>
 }) {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -451,22 +459,19 @@ function CreateRuleDialog({
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      toast.error("Name is required")
+      toast.error(t("alerts.createDialog.nameRequired"))
       return
     }
     const thresholdNum = parseFloat(threshold)
     if (isNaN(thresholdNum) || thresholdNum <= 0) {
-      toast.error("Threshold must be a positive number")
+      toast.error(t("alerts.createDialog.thresholdPositive"))
       return
     }
 
-    // For percentage-based thresholds, convert from display (e.g., 5%) to decimal (0.05)
-    // Token/cost budgets use absolute values — no conversion needed
     const actualThreshold = (ruleType === "error_rate" || ruleType === "traffic_drop")
       ? thresholdNum / 100
       : thresholdNum
 
-    // Merge saved contacts + custom inline channels
     const fromSavedContacts = savedContacts
       .filter((c) => selectedContactIds.has(c.id))
       .map((c): import("@/types/alert").AlertChannel => ({ type: c.type, config: c.config }))
@@ -489,9 +494,8 @@ function CreateRuleDialog({
         channels: alertChannels,
       }
       await api.createAlertRule(data)
-      toast.success("Alert rule created")
+      toast.success(t("alerts.alertRuleCreated"))
       onCreated()
-      // Reset form
       setName("")
       setDescription("")
       setRuleType("error_rate")
@@ -501,31 +505,31 @@ function CreateRuleDialog({
       setChannels([])
       setSelectedContactIds(new Set())
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create rule")
+      toast.error(err instanceof Error ? err.message : t("alerts.failedToCreate"))
     } finally {
       setSaving(false)
     }
   }
 
   const thresholdLabel = ruleType === "error_rate"
-    ? "Threshold (%)"
+    ? t("alerts.createDialog.thresholdPct")
     : ruleType === "traffic_drop"
-    ? "Drop Threshold (%)"
+    ? t("alerts.createDialog.dropThresholdPct")
     : ruleType === "token_budget"
-    ? "Token Limit"
+    ? t("alerts.createDialog.tokenLimit")
     : ruleType === "cost_budget"
-    ? "Cost Limit (USD)"
-    : "Threshold (ms)"
+    ? t("alerts.createDialog.costLimitUsd")
+    : t("alerts.createDialog.thresholdMs")
 
   const thresholdPlaceholder = ruleType === "error_rate"
-    ? "e.g., 5 for 5%"
+    ? t("alerts.createDialog.placeholderErrorRate")
     : ruleType === "traffic_drop"
-    ? "e.g., 50 for 50% drop"
+    ? t("alerts.createDialog.placeholderDrop")
     : ruleType === "token_budget"
-    ? "e.g., 1000000 for 1M tokens"
+    ? t("alerts.createDialog.placeholderTokens")
     : ruleType === "cost_budget"
-    ? "e.g., 100 for $100"
-    : "e.g., 500 for 500ms"
+    ? t("alerts.createDialog.placeholderCost")
+    : t("alerts.createDialog.placeholderMs")
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -533,40 +537,40 @@ function CreateRuleDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
-            New Alert Rule
+            {t("alerts.createDialog.title")}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto pr-1">
           <div className="space-y-2">
-            <Label>Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="High error rate" />
+            <Label>{t("alerts.createDialog.nameLabel")}</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("alerts.createDialog.namePlaceholder")} />
           </div>
           <div className="space-y-2">
-            <Label>Description</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description" className="min-h-[60px]" />
+            <Label>{t("alerts.createDialog.descriptionLabel")}</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("alerts.createDialog.descriptionPlaceholder")} className="min-h-[60px]" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Metric</Label>
+              <Label>{t("alerts.createDialog.metric")}</Label>
               <Select value={ruleType} onValueChange={(v) => setRuleType(v as AlertRule["rule_type"])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="error_rate">Error Rate</SelectItem>
-                  <SelectItem value="latency_p99">Latency (avg)</SelectItem>
-                  <SelectItem value="traffic_drop">Traffic Drop</SelectItem>
-                  <SelectItem value="token_budget">Token Budget</SelectItem>
-                  <SelectItem value="cost_budget">Cost Budget</SelectItem>
+                  <SelectItem value="error_rate">{t("alerts.ruleType.errorRate")}</SelectItem>
+                  <SelectItem value="latency_p99">{t("alerts.ruleType.latency")}</SelectItem>
+                  <SelectItem value="traffic_drop">{t("alerts.ruleType.trafficDrop")}</SelectItem>
+                  <SelectItem value="token_budget">{t("alerts.ruleType.tokenBudget")}</SelectItem>
+                  <SelectItem value="cost_budget">{t("alerts.ruleType.costBudget")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Scope</Label>
+              <Label>{t("alerts.createDialog.scope")}</Label>
               <Select value={scopeType} onValueChange={(v) => setScopeType(v as AlertRule["scope_type"])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="global">Global</SelectItem>
-                  <SelectItem value="route">Route</SelectItem>
-                  <SelectItem value="consumer">Application</SelectItem>
+                  <SelectItem value="global">{t("alerts.scopeType.global")}</SelectItem>
+                  <SelectItem value="route">{t("alerts.scopeType.route")}</SelectItem>
+                  <SelectItem value="consumer">{t("alerts.scopeType.consumer")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -577,7 +581,7 @@ function CreateRuleDialog({
               <Input value={threshold} onChange={(e) => setThreshold(e.target.value)} placeholder={thresholdPlaceholder} type="number" step="any" />
             </div>
             <div className="space-y-2">
-              <Label>Eval Window</Label>
+              <Label>{t("alerts.createDialog.evalWindow")}</Label>
               <Select value={evalWindow} onValueChange={(v) => setEvalWindow(v as AlertRule["eval_window"])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -594,20 +598,19 @@ function CreateRuleDialog({
           {/* Notification Channels */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>Notification Channels</Label>
+              <Label>{t("alerts.createDialog.notificationChannels")}</Label>
               <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-muted-foreground" asChild>
                 <Link href="/settings" target="_blank">
                   <Settings className="h-3 w-3" />
-                  Manage Channels
+                  {t("alerts.createDialog.manageChannels")}
                   <ExternalLink className="h-2.5 w-2.5" />
                 </Link>
               </Button>
             </div>
 
-            {/* Saved contacts checklist */}
             {savedContacts.length > 0 ? (
               <div className="rounded-lg border p-3 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Select channels to notify</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("alerts.createDialog.selectChannels")}</p>
                 {savedContacts.map((contact) => (
                   <label
                     key={contact.id}
@@ -629,25 +632,24 @@ function CreateRuleDialog({
             ) : (
               <div className="rounded-lg border border-dashed bg-muted/30 p-4 text-center">
                 <Bell className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
-                <p className="text-xs font-medium">No notification channels configured</p>
+                <p className="text-xs font-medium">{t("alerts.createDialog.noChannelsConfigured")}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Configure Slack, Teams, or Webhook channels in Settings to use them here.
+                  {t("alerts.createDialog.noChannelsDescription")}
                 </p>
                 <Button variant="outline" size="sm" className="h-7 text-xs mt-3 gap-1.5" asChild>
                   <Link href="/settings" target="_blank">
                     <Settings className="h-3 w-3" />
-                    Go to Settings
+                    {t("alerts.createDialog.goToSettings")}
                     <ExternalLink className="h-2.5 w-2.5" />
                   </Link>
                 </Button>
               </div>
             )}
 
-            {/* Custom one-off channels (collapsed behind a toggle) */}
             {savedContacts.length > 0 && (
               <>
                 <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">Or add a one-off channel:</p>
+                  <p className="text-xs text-muted-foreground">{t("alerts.createDialog.addOneOff")}</p>
                   <div className="flex gap-1">
                     <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => addChannel("slack")}>
                       + Slack
@@ -690,14 +692,14 @@ function CreateRuleDialog({
             )}
 
             {selectedContactIds.size === 0 && channels.length === 0 && savedContacts.length > 0 && (
-              <p className="text-xs text-muted-foreground">No channels selected. Alerts will only be visible in the dashboard.</p>
+              <p className="text-xs text-muted-foreground">{t("alerts.createDialog.noChannelsSelected")}</p>
             )}
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{tc("cancel")}</Button>
           <Button onClick={handleSubmit} disabled={saving}>
-            {saving ? "Creating..." : "Create Rule"}
+            {saving ? t("alerts.createDialog.creating") : t("alerts.createDialog.createRule")}
           </Button>
         </DialogFooter>
       </DialogContent>

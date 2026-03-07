@@ -7,7 +7,6 @@ export interface KafkaConnection {
   sasl_mechanism?: string
   sasl_username?: string
   sasl_password?: string
-  bridge_url: string
   is_active: boolean
   created_by?: string
   created_at: string
@@ -42,8 +41,7 @@ export interface ProduceRequest {
 }
 
 export interface ConsumeRequest {
-  group_id: string
-  max_bytes?: number
+  max_messages?: number
 }
 
 export interface ConsumerGroupInfo {

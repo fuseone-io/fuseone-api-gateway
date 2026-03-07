@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
+import { useTranslations } from "next-intl"
 import Link from "next/link"
 import { toast } from "sonner"
 import { ArrowLeft, Plus, Send, Trash2 } from "lucide-react"
@@ -31,6 +32,7 @@ import { useKafkaStore } from "@/stores/kafka-store"
 import type { KafkaMessage } from "@/types/kafka"
 
 function ExpandableValue({ value }: { value: string }) {
+  const t = useTranslations("kafka")
   const [expanded, setExpanded] = useState(false)
   const truncated = value.length > 120
 
@@ -47,13 +49,14 @@ function ExpandableValue({ value }: { value: string }) {
         className="text-xs text-primary hover:underline ml-1"
         onClick={() => setExpanded(!expanded)}
       >
-        {expanded ? "Recolher" : "Expandir"}
+        {expanded ? t("topicDetail.collapse") : t("topicDetail.expand")}
       </button>
     </div>
   )
 }
 
 function DetailsTab() {
+  const t = useTranslations("kafka")
   const { currentTopic, loadingTopic } = useKafkaStore()
 
   if (loadingTopic) {
@@ -70,7 +73,7 @@ function DetailsTab() {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-12">
-          <p className="text-muted-foreground">Nenhuma informacao de particao disponivel</p>
+          <p className="text-muted-foreground">{t("topicDetail.noPartitionInfo")}</p>
         </CardContent>
       </Card>
     )
@@ -79,18 +82,18 @@ function DetailsTab() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Particoes</CardTitle>
+        <CardTitle className="text-base">{t("topicDetail.partitions")}</CardTitle>
         <CardDescription>
-          {currentTopic.partitions.length} particao(es) no topico {currentTopic.name}
+          {t("topicDetail.partitionCount", { count: currentTopic.partitions.length, topic: currentTopic.name })}
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Particao</TableHead>
-              <TableHead>Lider</TableHead>
-              <TableHead>Replicas</TableHead>
+              <TableHead>{t("topicDetail.partition")}</TableHead>
+              <TableHead>{t("topicDetail.leader")}</TableHead>
+              <TableHead>{t("topicDetail.replicas")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -111,6 +114,7 @@ function DetailsTab() {
 }
 
 function ProduceTab({ connectionId, topic }: { connectionId: string; topic: string }) {
+  const t = useTranslations("kafka")
   const { produceMessage, producing } = useKafkaStore()
   const [key, setKey] = useState("")
   const [value, setValue] = useState("")
@@ -132,7 +136,7 @@ function ProduceTab({ connectionId, topic }: { connectionId: string; topic: stri
 
   const handleSend = async () => {
     if (!value.trim()) {
-      toast.error("O valor da mensagem e obrigatorio")
+      toast.error(t("topicDetail.produce.valueRequired"))
       return
     }
 
@@ -149,36 +153,36 @@ function ProduceTab({ connectionId, topic }: { connectionId: string; topic: stri
         value,
         headers: Object.keys(headersMap).length > 0 ? headersMap : undefined,
       })
-      toast.success("Mensagem enviada com sucesso")
+      toast.success(t("topicDetail.produce.messageSent"))
       setValue("")
       setKey("")
       setHeaders([])
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao enviar mensagem")
+      toast.error(err instanceof Error ? err.message : t("topicDetail.produce.sendFailed"))
     }
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Produzir Mensagem</CardTitle>
+        <CardTitle className="text-base">{t("topicDetail.produce.title")}</CardTitle>
         <CardDescription>
-          Envie uma mensagem para o topico {topic}
+          {t("topicDetail.produce.description", { topic })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="msg-key">Chave (opcional)</Label>
+          <Label htmlFor="msg-key">{t("topicDetail.produce.keyLabel")}</Label>
           <Input
             id="msg-key"
-            placeholder="Chave da mensagem"
+            placeholder={t("topicDetail.produce.keyPlaceholder")}
             value={key}
             onChange={(e) => setKey(e.target.value)}
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="msg-value">Valor *</Label>
+          <Label htmlFor="msg-value">{t("topicDetail.produce.valueLabel")}</Label>
           <Textarea
             id="msg-value"
             placeholder='{"event": "example", "data": {}}'
@@ -191,22 +195,22 @@ function ProduceTab({ connectionId, topic }: { connectionId: string; topic: stri
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label>Headers</Label>
+            <Label>{t("topicDetail.produce.headers")}</Label>
             <Button variant="outline" size="sm" onClick={handleAddHeader}>
               <Plus className="h-3.5 w-3.5 mr-1" />
-              Adicionar
+              {t("topicDetail.produce.addHeader")}
             </Button>
           </div>
           {headers.map((h, i) => (
             <div key={i} className="flex items-center gap-2">
               <Input
-                placeholder="Chave"
+                placeholder={t("topicDetail.produce.headerKey")}
                 value={h.key}
                 onChange={(e) => handleHeaderChange(i, "key", e.target.value)}
                 className="flex-1"
               />
               <Input
-                placeholder="Valor"
+                placeholder={t("topicDetail.produce.headerValue")}
                 value={h.value}
                 onChange={(e) => handleHeaderChange(i, "value", e.target.value)}
                 className="flex-1"
@@ -225,7 +229,7 @@ function ProduceTab({ connectionId, topic }: { connectionId: string; topic: stri
 
         <Button onClick={handleSend} disabled={producing}>
           <Send className="h-4 w-4 mr-2" />
-          {producing ? "Enviando..." : "Enviar Mensagem"}
+          {producing ? t("topicDetail.produce.sending") : t("topicDetail.produce.sendMessage")}
         </Button>
       </CardContent>
     </Card>
@@ -233,24 +237,18 @@ function ProduceTab({ connectionId, topic }: { connectionId: string; topic: stri
 }
 
 function ConsumeTab({ connectionId, topic }: { connectionId: string; topic: string }) {
+  const t = useTranslations("kafka")
   const { consumeMessages, messages, loadingMessages } = useKafkaStore()
-  const [groupId, setGroupId] = useState("")
-  const [maxBytes, setMaxBytes] = useState("")
+  const [maxMessages, setMaxMessages] = useState("")
 
   const handleConsume = async () => {
-    if (!groupId.trim()) {
-      toast.error("Group ID e obrigatorio")
-      return
-    }
-
     try {
       await consumeMessages(connectionId, topic, {
-        group_id: groupId.trim(),
-        max_bytes: maxBytes ? Number(maxBytes) : undefined,
+        max_messages: maxMessages ? Number(maxMessages) : undefined,
       })
-      toast.success("Mensagens consumidas")
+      toast.success(t("topicDetail.consume.messagesConsumed"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao consumir mensagens")
+      toast.error(err instanceof Error ? err.message : t("topicDetail.consume.consumeFailed"))
     }
   }
 
@@ -258,37 +256,28 @@ function ConsumeTab({ connectionId, topic }: { connectionId: string; topic: stri
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Consumir Mensagens</CardTitle>
+          <CardTitle className="text-base">{t("topicDetail.consume.title")}</CardTitle>
           <CardDescription>
-            Consuma mensagens do topico {topic}
+            {t("topicDetail.consume.description", { topic })}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex items-end gap-3">
             <div className="space-y-2">
-              <Label htmlFor="consume-group">Group ID *</Label>
-              <Input
-                id="consume-group"
-                placeholder="my-consumer-group"
-                value={groupId}
-                onChange={(e) => setGroupId(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="consume-max">Max Bytes</Label>
+              <Label htmlFor="consume-max">{t("topicDetail.consume.maxMessagesLabel")}</Label>
               <Input
                 id="consume-max"
                 type="number"
-                placeholder="1048576"
-                value={maxBytes}
-                onChange={(e) => setMaxBytes(e.target.value)}
+                placeholder="50"
+                className="w-40"
+                value={maxMessages}
+                onChange={(e) => setMaxMessages(e.target.value)}
               />
             </div>
+            <Button onClick={handleConsume} disabled={loadingMessages}>
+              {loadingMessages ? t("topicDetail.consume.consuming") : t("topicDetail.consume.consumeButton")}
+            </Button>
           </div>
-
-          <Button onClick={handleConsume} disabled={loadingMessages}>
-            {loadingMessages ? "Consumindo..." : "Consumir"}
-          </Button>
         </CardContent>
       </Card>
 
@@ -296,17 +285,17 @@ function ConsumeTab({ connectionId, topic }: { connectionId: string; topic: stri
       {messages.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Mensagens ({messages.length})</CardTitle>
+            <CardTitle className="text-base">{t("topicDetail.consume.messagesCount", { count: messages.length })}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[80px]">Offset</TableHead>
-                  <TableHead className="w-[80px]">Particao</TableHead>
-                  <TableHead className="w-[120px]">Chave</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead className="w-[140px]">Headers</TableHead>
+                  <TableHead className="w-[80px]">{t("topicDetail.consume.offset")}</TableHead>
+                  <TableHead className="w-[80px]">{t("topicDetail.partition")}</TableHead>
+                  <TableHead className="w-[120px]">{t("topicDetail.consume.key")}</TableHead>
+                  <TableHead>{t("topicDetail.consume.value")}</TableHead>
+                  <TableHead className="w-[140px]">{t("topicDetail.produce.headers")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -337,6 +326,8 @@ function ConsumeTab({ connectionId, topic }: { connectionId: string; topic: stri
 }
 
 export default function KafkaTopicDetailPage() {
+  const t = useTranslations("kafka")
+  const tc = useTranslations("common")
   const { connectionId, topic: rawTopic } = useParams<{ connectionId: string; topic: string }>()
   const topic = decodeURIComponent(rawTopic)
   const { fetchTopic, connections, fetchConnections } = useKafkaStore()
@@ -359,12 +350,12 @@ export default function KafkaTopicDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={topic}
-        description={`Topico na conexao ${connection?.name || connectionId}`}
+        description={t("topicDetail.description", { connection: connection?.name || connectionId })}
         actions={
           <Button variant="outline" asChild>
             <Link href={`/kafka/${connectionId}/topics`}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar
+              {tc("back")}
             </Link>
           </Button>
         }
@@ -372,9 +363,9 @@ export default function KafkaTopicDetailPage() {
 
       <Tabs defaultValue="details">
         <TabsList>
-          <TabsTrigger value="details">Detalhes</TabsTrigger>
-          <TabsTrigger value="produce">Produzir</TabsTrigger>
-          <TabsTrigger value="consume">Consumir</TabsTrigger>
+          <TabsTrigger value="details">{tc("details")}</TabsTrigger>
+          <TabsTrigger value="produce">{t("topicDetail.produce.tab")}</TabsTrigger>
+          <TabsTrigger value="consume">{t("topicDetail.consume.tab")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="details" className="mt-4">

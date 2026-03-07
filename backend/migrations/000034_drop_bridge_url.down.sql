@@ -1,0 +1,1 @@
+ALTER TABLE kafka_connections ADD COLUMN IF NOT EXISTS bridge_url TEXT NOT NULL DEFAULT '';

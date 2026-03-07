@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useTranslations } from "next-intl"
 import Link from "next/link"
 import { SlidersHorizontal, Plus, Trash2, Save, Loader2 } from "lucide-react"
 import { toast } from "sonner"
@@ -8,6 +9,7 @@ import { toast } from "sonner"
 import { api } from "@/lib/api-client"
 import type { CostModels, CostModelEntry } from "@/types/ai-metrics"
 
+import { PageHeader } from "@/components/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
@@ -84,6 +86,8 @@ function rowsToCostModels(rows: CostModelRow[]): CostModels {
 }
 
 export default function AICostSettingsPage() {
+  const t = useTranslations("ai.settings")
+  const tc = useTranslations("common")
   const [rows, setRows] = useState<CostModelRow[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -115,9 +119,9 @@ export default function AICostSettingsPage() {
       setSaving(true)
       const costModels = rowsToCostModels(rows)
       await api.updateSetting("ai_cost_models", costModels)
-      toast.success("Cost models saved successfully")
+      toast.success(t("savedSuccess"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save cost models")
+      toast.error(err instanceof Error ? err.message : t("savedFailed"))
     } finally {
       setSaving(false)
     }
@@ -148,35 +152,31 @@ export default function AICostSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight">Cost Models</h1>
-          </div>
-          <p className="text-muted-foreground">
-            Configure pricing per LLM provider and model for cost tracking.
-          </p>
-          <Link
-            href="/ai"
-            className="text-sm text-primary hover:underline"
-          >
-            Back to AI Dashboard
-          </Link>
-        </div>
-        <Button onClick={handleSave} disabled={saving || loading}>
-          {saving ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="mr-2 h-4 w-4" />
-          )}
-          Save
-        </Button>
-      </div>
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        icon={<SlidersHorizontal className="h-6 w-6" />}
+        actions={
+          <Button onClick={handleSave} disabled={saving || loading}>
+            {saving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            {tc("save")}
+          </Button>
+        }
+      />
+      <Link
+        href="/ai"
+        className="text-sm text-primary hover:underline -mt-4"
+      >
+        {t("backToDashboard")}
+      </Link>
 
       <Card>
         <CardHeader>
-          <CardTitle>LLM Pricing</CardTitle>
+          <CardTitle>{t("llmPricing")}</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -190,18 +190,18 @@ export default function AICostSettingsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[200px]">Provider</TableHead>
-                    <TableHead className="w-[250px]">Model</TableHead>
-                    <TableHead className="w-[180px]">Prompt Cost ($/1K tokens)</TableHead>
-                    <TableHead className="w-[180px]">Completion Cost ($/1K tokens)</TableHead>
-                    <TableHead className="w-[80px]">Actions</TableHead>
+                    <TableHead className="w-[200px]">{t("providerColumn")}</TableHead>
+                    <TableHead className="w-[250px]">{t("modelColumn")}</TableHead>
+                    <TableHead className="w-[180px]">{t("promptCost")}</TableHead>
+                    <TableHead className="w-[180px]">{t("completionCost")}</TableHead>
+                    <TableHead className="w-[80px]">{tc("actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        No cost models configured. Click &quot;Add Model&quot; to get started.
+                        {t("noCostModels")}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -261,7 +261,7 @@ export default function AICostSettingsPage() {
               <div className="mt-4">
                 <Button variant="outline" onClick={addRow}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Model
+                  {t("addModel")}
                 </Button>
               </div>
             </>

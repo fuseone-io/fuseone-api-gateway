@@ -874,6 +874,139 @@ export const api = {
   listKafkaConsumerGroups: (connectionId: string) =>
     request<{ data: import("@/types/kafka").ConsumerGroupInfo[] }>(`/api/kafka/${connectionId}/consumer-groups`),
 
+  // Event APIs
+  listEventApis: () =>
+    request<{ data: import("@/types/event-api").EventApi[] }>("/api/kafka/event-apis"),
+
+  getEventApi: (id: string) =>
+    request<{ data: import("@/types/event-api").EventApi }>(`/api/kafka/event-apis/${id}`),
+
+  createEventApi: (data: import("@/types/event-api").CreateEventApiRequest) =>
+    request<{ data: import("@/types/event-api").EventApi }>("/api/kafka/event-apis", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateEventApi: (id: string, data: import("@/types/event-api").UpdateEventApiRequest) =>
+    request<{ data: import("@/types/event-api").EventApi }>(`/api/kafka/event-apis/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteEventApi: (id: string) =>
+    request<void>(`/api/kafka/event-apis/${id}`, { method: "DELETE" }),
+
+  deployEventApi: (id: string) =>
+    request<{ data: import("@/types/event-api").EventApi }>(`/api/kafka/event-apis/${id}/deploy`, {
+      method: "POST",
+    }),
+
+  undeployEventApi: (id: string) =>
+    request<{ data: import("@/types/event-api").EventApi }>(`/api/kafka/event-apis/${id}/undeploy`, {
+      method: "POST",
+    }),
+
+  // Webhook Subscriptions
+  listWebhooks: (eventApiId: string) =>
+    request<{ data: import("@/types/webhook").WebhookSubscription[] }>(`/api/kafka/event-apis/${eventApiId}/webhooks`),
+
+  getWebhook: (eventApiId: string, whId: string) =>
+    request<{ data: import("@/types/webhook").WebhookSubscription }>(`/api/kafka/event-apis/${eventApiId}/webhooks/${whId}`),
+
+  createWebhook: (eventApiId: string, data: import("@/types/webhook").CreateWebhookRequest) =>
+    request<{ data: import("@/types/webhook").WebhookSubscription }>(`/api/kafka/event-apis/${eventApiId}/webhooks`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateWebhook: (eventApiId: string, whId: string, data: import("@/types/webhook").UpdateWebhookRequest) =>
+    request<{ data: import("@/types/webhook").WebhookSubscription }>(`/api/kafka/event-apis/${eventApiId}/webhooks/${whId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteWebhook: (eventApiId: string, whId: string) =>
+    request<void>(`/api/kafka/event-apis/${eventApiId}/webhooks/${whId}`, { method: "DELETE" }),
+
+  listWebhookDeliveries: (eventApiId: string, whId: string, limit?: number) =>
+    request<{ data: import("@/types/webhook").WebhookDelivery[] }>(
+      `/api/kafka/event-apis/${eventApiId}/webhooks/${whId}/deliveries${limit ? `?limit=${limit}` : ""}`
+    ),
+
+  resetWebhookCircuitBreaker: (eventApiId: string, whId: string) =>
+    request<{ ok: boolean }>(`/api/kafka/event-apis/${eventApiId}/webhooks/${whId}/reset-circuit`, {
+      method: "POST",
+    }),
+
+  retryWebhookDelivery: (eventApiId: string, whId: string, dlvId: string) =>
+    request<{ ok: boolean }>(`/api/kafka/event-apis/${eventApiId}/webhooks/${whId}/deliveries/${dlvId}/retry`, {
+      method: "POST",
+    }),
+
+  // Event API Permissions (per-topic access control)
+  listPermissions: (eventApiId: string) =>
+    request<{ data: import("@/types/event-api").EventApiPermission[] }>(`/api/kafka/event-apis/${eventApiId}/permissions`),
+
+  upsertPermission: (eventApiId: string, data: import("@/types/event-api").UpsertPermissionRequest) =>
+    request<{ data: import("@/types/event-api").EventApiPermission }>(`/api/kafka/event-apis/${eventApiId}/permissions`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  deletePermission: (eventApiId: string, permId: string) =>
+    request<void>(`/api/kafka/event-apis/${eventApiId}/permissions/${permId}`, { method: "DELETE" }),
+
+  // Event Gateway Metrics
+  getEventApiMetrics: (eventApiId: string, range_?: string) =>
+    request<{ data: import("@/types/event-api").EventApiMetricsRow[] }>(
+      `/api/kafka/event-apis/${eventApiId}/metrics${range_ ? `?range=${range_}` : ""}`
+    ).then((r) => r.data),
+
+  getEventApiMetricsSummary: (eventApiId: string, range_?: string) =>
+    request<{ data: import("@/types/event-api").EventApiMetricsSummary }>(
+      `/api/kafka/event-apis/${eventApiId}/metrics/summary${range_ ? `?range=${range_}` : ""}`
+    ).then((r) => r.data),
+
+  // Consumer Groups
+  listConsumerGroups: (eventApiId: string) =>
+    request<{ data: import("@/types/event-api").ConsumerGroupInfo[] }>(
+      `/api/kafka/event-apis/${eventApiId}/consumer-groups`
+    ).then((r) => r.data),
+
+  describeConsumerGroup: (eventApiId: string, groupId: string) =>
+    request<{ data: import("@/types/event-api").ConsumerGroupInfo }>(
+      `/api/kafka/event-apis/${eventApiId}/consumer-groups/${encodeURIComponent(groupId)}`
+    ).then((r) => r.data),
+
+  resetConsumerGroupOffsets: (eventApiId: string, groupId: string, strategy: string) =>
+    request<{ ok: boolean }>(
+      `/api/kafka/event-apis/${eventApiId}/consumer-groups/${encodeURIComponent(groupId)}/reset`,
+      { method: "POST", body: JSON.stringify({ strategy }) }
+    ),
+
+  // Event Schemas
+  listSchemas: (eventApiId: string) =>
+    request<{ data: import("@/types/event-api").EventSchema[] }>(
+      `/api/kafka/event-apis/${eventApiId}/schemas`
+    ).then((r) => r.data),
+
+  getSchemaVersion: (eventApiId: string, version: number) =>
+    request<{ data: import("@/types/event-api").EventSchema }>(
+      `/api/kafka/event-apis/${eventApiId}/schemas/${version}`
+    ).then((r) => r.data),
+
+  createSchema: (eventApiId: string, data: { schema_content: Record<string, unknown>; description?: string; is_active?: boolean }) =>
+    request<{ data: import("@/types/event-api").EventSchema }>(
+      `/api/kafka/event-apis/${eventApiId}/schemas`,
+      { method: "POST", body: JSON.stringify(data) }
+    ).then((r) => r.data),
+
+  deactivateSchema: (eventApiId: string, version: number) =>
+    request<{ ok: boolean }>(
+      `/api/kafka/event-apis/${eventApiId}/schemas/${version}`,
+      { method: "DELETE" }
+    ),
+
   // Request Tracing
   listTraces: (params?: import("@/types/trace").TraceListParams) => {
     const qs = new URLSearchParams()
@@ -943,6 +1076,91 @@ export const api = {
 
   getAnalyticsBackendStatus: () =>
     request<{ data: import("@/types/trace").AnalyticsBackendStatus }>("/api/settings/analytics-backend/status").then((r) => r.data),
+
+  // LLM / AI assistant
+  listLLMConfigs: () =>
+    request<{ data: import("@/types/llm").LLMConfig[] }>("/api/settings/llm-configs").then((r) => r.data ?? []),
+
+  getLLMUsage: () =>
+    request<{ data: import("@/types/llm").LLMUsageSummary[] }>("/api/settings/llm-configs/usage").then((r) => r.data ?? []),
+
+  upsertLLMConfig: (provider: string, payload: { model: string; api_key: string; enabled: boolean; daily_quota: number }) =>
+    request<{ data: import("@/types/llm").LLMConfig }>(`/api/settings/llm-configs/${provider}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }).then((r) => r.data),
+
+  deleteLLMConfig: (provider: string) =>
+    request<void>(`/api/settings/llm-configs/${provider}`, { method: "DELETE" }),
+
+  checkAIStatus: () =>
+    request<{ data: import("@/types/llm").AIStatus }>("/api/ai/status").then((r) => r.data),
+
+  sendChat: (payload: import("@/types/llm").ChatRequest) =>
+    request<{ data: import("@/types/llm").ChatResponse }>("/api/ai/chat", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }).then((r) => r.data),
+
+  sendChatStream: async (
+    payload: import("@/types/llm").ChatRequest,
+    onChunk: (chunk: string) => void,
+  ): Promise<{ tokens_in?: number; tokens_out?: number }> => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null
+    const response = await fetch(`${BASE_URL}/api/ai/chat/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    })
+    if (!response.ok) {
+      const text = await response.text()
+      let message = "Request failed"
+      try { message = JSON.parse(text)?.error?.message || message } catch { /* ignore */ }
+      throw new Error(message)
+    }
+    const reader = response.body!.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    let tokenData: { tokens_in?: number; tokens_out?: number } = {}
+    let currentEvent = ""
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split("\n")
+      buffer = lines.pop() ?? ""
+      for (const line of lines) {
+        if (line.startsWith("event:")) {
+          currentEvent = line.slice(6).trim()
+        } else if (line.startsWith("data:")) {
+          const data = line.slice(5).trim()
+          try {
+            const parsed = JSON.parse(data)
+            if (currentEvent === "chunk" && parsed.content) {
+              onChunk(parsed.content)
+            } else if (currentEvent === "done") {
+              tokenData = parsed
+            } else if (currentEvent === "error") {
+              throw new Error(parsed.message || "LLM error")
+            }
+          } catch (e) {
+            if (!(e instanceof SyntaxError)) throw e
+          }
+          currentEvent = ""
+        }
+      }
+    }
+    return tokenData
+  },
+
+  generateAPI: (description: string) =>
+    request<{ data: import("@/types/llm").GeneratedAPIConfig }>("/api/ai/generate-api", {
+      method: "POST",
+      body: JSON.stringify({ description }),
+    }).then((r) => r.data),
 
   // Backup & Restore
   getBackupConfig: () =>

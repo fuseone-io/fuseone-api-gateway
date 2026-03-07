@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import { Loader2, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -61,6 +62,8 @@ const DEFAULTS: GeneralSettings = {
 }
 
 export default function GeneralContent() {
+  const t = useTranslations("settings.general")
+  const tc = useTranslations("common")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -101,7 +104,7 @@ export default function GeneralContent() {
 
   const handleSave = async () => {
     if (!siteName.trim()) {
-      toast.error("Gateway name is required")
+      toast.error(t("gatewayNameRequired"))
       return
     }
 
@@ -115,9 +118,9 @@ export default function GeneralContent() {
       }
       await api.updateSetting("general", value)
       setOriginal(value)
-      toast.success("Settings saved")
+      toast.success(t("settingsSaved"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save settings")
+      toast.error(err instanceof Error ? err.message : t("failedToSaveSettings"))
     } finally {
       setSaving(false)
     }
@@ -127,8 +130,8 @@ export default function GeneralContent() {
     return (
       <div className="space-y-6">
         <div>
-          <h3 className="text-lg font-semibold">General Settings</h3>
-          <p className="text-sm text-muted-foreground mt-1">Gateway name, preferences, and defaults</p>
+          <h3 className="text-lg font-semibold">{t("heading")}</h3>
+          <p className="text-sm text-muted-foreground mt-1">{t("subtitle")}</p>
         </div>
         <Skeleton className="h-[160px] rounded-lg" />
         <Skeleton className="h-[250px] rounded-lg" />
@@ -140,9 +143,9 @@ export default function GeneralContent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">General Settings</h3>
+          <h3 className="text-lg font-semibold">{t("heading")}</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Gateway name, preferences, and defaults
+            {t("subtitle")}
           </p>
         </div>
         <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}>
@@ -151,28 +154,28 @@ export default function GeneralContent() {
           ) : (
             <Save className="h-3.5 w-3.5 mr-1.5" />
           )}
-          {saving ? "Saving..." : "Save Changes"}
+          {saving ? tc("saving") : tc("saveChanges")}
         </Button>
       </div>
 
       {/* Identity Card */}
       <div className="rounded-lg border bg-card p-6">
         <div className="mb-5">
-          <h4 className="text-sm font-semibold">Identity</h4>
+          <h4 className="text-sm font-semibold">{t("identity")}</h4>
           <p className="text-xs text-muted-foreground mt-0.5">
-            The name used across the platform
+            {t("identityDescription")}
           </p>
         </div>
         <div className="grid gap-4 max-w-lg">
           <div className="space-y-2">
-            <Label>Gateway Name</Label>
+            <Label>{t("gatewayName")}</Label>
             <Input
               value={siteName}
               onChange={(e) => setSiteName(e.target.value)}
               placeholder="FuseOne API Gateway"
             />
             <p className="text-xs text-muted-foreground">
-              Displayed in the sidebar and page headers
+              {t("gatewayNameHint")}
             </p>
           </div>
         </div>
@@ -181,17 +184,17 @@ export default function GeneralContent() {
       {/* Preferences Card */}
       <div className="rounded-lg border bg-card p-6">
         <div className="mb-5">
-          <h4 className="text-sm font-semibold">Preferences</h4>
+          <h4 className="text-sm font-semibold">{t("preferences")}</h4>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Regional and display preferences
+            {t("preferencesDescription")}
           </p>
         </div>
         <div className="grid gap-5 max-w-lg">
           <div className="space-y-2">
-            <Label>Time Zone</Label>
+            <Label>{t("timeZone")}</Label>
             <Select value={timezone} onValueChange={setTimezone}>
               <SelectTrigger>
-                <SelectValue placeholder="Select timezone..." />
+                <SelectValue placeholder={t("selectTimezone")} />
               </SelectTrigger>
               <SelectContent>
                 {TIMEZONES.map((tz) => (
@@ -204,10 +207,10 @@ export default function GeneralContent() {
           </div>
 
           <div className="space-y-2">
-            <Label>Date Format</Label>
+            <Label>{t("dateFormat")}</Label>
             <Select value={dateFormat} onValueChange={setDateFormat}>
               <SelectTrigger>
-                <SelectValue placeholder="Select format..." />
+                <SelectValue placeholder={t("selectFormat")} />
               </SelectTrigger>
               <SelectContent>
                 {DATE_FORMATS.map((f) => (
@@ -220,21 +223,21 @@ export default function GeneralContent() {
           </div>
 
           <div className="space-y-2">
-            <Label>Default Page Size</Label>
+            <Label>{t("defaultPageSize")}</Label>
             <Select value={defaultPageSize} onValueChange={setDefaultPageSize}>
               <SelectTrigger>
-                <SelectValue placeholder="Select page size..." />
+                <SelectValue placeholder={t("selectPageSize")} />
               </SelectTrigger>
               <SelectContent>
                 {PAGE_SIZES.map((ps) => (
                   <SelectItem key={ps.value} value={ps.value}>
-                    {ps.label} items per page
+                    {t("itemsPerPage", { count: ps.label })}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Default number of items shown in tables
+              {t("defaultPageSizeHint")}
             </p>
           </div>
         </div>

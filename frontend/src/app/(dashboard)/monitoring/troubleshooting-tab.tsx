@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { useTranslations } from "next-intl"
 import {
   ArrowDown,
   ArrowUp,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { AIInsightButton } from "@/components/ai-assistant/AIInsightButton"
 import {
   Card,
   CardContent,
@@ -65,7 +67,7 @@ import { toast } from "sonner"
 const PAGE_SIZE = 30
 const POLL_INTERVAL = 3_000
 
-/* ─── Detail Sheet (matches API debug page exactly) ─── */
+/* --- Detail Sheet (matches API debug page exactly) --- */
 
 function SummaryCell({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
@@ -86,7 +88,7 @@ const headerRowVariants = {
   response: "even:bg-emerald-50/50 dark:even:bg-emerald-950/15",
 } as const
 
-function CollapsibleHeaders({ title, variant, headers, defaultOpen }: { title: string; variant: "request" | "response"; headers: Record<string, string>; defaultOpen?: boolean }) {
+function CollapsibleHeaders({ title, variant, headers, defaultOpen, t }: { title: string; variant: "request" | "response"; headers: Record<string, string>; defaultOpen?: boolean; t: ReturnType<typeof useTranslations<"monitoring">> }) {
   const [open, setOpen] = useState(defaultOpen ?? false)
   const entries = Object.entries(headers).sort(([a], [b]) => a.localeCompare(b))
 
@@ -101,7 +103,7 @@ function CollapsibleHeaders({ title, variant, headers, defaultOpen }: { title: s
         <h4 className="text-sm font-medium">{title}</h4>
         <Badge variant="outline" className="text-[10px]">{entries.length}</Badge>
         <span className="text-xs text-muted-foreground ml-auto group-hover:text-foreground">
-          {open ? "Collapse" : "Expand"}
+          {open ? t("troubleshooting.detail.collapse") : t("troubleshooting.detail.expand")}
         </span>
       </button>
       {open && (
@@ -128,7 +130,7 @@ const codeVariants = {
   default: "bg-muted/50 border",
 } as const
 
-function CollapsibleCode({ title, badge, defaultOpen, variant = "default", children }: { title: string; badge?: string; defaultOpen?: boolean; variant?: keyof typeof codeVariants; children: string }) {
+function CollapsibleCode({ title, badge, defaultOpen, variant = "default", children, t }: { title: string; badge?: string; defaultOpen?: boolean; variant?: keyof typeof codeVariants; children: string; t: ReturnType<typeof useTranslations<"monitoring">> }) {
   const [open, setOpen] = useState(defaultOpen ?? false)
 
   return (
@@ -142,7 +144,7 @@ function CollapsibleCode({ title, badge, defaultOpen, variant = "default", child
         <h4 className="text-sm font-medium">{title}</h4>
         {badge && <Badge variant="outline" className="text-[10px]">{badge}</Badge>}
         <span className="text-xs text-muted-foreground ml-auto group-hover:text-foreground">
-          {open ? "Collapse" : "Expand"}
+          {open ? t("troubleshooting.detail.collapse") : t("troubleshooting.detail.expand")}
         </span>
       </button>
       {open && (
@@ -154,11 +156,27 @@ function CollapsibleCode({ title, badge, defaultOpen, variant = "default", child
   )
 }
 
-function LogDetailSheet({ log, open, onClose, apis }: { log: DebugLog | null; open: boolean; onClose: () => void; apis: ApiDefRecord[] }) {
+function LogDetailSheet({ log, open, onClose, apis, t }: { log: DebugLog | null; open: boolean; onClose: () => void; apis: ApiDefRecord[]; t: ReturnType<typeof useTranslations<"monitoring">> }) {
   if (!log) return null
 
   const apiName = apis.find((a) => a.apisix_route_ids?.includes(log.route_id))?.name
   const apiRecord = apis.find((a) => a.apisix_route_ids?.includes(log.route_id))
+
+  function buildLogPrompt() {
+    const lines = [
+      `Analyze this specific gateway request:`,
+      `- Method: ${log!.req_method}  URI: ${log!.req_uri}`,
+      `- Status: ${log!.resp_status}  Total latency: ${log!.latency_total}ms (upstream: ${log!.latency_upstream ?? "n/a"}ms, gateway: ${log!.latency_gateway ?? "n/a"}ms)`,
+      `- Client IP: ${log!.client_ip || "n/a"}  Upstream: ${log!.upstream_addr || "n/a"}`,
+      `- Request size: ${log!.req_size}B  Response size: ${log!.resp_size}B`,
+    ]
+    if (apiName) lines.push(`- API: ${apiName}`)
+    if (log!.consumer_name) lines.push(`- Application: ${log!.consumer_name}`)
+    if (log!.resp_status >= 400) lines.push(`\nThis request returned an error (${log!.resp_status}). What could be the cause and how to fix it?`)
+    else if (log!.latency_total > 1000) lines.push(`\nThis request was slow (${log!.latency_total}ms). What could be causing the high latency?`)
+    else lines.push(`\nAny observations or recommendations for this request?`)
+    return lines.join("\n")
+  }
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -173,6 +191,7 @@ function LogDetailSheet({ log, open, onClose, apis }: { log: DebugLog | null; op
             <Badge variant="outline" className={`shrink-0 font-mono text-[11px] ${statusBadgeClass(log.resp_status)}`}>
               {log.resp_status}
             </Badge>
+            <AIInsightButton buildPrompt={buildLogPrompt} variant="ghost" />
           </SheetTitle>
           <SheetDescription className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
             <span className="flex items-center gap-1">
@@ -195,33 +214,33 @@ function LogDetailSheet({ log, open, onClose, apis }: { log: DebugLog | null; op
                 className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
               >
                 <Bug className="h-3.5 w-3.5" />
-                Open debug page for {apiName}
+                {t("troubleshooting.detail.openDebugPage", { name: apiName || "" })}
                 <ExternalLink className="h-3 w-3" />
               </Link>
             )}
 
             {/* Summary grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <SummaryCell label="Client IP" value={log.client_ip || "-"} mono />
-              <SummaryCell label="Upstream" value={log.upstream_addr || "-"} mono />
-              <SummaryCell label="Req Size" value={formatSize(log.req_size)} />
-              <SummaryCell label="Resp Size" value={formatSize(log.resp_size)} />
+              <SummaryCell label={t("troubleshooting.detail.clientIp")} value={log.client_ip || "-"} mono />
+              <SummaryCell label={t("troubleshooting.detail.upstream")} value={log.upstream_addr || "-"} mono />
+              <SummaryCell label={t("troubleshooting.detail.reqSize")} value={formatSize(log.req_size)} />
+              <SummaryCell label={t("troubleshooting.detail.respSize")} value={formatSize(log.resp_size)} />
             </div>
 
             {/* Latency bar */}
             <div className="flex items-center gap-6 text-sm">
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">Total</span>
+                <span className="text-muted-foreground">{t("troubleshooting.detail.total")}</span>
                 <span className="font-mono font-semibold">{formatLatency(log.latency_total)}</span>
               </div>
               <Separator orientation="vertical" className="h-4" />
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">Upstream</span>
+                <span className="text-muted-foreground">{t("troubleshooting.detail.upstream")}</span>
                 <span className="font-mono">{log.latency_upstream != null ? formatLatency(log.latency_upstream) : "-"}</span>
               </div>
               <Separator orientation="vertical" className="h-4" />
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">Gateway</span>
+                <span className="text-muted-foreground">{t("troubleshooting.detail.gateway")}</span>
                 <span className="font-mono">{log.latency_gateway != null ? formatLatency(log.latency_gateway) : "-"}</span>
               </div>
             </div>
@@ -230,24 +249,24 @@ function LogDetailSheet({ log, open, onClose, apis }: { log: DebugLog | null; op
 
             {/* Request Headers */}
             {log.req_headers && Object.keys(log.req_headers).length > 0 && (
-              <CollapsibleHeaders title="Request Headers" variant="request" headers={log.req_headers} defaultOpen />
+              <CollapsibleHeaders title={t("troubleshooting.detail.requestHeaders")} variant="request" headers={log.req_headers} defaultOpen t={t} />
             )}
 
             {/* Request Body */}
             {log.req_body && (
-              <CollapsibleCode title="Request Body" variant="request" badge="Debug Mode">
+              <CollapsibleCode title={t("troubleshooting.detail.requestBody")} variant="request" badge={t("troubleshooting.detail.debugMode")} t={t}>
                 {tryFormatJSON(log.req_body)}
               </CollapsibleCode>
             )}
 
             {/* Response Headers */}
             {log.resp_headers && Object.keys(log.resp_headers).length > 0 && (
-              <CollapsibleHeaders title="Response Headers" variant="response" headers={log.resp_headers} defaultOpen />
+              <CollapsibleHeaders title={t("troubleshooting.detail.responseHeaders")} variant="response" headers={log.resp_headers} defaultOpen t={t} />
             )}
 
             {/* Response Body */}
             {log.resp_body && (
-              <CollapsibleCode title="Response Body" variant="response" badge="Debug Mode">
+              <CollapsibleCode title={t("troubleshooting.detail.responseBody")} variant="response" badge={t("troubleshooting.detail.debugMode")} t={t}>
                 {tryFormatJSON(log.resp_body)}
               </CollapsibleCode>
             )}
@@ -259,6 +278,9 @@ function LogDetailSheet({ log, open, onClose, apis }: { log: DebugLog | null; op
 }
 
 export function TroubleshootingTab() {
+  const t = useTranslations("monitoring")
+  const tc = useTranslations("common")
+
   const [logs, setLogs] = useState<DebugLog[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -352,9 +374,7 @@ export function TroubleshootingTab() {
       {/* Hint: debug toggle is on the API page */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-md px-3 py-2">
         <Bug className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-        <span>
-          To enable debug capture, go to an API and click <strong>Debug</strong>. This view shows all captured logs across APIs.
-        </span>
+        <span dangerouslySetInnerHTML={{ __html: t.raw("troubleshooting.debugHint") }} />
       </div>
 
       {/* Filters Row */}
@@ -362,10 +382,10 @@ export function TroubleshootingTab() {
         {/* API filter */}
         <Select value={apiFilter} onValueChange={(v) => { setApiFilter(v); setPage(1) }}>
           <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="All APIs" />
+            <SelectValue placeholder={t("troubleshooting.allApis")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All APIs</SelectItem>
+            <SelectItem value="all">{t("troubleshooting.allApis")}</SelectItem>
             {apis.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 <span className="truncate">{a.name}</span>
@@ -378,15 +398,15 @@ export function TroubleshootingTab() {
         {/* Status filter */}
         <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1) }}>
           <SelectTrigger className="w-[130px]">
-            <SelectValue placeholder="Status" />
+            <SelectValue placeholder={tc("status")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="2xx">2xx Success</SelectItem>
-            <SelectItem value="3xx">3xx Redirect</SelectItem>
-            <SelectItem value="4xx">4xx Client</SelectItem>
-            <SelectItem value="5xx">5xx Server</SelectItem>
-            <SelectItem value="error">Errors (4xx+5xx)</SelectItem>
+            <SelectItem value="all">{t("troubleshooting.allStatus")}</SelectItem>
+            <SelectItem value="2xx">{t("troubleshooting.statusLabels.success2xx")}</SelectItem>
+            <SelectItem value="3xx">{t("troubleshooting.statusLabels.redirect3xx")}</SelectItem>
+            <SelectItem value="4xx">{t("troubleshooting.statusLabels.client4xx")}</SelectItem>
+            <SelectItem value="5xx">{t("troubleshooting.statusLabels.server5xx")}</SelectItem>
+            <SelectItem value="error">{t("troubleshooting.statusLabels.errors")}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -396,7 +416,7 @@ export function TroubleshootingTab() {
             <SelectValue placeholder="Method" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Methods</SelectItem>
+            <SelectItem value="all">{t("troubleshooting.allMethods")}</SelectItem>
             <SelectItem value="GET">GET</SelectItem>
             <SelectItem value="POST">POST</SelectItem>
             <SelectItem value="PUT">PUT</SelectItem>
@@ -409,7 +429,7 @@ export function TroubleshootingTab() {
         <div className="relative flex-1 min-w-[180px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search URI..."
+            placeholder={t("troubleshooting.searchUri")}
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setPage(1) }}
             className="pl-9 h-9"
@@ -420,7 +440,7 @@ export function TroubleshootingTab() {
         {hasFilters && (
           <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
             <X className="h-3.5 w-3.5" />
-            Clear
+            {t("troubleshooting.clear")}
           </Button>
         )}
 
@@ -430,7 +450,7 @@ export function TroubleshootingTab() {
             {autoRefresh && <Radio className="h-3 w-3 text-emerald-500 animate-pulse" />}
             <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} id="debug-auto-refresh" />
             <label htmlFor="debug-auto-refresh" className="text-xs text-muted-foreground cursor-pointer">
-              Live
+              {t("troubleshooting.live")}
             </label>
           </div>
           <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchLogs() }}>
@@ -454,16 +474,16 @@ export function TroubleshootingTab() {
         <Card>
           <CardContent className="p-12 text-center">
             <Search className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-            <p className="text-lg font-medium">No traffic captured yet</p>
+            <p className="text-lg font-medium">{t("troubleshooting.noTrafficCaptured")}</p>
             <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
               {hasFilters
-                ? "No logs match your current filters. Try adjusting or clearing them."
-                : "Enable debug mode on an API to start capturing traffic. Go to APIs, select one, and click Debug."}
+                ? t("troubleshooting.noLogsMatch")
+                : t("troubleshooting.enableDebugMode")}
             </p>
             {hasFilters && (
               <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}>
                 <Filter className="h-4 w-4 mr-2" />
-                Clear Filters
+                {t("troubleshooting.clearFilters")}
               </Button>
             )}
           </CardContent>
@@ -474,24 +494,24 @@ export function TroubleshootingTab() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[70px]">Time</TableHead>
-                  <TableHead className="w-[70px]">Method</TableHead>
-                  <TableHead>URI</TableHead>
-                  <TableHead className="w-[70px]">Status</TableHead>
-                  <TableHead className="w-[90px] text-right">Latency</TableHead>
+                  <TableHead className="w-[70px]">{t("troubleshooting.tableHeaders.time")}</TableHead>
+                  <TableHead className="w-[70px]">{t("troubleshooting.tableHeaders.method")}</TableHead>
+                  <TableHead>{t("troubleshooting.tableHeaders.uri")}</TableHead>
+                  <TableHead className="w-[70px]">{t("troubleshooting.tableHeaders.status")}</TableHead>
+                  <TableHead className="w-[90px] text-right">{t("troubleshooting.tableHeaders.latency")}</TableHead>
                   <TableHead className="w-[70px] text-right">
                     <div className="flex items-center justify-end gap-1">
                       <ArrowDown className="h-3 w-3" />
-                      Size
+                      {t("troubleshooting.tableHeaders.reqSize")}
                     </div>
                   </TableHead>
                   <TableHead className="w-[70px] text-right">
                     <div className="flex items-center justify-end gap-1">
                       <ArrowUp className="h-3 w-3" />
-                      Size
+                      {t("troubleshooting.tableHeaders.respSize")}
                     </div>
                   </TableHead>
-                  <TableHead className="w-[100px]">API</TableHead>
+                  <TableHead className="w-[100px]">{t("troubleshooting.tableHeaders.api")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -537,7 +557,7 @@ export function TroubleshootingTab() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t">
               <span className="text-xs text-muted-foreground">
-                {total} total logs
+                {t("troubleshooting.totalLogs", { count: total })}
               </span>
               <div className="flex items-center gap-2">
                 <Button
@@ -549,7 +569,7 @@ export function TroubleshootingTab() {
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <span className="text-xs text-muted-foreground">
-                  Page {page} of {totalPages}
+                  {t("troubleshooting.pageOf", { page, total: totalPages })}
                 </span>
                 <Button
                   variant="outline"
@@ -571,6 +591,7 @@ export function TroubleshootingTab() {
         open={selectedLog !== null}
         onClose={() => setSelectedLog(null)}
         apis={apis}
+        t={t}
       />
     </div>
   )

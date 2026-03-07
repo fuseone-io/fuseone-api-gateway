@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { useParams } from "next/navigation"
+import { useTranslations } from "next-intl"
 import Link from "next/link"
 import { ArrowLeft, Inbox, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -23,6 +24,8 @@ import { PageHeader } from "@/components/page-header"
 import { useKafkaStore } from "@/stores/kafka-store"
 
 export default function KafkaTopicsPage() {
+  const t = useTranslations("kafka")
+  const tc = useTranslations("common")
   const { connectionId } = useParams<{ connectionId: string }>()
   const { connections, topics, loadingTopics, fetchConnections, fetchTopics } = useKafkaStore()
   const [search, setSearch] = useState("")
@@ -63,13 +66,13 @@ export default function KafkaTopicsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Topicos - ${connectionName}`}
-        description="Navegue pelos topicos desta conexao Kafka"
+        title={t("topics.title", { connection: connectionName })}
+        description={t("topics.description")}
         actions={
           <Button variant="outline" asChild>
             <Link href="/kafka">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar
+              {tc("back")}
             </Link>
           </Button>
         }
@@ -79,7 +82,7 @@ export default function KafkaTopicsPage() {
       <div className="relative max-w-md">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Filtrar topicos..."
+          placeholder={t("topics.filterPlaceholder")}
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -92,12 +95,12 @@ export default function KafkaTopicsPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Inbox className="h-12 w-12 text-muted-foreground/30 mb-4" />
             <p className="text-lg font-medium text-muted-foreground mb-2">
-              {search ? "Nenhum topico encontrado" : "Nenhum topico disponivel"}
+              {search ? t("topics.noTopicsFound") : t("topics.noTopicsAvailable")}
             </p>
             <p className="text-sm text-muted-foreground">
               {search
-                ? "Tente ajustar o filtro de busca"
-                : "Esta conexao nao possui topicos ou o cluster esta indisponivel"}
+                ? tc("tryAdjusting")
+                : t("topics.noTopicsDescription")}
             </p>
           </CardContent>
         </Card>
@@ -106,8 +109,8 @@ export default function KafkaTopicsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nome do Topico</TableHead>
-                <TableHead className="w-[100px]">Acoes</TableHead>
+                <TableHead>{t("topics.topicName")}</TableHead>
+                <TableHead className="w-[100px]">{tc("actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -119,7 +122,7 @@ export default function KafkaTopicsPage() {
                   <TableCell>
                     <Button variant="ghost" size="sm" asChild>
                       <Link href={`/kafka/${connectionId}/topics/${encodeURIComponent(topic)}`}>
-                        Ver
+                        {tc("view")}
                       </Link>
                     </Button>
                   </TableCell>

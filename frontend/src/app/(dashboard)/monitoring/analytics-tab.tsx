@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useTranslations } from "next-intl"
 import {
   LineChart,
   Line,
@@ -29,6 +30,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { AIInsightButton } from "@/components/ai-assistant/AIInsightButton"
 import {
   Card,
   CardContent,
@@ -64,6 +66,9 @@ const AUTO_REFRESH_INTERVAL = 30_000
 const SYNC_ID = "global-analytics"
 
 export function AnalyticsTab() {
+  const t = useTranslations("monitoring")
+  const tc = useTranslations("common")
+
   const [dateRange, setDateRange] = useState<DateRangeValue>({ type: "preset", preset: "1h" })
   const [timeSeries, setTimeSeries] = useState<TimeSeriesPoint[]>([])
   const [summary, setSummary] = useState<MetricsSummary | null>(null)
@@ -95,12 +100,12 @@ export function AnalyticsTab() {
       setError(null)
       setLastRefresh(new Date())
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to fetch metrics"
+      const msg = err instanceof Error ? err.message : t("analytics.unableToFetchMetrics")
       setError(msg)
     } finally {
       setLoading(false)
     }
-  }, [dateRange])
+  }, [dateRange, t])
 
   useEffect(() => {
     setLoading(true)
@@ -118,7 +123,7 @@ export function AnalyticsTab() {
 
   const handleManualRefresh = () => {
     setLoading(true)
-    fetchData().then(() => toast.success("Metrics refreshed"))
+    fetchData().then(() => toast.success(t("analytics.metricsRefreshed")))
   }
 
   const spanHours = dateRangeSpanHours(dateRange)
@@ -127,7 +132,7 @@ export function AnalyticsTab() {
     time: formatTimestampForSpan(p.ts, spanHours),
   }))
 
-  // Drag-to-zoom: select a time range on any chart → update dateRange to custom
+  // Drag-to-zoom: select a time range on any chart -> update dateRange to custom
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function handleChartMouseDown(e: any) {
     if (e?.activeTooltipIndex != null) setDragStartIdx(e.activeTooltipIndex)
@@ -187,11 +192,11 @@ export function AnalyticsTab() {
       <Card>
         <CardContent className="p-8 text-center">
           <Activity className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-          <p className="text-lg font-medium">Unable to fetch metrics</p>
+          <p className="text-lg font-medium">{t("analytics.unableToFetchMetrics")}</p>
           <p className="text-sm text-muted-foreground mt-1">{error}</p>
           <Button variant="outline" className="mt-4" onClick={handleManualRefresh}>
             <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
+            {tc("retry")}
           </Button>
         </CardContent>
       </Card>
@@ -209,7 +214,7 @@ export function AnalyticsTab() {
           <div className="flex items-center gap-2">
             <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} id="metrics-auto-refresh" />
             <label htmlFor="metrics-auto-refresh" className="text-sm text-muted-foreground cursor-pointer">
-              Auto-refresh (30s)
+              {t("analytics.autoRefresh30s")}
             </label>
           </div>
           {lastRefresh && (
@@ -220,9 +225,17 @@ export function AnalyticsTab() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <AIInsightButton
+            buildPrompt={() => {
+              const s = summary
+              if (!s) return "Analyze the current API Gateway traffic metrics and identify any anomalies or areas for improvement."
+              const top = topRoutes.slice(0, 5).map((r) => `  - ${r.route_name || r.route_id}: ${r.requests_total} requests, ${(r.error_rate * 100).toFixed(1)}% errors`).join("\n")
+              return `Analyze these API Gateway metrics:\n- Total requests: ${s.total_requests}\n- Avg latency: ${s.avg_latency_ms.toFixed(1)}ms\n- Error rate: ${(s.error_rate * 100).toFixed(2)}%\n- Status: ${s.status_2xx} 2xx, ${s.status_3xx} 3xx, ${s.status_4xx} 4xx, ${s.status_5xx} 5xx\n\nTop routes:\n${top || "  (no data)"}\n\nIdentify anomalies, potential issues, and optimization recommendations.`
+            }}
+          />
           <Button variant="outline" size="sm" onClick={handleManualRefresh} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+            {tc("refresh")}
           </Button>
         </div>
       </div>
@@ -234,7 +247,7 @@ export function AnalyticsTab() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Total Requests</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("analytics.totalRequests")}</p>
                   <p className="text-2xl font-bold mt-1">{formatNumber(summary.total_requests)}</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
@@ -247,7 +260,7 @@ export function AnalyticsTab() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Avg Latency</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("analytics.avgLatency")}</p>
                   <p className="text-2xl font-bold mt-1">{formatLatency(summary.avg_latency_ms)}</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
@@ -260,7 +273,7 @@ export function AnalyticsTab() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Error Rate</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("analytics.errorRate")}</p>
                   <p className={`text-2xl font-bold mt-1 ${summary.error_rate > 0.05 ? "text-red-600" : "text-emerald-600"}`}>
                     {formatErrorRate(summary.error_rate)}
                   </p>
@@ -279,7 +292,7 @@ export function AnalyticsTab() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Bandwidth</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("analytics.bandwidth")}</p>
                   <p className="text-2xl font-bold mt-1">
                     {formatBytes(summary.total_bandwidth_ingress + summary.total_bandwidth_egress)}
                   </p>
@@ -297,10 +310,9 @@ export function AnalyticsTab() {
         <Card>
           <CardContent className="p-12 text-center">
             <Activity className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-            <p className="text-lg font-medium">No traffic data yet</p>
+            <p className="text-lg font-medium">{t("analytics.noTrafficDataYet")}</p>
             <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-              Metrics will appear here once API traffic flows through the gateway.
-              The scraper collects data every 15 seconds and flushes every minute.
+              {t("analytics.noTrafficDataDescription")}
             </p>
           </CardContent>
         </Card>
@@ -309,8 +321,8 @@ export function AnalyticsTab() {
           {/* Requests/min Chart */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Requests Over Time</CardTitle>
-              <CardDescription>Drag on any chart to select a time range</CardDescription>
+              <CardTitle className="text-base">{t("analytics.requestsOverTime")}</CardTitle>
+              <CardDescription>{t("analytics.dragToSelect")}</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
@@ -331,8 +343,8 @@ export function AnalyticsTab() {
           {/* Latency Percentiles Chart */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Latency Percentiles</CardTitle>
-              <CardDescription>Response time distribution (ms)</CardDescription>
+              <CardTitle className="text-base">{t("analytics.latencyPercentiles")}</CardTitle>
+              <CardDescription>{t("analytics.latencyDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
@@ -359,8 +371,8 @@ export function AnalyticsTab() {
           {/* Status Code Distribution */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Status Code Distribution</CardTitle>
-              <CardDescription>HTTP response status codes over time</CardDescription>
+              <CardTitle className="text-base">{t("analytics.statusCodeDistribution")}</CardTitle>
+              <CardDescription>{t("analytics.statusCodeDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
@@ -388,8 +400,8 @@ export function AnalyticsTab() {
             {topRoutes.length > 0 && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Top Routes by Traffic</CardTitle>
-                  <CardDescription>Most active API routes</CardDescription>
+                  <CardTitle className="text-base">{t("analytics.topRoutesByTraffic")}</CardTitle>
+                  <CardDescription>{t("analytics.mostActiveRoutes")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={Math.max(200, topRoutes.length * 36)}>
@@ -418,8 +430,8 @@ export function AnalyticsTab() {
             {summary && summary.total_requests > 0 && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Status Distribution</CardTitle>
-                  <CardDescription>HTTP response status breakdown</CardDescription>
+                  <CardTitle className="text-base">{t("analytics.statusDistribution")}</CardTitle>
+                  <CardDescription>{t("analytics.statusBreakdown")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
@@ -464,18 +476,18 @@ export function AnalyticsTab() {
           {topRoutes.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Top Routes</CardTitle>
-                <CardDescription>Detailed route-level metrics</CardDescription>
+                <CardTitle className="text-base">{t("analytics.topRoutes")}</CardTitle>
+                <CardDescription>{t("analytics.detailedRouteMetrics")}</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Route</TableHead>
-                      <TableHead className="text-right">Requests</TableHead>
-                      <TableHead className="text-right">Avg Latency</TableHead>
-                      <TableHead className="text-right">Error Rate</TableHead>
-                      <TableHead className="text-right">Bandwidth</TableHead>
+                      <TableHead>{t("analytics.tableHeaders.route")}</TableHead>
+                      <TableHead className="text-right">{t("analytics.tableHeaders.requests")}</TableHead>
+                      <TableHead className="text-right">{t("analytics.tableHeaders.avgLatency")}</TableHead>
+                      <TableHead className="text-right">{t("analytics.tableHeaders.errorRate")}</TableHead>
+                      <TableHead className="text-right">{t("analytics.tableHeaders.bandwidth")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -518,8 +530,8 @@ export function AnalyticsTab() {
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <CardTitle className="text-base">Top Applications by Traffic</CardTitle>
-                    <CardDescription>Consumer-level traffic breakdown</CardDescription>
+                    <CardTitle className="text-base">{t("analytics.topAppsByTraffic")}</CardTitle>
+                    <CardDescription>{t("analytics.consumerBreakdown")}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -527,11 +539,11 @@ export function AnalyticsTab() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Application</TableHead>
-                      <TableHead className="text-right">Requests</TableHead>
-                      <TableHead className="text-right">Avg Latency</TableHead>
-                      <TableHead className="text-right">Error Rate</TableHead>
-                      <TableHead className="text-right">Bandwidth</TableHead>
+                      <TableHead>{t("analytics.tableHeaders.application")}</TableHead>
+                      <TableHead className="text-right">{t("analytics.tableHeaders.requests")}</TableHead>
+                      <TableHead className="text-right">{t("analytics.tableHeaders.avgLatency")}</TableHead>
+                      <TableHead className="text-right">{t("analytics.tableHeaders.errorRate")}</TableHead>
+                      <TableHead className="text-right">{t("analytics.tableHeaders.bandwidth")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

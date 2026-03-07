@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useTranslations } from "next-intl"
 import Link from "next/link"
 import { toast } from "sonner"
 import {
@@ -44,6 +45,8 @@ import { api } from "@/lib/api-client"
 import type { APISIXConsumer, APISIXConsumerGroup } from "@/types/apisix"
 
 export default function PlansPage() {
+  const t = useTranslations("plans")
+  const tc = useTranslations("common")
   const [plans, setPlans] = useState<APISIXConsumerGroup[]>([])
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
@@ -67,7 +70,7 @@ export default function PlansPage() {
       setMemberCounts(counts)
       setPlans(planItems)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load plans")
+      toast.error(err instanceof Error ? err.message : tc("failedToLoad", { resource: t("title") }))
     } finally {
       setLoading(false)
     }
@@ -81,10 +84,10 @@ export default function PlansPage() {
     if (!deleteId) return
     try {
       await api.deleteResource("consumer-groups", deleteId)
-      toast.success("Plan deleted")
+      toast.success(t("toasts.deleted"))
       fetchData()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete failed")
+      toast.error(err instanceof Error ? err.message : t("toasts.failedDelete"))
     } finally {
       setDeleteId(null)
     }
@@ -103,13 +106,14 @@ export default function PlansPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Plans"
-        description="Define shared policies and rate limits for application groups"
+        title={t("title")}
+        description={t("description")}
+        icon={<CreditCard className="h-6 w-6" />}
         actions={
           <Button asChild>
             <Link href="/plans/new">
               <Plus className="mr-2 h-4 w-4" />
-              New Plan
+              {t("newPlan")}
             </Link>
           </Button>
         }
@@ -118,7 +122,7 @@ export default function PlansPage() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search plans..."
+          placeholder={t("searchPlaceholder")}
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -129,10 +133,10 @@ export default function PlansPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead>Name</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Policies</TableHead>
-              <TableHead>Members</TableHead>
+              <TableHead>{tc("name")}</TableHead>
+              <TableHead>{tc("description")}</TableHead>
+              <TableHead>{t("tableHeaders.policies")}</TableHead>
+              <TableHead>{t("tableHeaders.members")}</TableHead>
               <TableHead className="w-[70px]" />
             </TableRow>
           </TableHeader>
@@ -153,11 +157,11 @@ export default function PlansPage() {
                   <div className="flex flex-col items-center gap-2">
                     <CreditCard className="h-8 w-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
-                      {search ? "No plans match your search" : "No plans configured"}
+                      {search ? t("noMatchSearch") : t("noConfigured")}
                     </p>
                     {!search && (
                       <Button asChild variant="outline" size="sm">
-                        <Link href="/plans/new">Create your first plan</Link>
+                        <Link href="/plans/new">{t("createFirst")}</Link>
                       </Button>
                     )}
                   </div>
@@ -178,7 +182,7 @@ export default function PlansPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm">
-                    {memberCounts[plan.id || ""] || 0} apps
+                    {t("memberCount", { count: memberCounts[plan.id || ""] || 0 })}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -191,7 +195,7 @@ export default function PlansPage() {
                         <DropdownMenuItem asChild>
                           <Link href={`/plans/${plan.id}`}>
                             <Pencil className="mr-2 h-4 w-4" />
-                            Edit
+                            {tc("edit")}
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem
@@ -199,7 +203,7 @@ export default function PlansPage() {
                           onClick={() => setDeleteId(plan.id || null)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
+                          {tc("delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -214,15 +218,14 @@ export default function PlansPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Plan</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete plan &quot;{deleteId}&quot;? Applications
-              assigned to this plan will lose their shared policies.
+              {t("deleteDialog.description", { name: deleteId || "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{tc("delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

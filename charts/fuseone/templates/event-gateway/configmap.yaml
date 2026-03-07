@@ -1,0 +1,14 @@
+{{- if .Values.eventGateway.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fuseone.fullname" . }}-event-gateway
+  labels:
+    {{- include "fuseone.eventGateway.labels" . | nindent 4 }}
+data:
+  SERVER_PORT: {{ .Values.eventGateway.config.serverPort | default "8090" | quote }}
+  DB_HOST: {{ include "fuseone.postgresql.host" . | quote }}
+  DB_PORT: {{ include "fuseone.postgresql.port" . | quote }}
+  DB_NAME: {{ .Values.eventGateway.config.dbName | default .Values.backend.config.dbName | quote }}
+  DB_SSLMODE: {{ .Values.eventGateway.config.dbSSLMode | default "disable" | quote }}
+{{- end }}

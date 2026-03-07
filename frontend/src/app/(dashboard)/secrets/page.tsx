@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import {
   Plus,
@@ -79,22 +80,24 @@ const MANAGER_TYPE_LABELS: Record<string, { label: string; description: string }
 // --- Main Page ---
 
 export default function SecretsPage() {
+  const t = useTranslations("secrets")
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Secrets"
-        description="Manage local secrets and external secret manager integrations."
+        title={t("title")}
+        description={t("description")}
+        icon={<KeyRound className="h-6 w-6" />}
       />
 
       <Tabs defaultValue="local" className="space-y-6">
         <TabsList variant="line">
           <TabsTrigger value="local" className="gap-2">
             <KeyRound className="h-4 w-4" />
-            Local Secrets
+            {t("localSecrets")}
           </TabsTrigger>
           <TabsTrigger value="managers" className="gap-2">
             <CloudCog className="h-4 w-4" />
-            External Managers
+            {t("externalManagers")}
           </TabsTrigger>
         </TabsList>
 
@@ -115,6 +118,8 @@ export default function SecretsPage() {
 // ============================================================================
 
 function LocalSecretsTab() {
+  const t = useTranslations("secrets")
+  const tc = useTranslations("common")
   const [secrets, setSecrets] = useState<Secret[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -146,10 +151,10 @@ function LocalSecretsTab() {
     if (!deleteId) return
     try {
       await api.deleteSecret(deleteId)
-      toast.success("Secret deleted")
+      toast.success(t("secretDeleted"))
       fetchSecrets()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete failed")
+      toast.error(err instanceof Error ? err.message : t("deleteFailed"))
     } finally {
       setDeleteId(null)
     }
@@ -162,7 +167,7 @@ function LocalSecretsTab() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search secrets..."
+            placeholder={t("searchSecrets")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -170,16 +175,14 @@ function LocalSecretsTab() {
         </div>
         <Button onClick={() => setShowCreate(true)}>
           <Plus className="h-4 w-4 mr-2" />
-          New Secret
+          {t("newSecret")}
         </Button>
       </div>
 
       {/* Info banner */}
       <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
         <p>
-          Local secrets are stored encrypted in the database. Reference them in plugin configurations
-          using <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">$secret://local/secret-name</code>.
-          Values are resolved to plaintext when saving to the gateway.
+          {t("localSecretsInfo")}
         </p>
       </div>
 
@@ -194,7 +197,7 @@ function LocalSecretsTab() {
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <KeyRound className="h-12 w-12 text-muted-foreground/20" />
           <p className="text-sm text-muted-foreground">
-            {search ? "No secrets match your search." : "No secrets yet. Create your first secret."}
+            {search ? t("noSecretsSearch") : t("noSecretsYet")}
           </p>
         </div>
       ) : (
@@ -202,11 +205,11 @@ function LocalSecretsTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Reference</TableHead>
-                <TableHead>Tags</TableHead>
-                <TableHead className="text-right">Created</TableHead>
+                <TableHead>{tc("name")}</TableHead>
+                <TableHead>{tc("description")}</TableHead>
+                <TableHead>{t("reference")}</TableHead>
+                <TableHead>{t("tags")}</TableHead>
+                <TableHead className="text-right">{t("created")}</TableHead>
                 <TableHead className="w-[50px]" />
               </TableRow>
             </TableHeader>
@@ -291,16 +294,15 @@ function LocalSecretsTab() {
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Secret</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteSecret")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this secret. Any plugin configurations
-              referencing it will fail to resolve. This action cannot be undone.
+              {t("deleteSecretConfirm")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+              {tc("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -312,11 +314,12 @@ function LocalSecretsTab() {
 // --- Secret reference with copy button ---
 
 function SecretReference({ name }: { name: string }) {
+  const t = useTranslations("secrets")
   const ref = `$secret://local/${name}`
 
   const handleCopy = () => {
     navigator.clipboard.writeText(ref)
-    toast.success("Reference copied to clipboard")
+    toast.success(t("referenceCopied"))
   }
 
   return (
@@ -343,6 +346,8 @@ function SecretFormDialog({
   onClose: () => void
   onSaved: () => void
 }) {
+  const t = useTranslations("secrets")
+  const tc = useTranslations("common")
   const isEdit = !!secret
   const [name, setName] = useState(secret?.name || "")
   const [description, setDescription] = useState(secret?.description || "")
@@ -353,11 +358,11 @@ function SecretFormDialog({
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      toast.error("Name is required")
+      toast.error(t("nameRequired"))
       return
     }
     if (!isEdit && !value.trim()) {
-      toast.error("Value is required")
+      toast.error(t("valueRequired"))
       return
     }
 
@@ -374,7 +379,7 @@ function SecretFormDialog({
           value: value.trim() ? value : undefined,
           tags: parsedTags,
         })
-        toast.success("Secret updated")
+        toast.success(t("secretUpdated"))
       } else {
         await api.createSecret({
           name: name.trim(),
@@ -382,12 +387,12 @@ function SecretFormDialog({
           value,
           tags: parsedTags,
         })
-        toast.success("Secret created")
+        toast.success(t("secretCreated"))
       }
       onSaved()
       onClose()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Save failed")
+      toast.error(err instanceof Error ? err.message : t("saveFailed"))
     } finally {
       setSaving(false)
     }
@@ -397,17 +402,17 @@ function SecretFormDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Secret" : "New Secret"}</DialogTitle>
+          <DialogTitle>{isEdit ? t("editSecret") : t("newSecret")}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "Update the secret value or metadata. Leave value empty to keep the current value."
-              : "Create a new encrypted secret. It will be available as a reference in plugin configurations."}
+              ? t("editSecretDesc")
+              : t("newSecretDesc")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Name</Label>
+            <Label>{tc("name")}</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -416,28 +421,28 @@ function SecretFormDialog({
             />
             {!isEdit && (
               <p className="text-xs text-muted-foreground">
-                Use lowercase letters, numbers, and hyphens. This will be the reference key.
+                {t("nameHint")}
               </p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label>Description</Label>
+            <Label>{tc("description")}</Label>
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="API key for external service"
+              placeholder={t("descriptionPlaceholder")}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>{isEdit ? "New Value (optional)" : "Value"}</Label>
+            <Label>{isEdit ? t("newValueOptional") : t("value")}</Label>
             <div className="relative">
               <Input
                 type={showValue ? "text" : "password"}
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                placeholder={isEdit ? "Leave empty to keep current value" : "Enter secret value"}
+                placeholder={isEdit ? t("leaveEmptyToKeep") : t("enterSecretValue")}
                 className="pr-10"
               />
               <Button
@@ -457,23 +462,23 @@ function SecretFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Tags</Label>
+            <Label>{t("tags")}</Label>
             <Input
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              placeholder="production, api-key"
+              placeholder={t("tagsPlaceholder")}
             />
-            <p className="text-xs text-muted-foreground">Comma-separated tags for organization.</p>
+            <p className="text-xs text-muted-foreground">{t("tagsHint")}</p>
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {tc("cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {isEdit ? "Update" : "Create"}
+            {isEdit ? t("update") : tc("create")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -486,6 +491,8 @@ function SecretFormDialog({
 // ============================================================================
 
 function SecretManagersTab() {
+  const t = useTranslations("secrets")
+  const tc = useTranslations("common")
   const [managers, setManagers] = useState<SecretManager[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -507,10 +514,10 @@ function SecretManagersTab() {
   const handleToggle = async (manager: SecretManager) => {
     try {
       await api.updateSecretManager(manager.id, { is_active: !manager.is_active })
-      toast.success(`Manager ${manager.is_active ? "disabled" : "enabled"}`)
+      toast.success(manager.is_active ? t("managerDisabled") : t("managerEnabled"))
       fetchManagers()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Update failed")
+      toast.error(err instanceof Error ? err.message : t("updateFailed"))
     }
   }
 
@@ -518,10 +525,10 @@ function SecretManagersTab() {
     if (!deleteId) return
     try {
       await api.deleteSecretManager(deleteId)
-      toast.success("Secret manager removed")
+      toast.success(t("managerRemoved"))
       fetchManagers()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete failed")
+      toast.error(err instanceof Error ? err.message : t("deleteFailed"))
     } finally {
       setDeleteId(null)
     }
@@ -532,11 +539,11 @@ function SecretManagersTab() {
       {/* Toolbar */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Connect external secret managers to reference secrets stored in Vault, AWS, or GCP.
+          {t("externalManagersInfo")}
         </p>
         <Button onClick={() => setShowCreate(true)}>
           <Plus className="h-4 w-4 mr-2" />
-          Add Manager
+          {t("addManager")}
         </Button>
       </div>
 
@@ -551,7 +558,7 @@ function SecretManagersTab() {
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <CloudCog className="h-12 w-12 text-muted-foreground/20" />
           <p className="text-sm text-muted-foreground">
-            No external secret managers configured.
+            {t("noManagersConfigured")}
           </p>
         </div>
       ) : (
@@ -596,7 +603,7 @@ function SecretManagersTab() {
                       onClick={() => setDeleteId(manager.id)}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
-                      Remove
+                      {t("remove")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -617,16 +624,15 @@ function SecretManagersTab() {
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Secret Manager</AlertDialogTitle>
+            <AlertDialogTitle>{t("removeManager")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove the secret manager configuration. Any plugin configurations
-              referencing secrets from this manager will fail to resolve.
+              {t("removeManagerConfirm")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Remove
+              {t("remove")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -680,6 +686,8 @@ function ManagerFormDialog({
   onClose: () => void
   onSaved: () => void
 }) {
+  const t = useTranslations("secrets")
+  const tc = useTranslations("common")
   const [name, setName] = useState("")
   const [type, setType] = useState<string>("vault")
   const [config, setConfig] = useState<Record<string, string>>({})
@@ -689,7 +697,7 @@ function ManagerFormDialog({
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      toast.error("Name is required")
+      toast.error(t("nameRequired"))
       return
     }
 
@@ -700,11 +708,11 @@ function ManagerFormDialog({
         type,
         config,
       })
-      toast.success("Secret manager added")
+      toast.success(t("managerAdded"))
       onSaved()
       onClose()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Save failed")
+      toast.error(err instanceof Error ? err.message : t("saveFailed"))
     } finally {
       setSaving(false)
     }
@@ -714,15 +722,15 @@ function ManagerFormDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add Secret Manager</DialogTitle>
+          <DialogTitle>{t("addManager")}</DialogTitle>
           <DialogDescription>
-            Configure an external secret manager to store and reference secrets.
+            {t("addManagerDesc")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Name</Label>
+            <Label>{tc("name")}</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -731,7 +739,7 @@ function ManagerFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Type</Label>
+            <Label>{tc("type")}</Label>
             <Select value={type} onValueChange={(v) => { setType(v); setConfig({}) }}>
               <SelectTrigger>
                 <SelectValue />
@@ -774,8 +782,7 @@ function ManagerFormDialog({
           {type === "env" && (
             <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
               <p>
-                Environment variable secrets reference variables defined on the gateway host.
-                Use <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">$env://VARIABLE_NAME</code> in plugin configurations.
+                {t("envInfo")}
               </p>
             </div>
           )}
@@ -783,11 +790,11 @@ function ManagerFormDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {tc("cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Add Manager
+            {t("addManager")}
           </Button>
         </DialogFooter>
       </DialogContent>

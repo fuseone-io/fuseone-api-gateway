@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import {
   CheckCircle2,
   Copy,
@@ -43,7 +44,7 @@ import { toast } from "sonner"
 
 interface ProviderField {
   key: string
-  label: string
+  labelKey: string
   placeholder: string
   secret?: boolean
 }
@@ -51,7 +52,7 @@ interface ProviderField {
 interface ProviderTemplate {
   provider: string
   name: string
-  description: string
+  descKey: string
   color: string
   fields: ProviderField[]
   extraFields: ProviderField[]
@@ -63,11 +64,11 @@ const PROVIDER_TEMPLATES: ProviderTemplate[] = [
   {
     provider: "google",
     name: "Google",
-    description: "Google Workspace / Gmail accounts",
+    descKey: "googleDesc",
     color: "#4285F4",
     fields: [
-      { key: "client_id", label: "Client ID", placeholder: "xxxx.apps.googleusercontent.com" },
-      { key: "client_secret", label: "Client Secret", placeholder: "GOCSPX-...", secret: true },
+      { key: "client_id", labelKey: "clientId", placeholder: "xxxx.apps.googleusercontent.com" },
+      { key: "client_secret", labelKey: "clientSecret", placeholder: "GOCSPX-...", secret: true },
     ],
     extraFields: [],
     defaultScopes: ["openid", "email", "profile"],
@@ -76,14 +77,14 @@ const PROVIDER_TEMPLATES: ProviderTemplate[] = [
   {
     provider: "microsoft",
     name: "Microsoft",
-    description: "Azure AD / Microsoft 365",
+    descKey: "microsoftDesc",
     color: "#00A4EF",
     fields: [
-      { key: "client_id", label: "Application (Client) ID", placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" },
-      { key: "client_secret", label: "Client Secret Value", placeholder: "xxxxx~xxxxx", secret: true },
+      { key: "client_id", labelKey: "applicationClientId", placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" },
+      { key: "client_secret", labelKey: "clientSecretValue", placeholder: "xxxxx~xxxxx", secret: true },
     ],
     extraFields: [
-      { key: "tenant_id", label: "Tenant ID", placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx or 'common'" },
+      { key: "tenant_id", labelKey: "tenantId", placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx or 'common'" },
     ],
     defaultScopes: ["openid", "email", "profile", "User.Read"],
     docsUrl: "https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps",
@@ -91,11 +92,11 @@ const PROVIDER_TEMPLATES: ProviderTemplate[] = [
   {
     provider: "github",
     name: "GitHub",
-    description: "GitHub personal and org accounts",
+    descKey: "githubDesc",
     color: "#333333",
     fields: [
-      { key: "client_id", label: "Client ID", placeholder: "Iv1.xxxxx" },
-      { key: "client_secret", label: "Client Secret", placeholder: "xxxxx", secret: true },
+      { key: "client_id", labelKey: "clientId", placeholder: "Iv1.xxxxx" },
+      { key: "client_secret", labelKey: "clientSecret", placeholder: "xxxxx", secret: true },
     ],
     extraFields: [],
     defaultScopes: ["read:user", "user:email"],
@@ -104,14 +105,14 @@ const PROVIDER_TEMPLATES: ProviderTemplate[] = [
   {
     provider: "okta",
     name: "Okta",
-    description: "Okta Workforce Identity",
+    descKey: "oktaDesc",
     color: "#007DC1",
     fields: [
-      { key: "client_id", label: "Client ID", placeholder: "0oaxxxxxx" },
-      { key: "client_secret", label: "Client Secret", placeholder: "xxxxx", secret: true },
+      { key: "client_id", labelKey: "clientId", placeholder: "0oaxxxxxx" },
+      { key: "client_secret", labelKey: "clientSecret", placeholder: "xxxxx", secret: true },
     ],
     extraFields: [
-      { key: "domain", label: "Okta Domain", placeholder: "dev-123456.okta.com" },
+      { key: "domain", labelKey: "oktaDomain", placeholder: "dev-123456.okta.com" },
     ],
     defaultScopes: ["openid", "email", "profile"],
     docsUrl: "https://developer.okta.com/docs/guides/",
@@ -119,16 +120,16 @@ const PROVIDER_TEMPLATES: ProviderTemplate[] = [
   {
     provider: "oidc",
     name: "Generic OIDC",
-    description: "Any OpenID Connect provider",
+    descKey: "oidcDesc",
     color: "#6B7280",
     fields: [
-      { key: "client_id", label: "Client ID", placeholder: "your-client-id" },
-      { key: "client_secret", label: "Client Secret", placeholder: "your-client-secret", secret: true },
+      { key: "client_id", labelKey: "clientId", placeholder: "your-client-id" },
+      { key: "client_secret", labelKey: "clientSecret", placeholder: "your-client-secret", secret: true },
     ],
     extraFields: [
-      { key: "authorization_url", label: "Authorization URL", placeholder: "https://idp.example.com/authorize" },
-      { key: "token_url", label: "Token URL", placeholder: "https://idp.example.com/token" },
-      { key: "userinfo_url", label: "UserInfo URL", placeholder: "https://idp.example.com/userinfo" },
+      { key: "authorization_url", labelKey: "authorizationUrl", placeholder: "https://idp.example.com/authorize" },
+      { key: "token_url", labelKey: "tokenUrl", placeholder: "https://idp.example.com/token" },
+      { key: "userinfo_url", labelKey: "userinfoUrl", placeholder: "https://idp.example.com/userinfo" },
     ],
     defaultScopes: ["openid", "email", "profile"],
   },
@@ -137,6 +138,8 @@ const PROVIDER_TEMPLATES: ProviderTemplate[] = [
 // ---------- Component ----------
 
 export default function OAuthContent() {
+  const t = useTranslations("settings.oauth")
+  const tc = useTranslations("common")
   const [providers, setProviders] = useState<OAuthProvider[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
@@ -152,7 +155,7 @@ export default function OAuthContent() {
       setProviders(p)
       setRoles(r)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load providers")
+      toast.error(err instanceof Error ? err.message : t("failedToLoad"))
     } finally {
       setLoading(false)
     }
@@ -184,9 +187,9 @@ export default function OAuthContent() {
     return (
       <div className="space-y-6">
         <div>
-          <h3 className="text-lg font-semibold">Authentication Providers</h3>
+          <h3 className="text-lg font-semibold">{t("title")}</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure SSO and OAuth2 providers for user authentication
+            {t("subtitle")}
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -205,9 +208,9 @@ export default function OAuthContent() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold">Authentication Providers</h3>
+        <h3 className="text-lg font-semibold">{t("title")}</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Configure SSO and OAuth2 providers for user authentication
+          {t("subtitle")}
         </p>
       </div>
 
@@ -216,7 +219,7 @@ export default function OAuthContent() {
         <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3">
           <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-muted-foreground">Redirect / Callback URL (use this in your provider console):</p>
+            <p className="text-xs text-muted-foreground">{t("callbackUrlHint")}</p>
             <p className="text-sm font-mono truncate">{callbackUrl}</p>
           </div>
           <Button
@@ -225,7 +228,7 @@ export default function OAuthContent() {
             className="h-7 w-7 shrink-0"
             onClick={() => {
               navigator.clipboard.writeText(callbackUrl)
-              toast.success("Copied to clipboard")
+              toast.success(t("copiedToClipboard"))
             }}
           >
             <Copy className="h-3.5 w-3.5" />
@@ -254,7 +257,7 @@ export default function OAuthContent() {
                   </div>
                   <div>
                     <p className="text-sm font-medium">{template.name}</p>
-                    <p className="text-xs text-muted-foreground">{template.description}</p>
+                    <p className="text-xs text-muted-foreground">{t(template.descKey)}</p>
                   </div>
                 </div>
               </div>
@@ -267,25 +270,25 @@ export default function OAuthContent() {
                       className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-200"
                     >
                       <CheckCircle2 className="h-2.5 w-2.5 mr-1" />
-                      Configured
+                      {t("configured")}
                     </Badge>
                     {configured.is_enabled ? (
                       <Badge
                         variant="outline"
                         className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-600 border-blue-200"
                       >
-                        Enabled
+                        {tc("enabled")}
                       </Badge>
                     ) : (
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                        Disabled
+                        {tc("disabled")}
                       </Badge>
                     )}
                   </>
                 ) : (
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                     <Plus className="h-2.5 w-2.5 mr-1" />
-                    Not Configured
+                    {t("notConfigured")}
                   </Badge>
                 )}
               </div>
@@ -329,6 +332,8 @@ function ProviderSheet({
   roles: Role[]
   callbackUrl: string
 }) {
+  const t = useTranslations("settings.oauth")
+  const tc = useTranslations("common")
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -375,18 +380,18 @@ function ProviderSheet({
 
   const handleSave = async () => {
     if (!clientId.trim()) {
-      toast.error("Client ID is required")
+      toast.error(t("clientIdRequired"))
       return
     }
     if (!existing && !clientSecret.trim()) {
-      toast.error("Client Secret is required")
+      toast.error(t("clientSecretRequired"))
       return
     }
 
     // Validate extra fields
     for (const field of template.extraFields) {
       if (!extraValues[field.key]?.trim()) {
-        toast.error(`${field.label} is required`)
+        toast.error(t("fieldRequired", { field: t(field.labelKey) }))
         return
       }
     }
@@ -407,7 +412,7 @@ function ProviderSheet({
           data.client_secret = clientSecret
         }
         await api.updateOAuthProvider(existing.id, data)
-        toast.success(`${template.name} provider updated`)
+        toast.success(t("providerUpdated", { name: template.name }))
       } else {
         const data: CreateOAuthProviderRequest = {
           provider: template.provider,
@@ -421,11 +426,11 @@ function ProviderSheet({
           is_enabled: enabled,
         }
         await api.createOAuthProvider(data)
-        toast.success(`${template.name} provider configured`)
+        toast.success(t("providerConfigured", { name: template.name }))
       }
       onSaved()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save")
+      toast.error(err instanceof Error ? err.message : t("failedToSave"))
     } finally {
       setSaving(false)
     }
@@ -436,10 +441,10 @@ function ProviderSheet({
     setDeleting(true)
     try {
       await api.deleteOAuthProvider(existing.id)
-      toast.success(`${template.name} provider removed`)
+      toast.success(t("providerRemoved", { name: template.name }))
       onSaved()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete")
+      toast.error(err instanceof Error ? err.message : t("failedToDelete"))
     } finally {
       setDeleting(false)
     }
@@ -456,17 +461,17 @@ function ProviderSheet({
             >
               {template.name.charAt(0)}
             </div>
-            {existing ? `Edit ${template.name}` : `Configure ${template.name}`}
+            {existing ? t("editProvider", { name: template.name }) : t("configureProvider", { name: template.name })}
           </SheetTitle>
           <SheetDescription>
-            {template.description}
+            {t(template.descKey)}
           </SheetDescription>
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-4 space-y-4">
           {/* Display Name */}
           <div className="space-y-2">
-            <Label>Display Name</Label>
+            <Label>{t("displayName")}</Label>
             <Input
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
@@ -481,7 +486,7 @@ function ProviderSheet({
             <>
               {template.extraFields.map((field) => (
                 <div key={field.key} className="space-y-2">
-                  <Label>{field.label}</Label>
+                  <Label>{t(field.labelKey)}</Label>
                   <Input
                     value={extraValues[field.key] || ""}
                     onChange={(e) => handleExtraChange(field.key, e.target.value)}
@@ -496,7 +501,7 @@ function ProviderSheet({
           {/* Standard fields (client_id, client_secret) */}
           {template.fields.map((field) => (
             <div key={field.key} className="space-y-2">
-              <Label>{field.label}</Label>
+              <Label>{t(field.labelKey)}</Label>
               {field.key === "client_id" ? (
                 <Input
                   value={clientId}
@@ -508,7 +513,7 @@ function ProviderSheet({
                   type="password"
                   value={clientSecret}
                   onChange={(e) => setClientSecret(e.target.value)}
-                  placeholder={existing ? "Leave blank to keep existing" : field.placeholder}
+                  placeholder={existing ? t("leaveBlankToKeep") : field.placeholder}
                 />
               ) : null}
             </div>
@@ -516,13 +521,13 @@ function ProviderSheet({
 
           {/* Scopes */}
           <div className="space-y-2">
-            <Label>Scopes</Label>
+            <Label>{t("scopes")}</Label>
             <Input
               value={scopes}
               onChange={(e) => setScopes(e.target.value)}
               placeholder="openid, email, profile"
             />
-            <p className="text-xs text-muted-foreground">Comma-separated list of OAuth scopes</p>
+            <p className="text-xs text-muted-foreground">{t("scopesHint")}</p>
           </div>
 
           <Separator />
@@ -530,9 +535,9 @@ function ProviderSheet({
           {/* Auto-create users */}
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium">Auto-create users</p>
+              <p className="text-sm font-medium">{t("autoCreateUsers")}</p>
               <p className="text-xs text-muted-foreground">
-                Automatically provision accounts on first SSO login
+                {t("autoCreateUsersDescription")}
               </p>
             </div>
             <Switch checked={autoCreate} onCheckedChange={setAutoCreate} />
@@ -541,13 +546,13 @@ function ProviderSheet({
           {/* Default role */}
           {autoCreate && (
             <div className="space-y-2">
-              <Label>Default Role for New Users</Label>
+              <Label>{t("defaultRole")}</Label>
               <Select value={defaultRoleId} onValueChange={setDefaultRoleId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a role..." />
+                  <SelectValue placeholder={t("selectRole")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No role (uses viewer)</SelectItem>
+                  <SelectItem value="none">{t("noRoleViewer")}</SelectItem>
                   {roles.map((role) => (
                     <SelectItem key={role.id} value={role.id}>
                       {role.name}
@@ -561,9 +566,9 @@ function ProviderSheet({
           {/* Enabled toggle */}
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium">Enabled</p>
+              <p className="text-sm font-medium">{tc("enabled")}</p>
               <p className="text-xs text-muted-foreground">
-                Show this provider on the login page
+                {t("showOnLoginPage")}
               </p>
             </div>
             <Switch checked={enabled} onCheckedChange={setEnabled} />
@@ -572,7 +577,7 @@ function ProviderSheet({
           {/* Callback URL */}
           {callbackUrl && (
             <div className="rounded-md bg-muted/50 p-3">
-              <p className="text-xs text-muted-foreground mb-1">Redirect URI (add to your provider console):</p>
+              <p className="text-xs text-muted-foreground mb-1">{t("redirectUriHint")}</p>
               <p className="text-xs font-mono break-all">{callbackUrl}</p>
             </div>
           )}
@@ -586,7 +591,7 @@ function ProviderSheet({
               className="flex items-center gap-1.5 text-xs text-primary hover:underline"
             >
               <ExternalLink className="h-3 w-3" />
-              {template.name} Developer Console
+              {t("developerConsole", { name: template.name })}
             </a>
           )}
         </div>
@@ -606,12 +611,12 @@ function ProviderSheet({
                 ) : (
                   <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                 )}
-                Remove
+                {t("remove")}
               </Button>
             )}
             <div className={`flex items-center gap-2 ${existing ? "" : "ml-auto"}`}>
               <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
+                {tc("cancel")}
               </Button>
               <Button onClick={handleSave} disabled={saving}>
                 {saving ? (
@@ -621,7 +626,7 @@ function ProviderSheet({
                 ) : (
                   <KeyRound className="h-3.5 w-3.5 mr-1.5" />
                 )}
-                {saving ? "Saving..." : existing ? "Save Changes" : "Configure Provider"}
+                {saving ? tc("saving") : existing ? tc("saveChanges") : t("configureProviderBtn")}
               </Button>
             </div>
           </div>

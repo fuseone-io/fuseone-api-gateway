@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import Link from "next/link"
+import { useTranslations } from "next-intl"
 import {
   Activity,
   CheckCircle2,
@@ -36,33 +37,15 @@ import { PageHeader } from "@/components/page-header"
 import { SLAGauge } from "@/components/sla-gauge"
 import { useTestingStore } from "@/stores/testing-store"
 
-const RUN_STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  passed: { label: "Aprovado", className: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
-  failed: { label: "Falhou", className: "bg-red-500/15 text-red-600 border-red-500/30" },
-  error: { label: "Erro", className: "bg-red-500/15 text-red-600 border-red-500/30" },
-  running: { label: "Executando", className: "bg-blue-500/15 text-blue-600 border-blue-500/30" },
-  pending: { label: "Pendente", className: "bg-slate-500/15 text-slate-600 border-slate-500/30" },
-}
-
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`
   return `${(ms / 1000).toFixed(1)}s`
 }
 
-function formatRelativeTime(dateStr: string): string {
-  const now = new Date()
-  const date = new Date(dateStr)
-  const diffMs = now.getTime() - date.getTime()
-  const diffMin = Math.floor(diffMs / 60000)
-  if (diffMin < 1) return "agora"
-  if (diffMin < 60) return `${diffMin}min atras`
-  const diffHours = Math.floor(diffMin / 60)
-  if (diffHours < 24) return `${diffHours}h atras`
-  const diffDays = Math.floor(diffHours / 24)
-  return `${diffDays}d atras`
-}
-
 export default function TestingOverviewPage() {
+  const t = useTranslations("testing")
+  const tc = useTranslations("common")
+
   const {
     suites,
     suitesLoading,
@@ -90,9 +73,26 @@ export default function TestingOverviewPage() {
   const compliantSLAs = slaDefinitions.filter((s) => s.compliance_status === "compliant").length
   const totalSLAs = slaDefinitions.length
 
-  // Gather all recent runs from all suites - we only have the `runs` for the currently-viewed suite.
-  // For the overview, we show last known runs or a message.
-  // For a real implementation, the backend would provide a "recent-runs" endpoint.
+  const RUN_STATUS_BADGE: Record<string, { label: string; className: string }> = {
+    passed: { label: t("runStatus.passed"), className: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
+    failed: { label: t("runStatus.failed"), className: "bg-red-500/15 text-red-600 border-red-500/30" },
+    error: { label: t("runStatus.error"), className: "bg-red-500/15 text-red-600 border-red-500/30" },
+    running: { label: t("runStatus.running"), className: "bg-blue-500/15 text-blue-600 border-blue-500/30" },
+    pending: { label: t("runStatus.pending"), className: "bg-slate-500/15 text-slate-600 border-slate-500/30" },
+  }
+
+  function formatRelativeTime(dateStr: string): string {
+    const now = new Date()
+    const date = new Date(dateStr)
+    const diffMs = now.getTime() - date.getTime()
+    const diffMin = Math.floor(diffMs / 60000)
+    if (diffMin < 1) return t("overview.timeAgo.now")
+    if (diffMin < 60) return t("overview.timeAgo.minutesAgo", { min: diffMin })
+    const diffHours = Math.floor(diffMin / 60)
+    if (diffHours < 24) return t("overview.timeAgo.hoursAgo", { hours: diffHours })
+    const diffDays = Math.floor(diffHours / 24)
+    return t("overview.timeAgo.daysAgo", { days: diffDays })
+  }
 
   if (loading) {
     return (
@@ -116,20 +116,21 @@ export default function TestingOverviewPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="API Testing & Quality"
-        description="Suites de teste, monitoramento sintetico e controle de SLA"
+        title={t("overview.title")}
+        description={t("overview.description")}
+        icon={<FlaskConical className="h-6 w-6" />}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" asChild>
               <Link href="/testing/monitors">
                 <MonitorCheck className="mr-2 h-4 w-4" />
-                Novo Monitor
+                {t("overview.newMonitor")}
               </Link>
             </Button>
             <Button asChild>
               <Link href="/testing/suites">
                 <Plus className="mr-2 h-4 w-4" />
-                Nova Suite
+                {t("overview.newSuite")}
               </Link>
             </Button>
           </div>
@@ -142,7 +143,7 @@ export default function TestingOverviewPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Total de Suites</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("overview.totalSuites")}</p>
                 <p className="text-2xl font-bold mt-1">{totalSuites}</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -156,7 +157,7 @@ export default function TestingOverviewPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Ultima Execucao</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("overview.lastRun")}</p>
                 <p className="text-2xl font-bold mt-1">
                   {runs.length > 0 ? (
                     <Badge
@@ -181,7 +182,7 @@ export default function TestingOverviewPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Monitores Ativos</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("overview.activeMonitors")}</p>
                 <p className="text-2xl font-bold text-emerald-600 mt-1">{activeMonitors}</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
@@ -195,7 +196,7 @@ export default function TestingOverviewPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">SLA Compliance</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("overview.slaCompliance")}</p>
                 <p className="text-2xl font-bold mt-1">
                   {totalSLAs > 0 ? (
                     <span className={compliantSLAs === totalSLAs ? "text-emerald-600" : "text-amber-600"}>
@@ -223,8 +224,8 @@ export default function TestingOverviewPage() {
                 <Plus className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <p className="font-medium">Nova Suite de Teste</p>
-                <p className="text-sm text-muted-foreground">Criar uma nova suite com steps e assertions</p>
+                <p className="font-medium">{t("overview.newTestSuite")}</p>
+                <p className="text-sm text-muted-foreground">{t("overview.newTestSuiteDescription")}</p>
               </div>
             </CardContent>
           </Link>
@@ -237,8 +238,8 @@ export default function TestingOverviewPage() {
                 <Play className="h-6 w-6 text-emerald-500" />
               </div>
               <div>
-                <p className="font-medium">Executar Teste</p>
-                <p className="text-sm text-muted-foreground">Selecionar e executar uma suite existente</p>
+                <p className="font-medium">{t("overview.runTest")}</p>
+                <p className="text-sm text-muted-foreground">{t("overview.runTestDescription")}</p>
               </div>
             </CardContent>
           </Link>
@@ -251,8 +252,8 @@ export default function TestingOverviewPage() {
                 <MonitorCheck className="h-6 w-6 text-amber-500" />
               </div>
               <div>
-                <p className="font-medium">Novo Monitor</p>
-                <p className="text-sm text-muted-foreground">Configurar monitoramento sintetico</p>
+                <p className="font-medium">{t("overview.newMonitorAction")}</p>
+                <p className="text-sm text-muted-foreground">{t("overview.newMonitorDescription")}</p>
               </div>
             </CardContent>
           </Link>
@@ -262,27 +263,27 @@ export default function TestingOverviewPage() {
       {/* Recent runs table */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Execucoes Recentes</CardTitle>
-          <CardDescription>Ultimas execucoes de testes em todas as suites</CardDescription>
+          <CardTitle className="text-base">{t("overview.recentRuns")}</CardTitle>
+          <CardDescription>{t("overview.recentRunsDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           {runs.length === 0 ? (
             <div className="text-center py-8">
               <FlaskConical className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
               <p className="text-sm text-muted-foreground">
-                Nenhuma execucao encontrada. Execute uma suite para ver os resultados aqui.
+                {t("overview.noRunsFound")}
               </p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Suite</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-center">Steps</TableHead>
-                  <TableHead className="text-right">Duracao</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead className="text-right">Quando</TableHead>
+                  <TableHead>{t("overview.tableHeaders.suite")}</TableHead>
+                  <TableHead>{t("overview.tableHeaders.status")}</TableHead>
+                  <TableHead className="text-center">{t("overview.tableHeaders.steps")}</TableHead>
+                  <TableHead className="text-right">{t("overview.tableHeaders.duration")}</TableHead>
+                  <TableHead>{t("overview.tableHeaders.type")}</TableHead>
+                  <TableHead className="text-right">{t("overview.tableHeaders.when")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -314,7 +315,7 @@ export default function TestingOverviewPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-[10px]">
-                          {run.trigger_type === "manual" ? "Manual" : run.trigger_type === "synthetic" ? "Sintetico" : "CI"}
+                          {run.trigger_type === "manual" ? t("suiteDetail.triggerManual") : run.trigger_type === "synthetic" ? t("suiteDetail.triggerSynthetic") : t("suiteDetail.triggerCI")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right text-xs text-muted-foreground">
@@ -335,11 +336,11 @@ export default function TestingOverviewPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-base">Resumo SLA</CardTitle>
-              <CardDescription>Status atual dos acordos de nivel de servico</CardDescription>
+              <CardTitle className="text-base">{t("overview.slaSummary")}</CardTitle>
+              <CardDescription>{t("overview.slaSummaryDescription")}</CardDescription>
             </div>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/testing/sla">Ver Todos</Link>
+              <Link href="/testing/sla">{tc("viewAll")}</Link>
             </Button>
           </CardHeader>
           <CardContent>
@@ -358,10 +359,10 @@ export default function TestingOverviewPage() {
                     }`}
                   >
                     {sla.compliance_status === "compliant"
-                      ? "Em Conformidade"
+                      ? t("overview.complianceStatus.compliant")
                       : sla.compliance_status === "at_risk"
-                        ? "Em Risco"
-                        : "Violado"}
+                        ? t("overview.complianceStatus.atRisk")
+                        : t("overview.complianceStatus.breached")}
                   </Badge>
                 </div>
               ))}

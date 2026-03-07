@@ -24,11 +24,13 @@ import {
   SlidersHorizontal,
   Wifi,
   Workflow,
+  Zap,
   type LucideIcon,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect } from "react"
+import { useTranslations } from "next-intl"
 import { useAlertStore } from "@/stores/alert-store"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -61,64 +63,65 @@ import type { User } from "@/types/auth"
 
 type NavItem = {
   path: string
-  label: string
+  labelKey: string
   icon: LucideIcon
   badge?: "firing"
 }
 
 type NavGroup = {
-  label: string
+  labelKey: string
   collapsible?: boolean
   items: NavItem[]
 }
 
 const navGroups: NavGroup[] = [
   {
-    label: "API Management",
+    labelKey: "apiManagement",
     items: [
-      { path: "/design", label: "Design Studio", icon: PenTool },
-      { path: "/apis", label: "APIs", icon: Workflow },
-      { path: "/promotions", label: "Promotions", icon: ArrowRightLeft },
-      { path: "/applications", label: "Applications", icon: AppWindow },
-      { path: "/plans", label: "Plans", icon: CreditCard },
+      { path: "/design", labelKey: "designStudio", icon: PenTool },
+      { path: "/apis", labelKey: "apis", icon: Workflow },
+      { path: "/promotions", labelKey: "promotions", icon: ArrowRightLeft },
+      { path: "/applications", labelKey: "applications", icon: AppWindow },
+      { path: "/plans", labelKey: "plans", icon: CreditCard },
     ],
   },
   {
-    label: "Configuration",
+    labelKey: "configuration",
     collapsible: true,
     items: [
-      { path: "/plugins", label: "Policy Catalog", icon: Puzzle },
-      { path: "/plugin-configs", label: "Policy Templates", icon: FileJson },
-      { path: "/global-rules", label: "Global Policies", icon: ShieldCheck },
-      { path: "/ssl", label: "SSL / Certificates", icon: Lock },
-      { path: "/stream-routes", label: "Stream Proxy", icon: Wifi },
-      { path: "/secrets", label: "Secrets", icon: KeyRound },
+      { path: "/plugins", labelKey: "policyCatalog", icon: Puzzle },
+      { path: "/plugin-configs", labelKey: "policyTemplates", icon: FileJson },
+      { path: "/global-rules", labelKey: "globalPolicies", icon: ShieldCheck },
+      { path: "/ssl", labelKey: "sslCertificates", icon: Lock },
+      { path: "/stream-routes", labelKey: "streamProxy", icon: Wifi },
+      { path: "/secrets", labelKey: "secrets", icon: KeyRound },
     ],
   },
   {
-    label: "Integrations",
+    labelKey: "integrations",
     collapsible: true,
     items: [
-      { path: "/ai", label: "AI Dashboard", icon: Bot },
-      { path: "/ai/settings", label: "AI Cost Models", icon: SlidersHorizontal },
-      { path: "/kafka", label: "Kafka", icon: Radio },
-      { path: "/mesh", label: "Service Mesh", icon: Network },
+      { path: "/ai", labelKey: "aiDashboard", icon: Bot },
+      { path: "/ai/settings", labelKey: "aiCostModels", icon: SlidersHorizontal },
+      { path: "/kafka", labelKey: "kafka", icon: Radio },
+      { path: "/kafka/event-apis", labelKey: "eventApis", icon: Zap },
+      { path: "/mesh", labelKey: "serviceMesh", icon: Network },
     ],
   },
   {
-    label: "Observability",
+    labelKey: "observability",
     collapsible: true,
     items: [
-      { path: "/testing", label: "Testing", icon: FlaskConical },
-      { path: "/monitoring", label: "Monitoring", icon: Activity, badge: "firing" },
-      { path: "/reports", label: "Reports", icon: FileBarChart },
+      { path: "/testing", labelKey: "testing", icon: FlaskConical },
+      { path: "/monitoring", labelKey: "monitoring", icon: Activity, badge: "firing" },
+      { path: "/reports", labelKey: "reports", icon: FileBarChart },
     ],
   },
   {
-    label: "Administration",
+    labelKey: "administration",
     items: [
-      { path: "/audit", label: "Audit Log", icon: ScrollText },
-      { path: "/settings", label: "Settings", icon: Settings },
+      { path: "/audit", labelKey: "auditLog", icon: ScrollText },
+      { path: "/settings", labelKey: "settings", icon: Settings },
     ],
   },
 ]
@@ -127,6 +130,7 @@ export function AppSidebar({ user }: { user: User | null }) {
   const pathname = usePathname()
   const firingCount = useAlertStore((s) => s.firingCount)
   const startPolling = useAlertStore((s) => s.startPolling)
+  const t = useTranslations("sidebar")
 
   useEffect(() => {
     startPolling()
@@ -144,7 +148,7 @@ export function AppSidebar({ user }: { user: User | null }) {
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">FuseOne</span>
-                  <span className="truncate text-xs">API Gateway</span>
+                  <span className="truncate text-xs">{t("apiGateway")}</span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -159,7 +163,7 @@ export function AppSidebar({ user }: { user: User | null }) {
               <SidebarMenuButton asChild isActive={pathname === "/dashboard"}>
                 <Link href="/dashboard">
                   <LayoutDashboard />
-                  <span>Dashboard</span>
+                  <span>{t("dashboard")}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -170,17 +174,19 @@ export function AppSidebar({ user }: { user: User | null }) {
         {navGroups.map((group) =>
           group.collapsible ? (
             <CollapsibleNavGroup
-              key={group.label}
+              key={group.labelKey}
               group={group}
               pathname={pathname}
               firingCount={firingCount}
+              t={t}
             />
           ) : (
             <FlatNavGroup
-              key={group.label}
+              key={group.labelKey}
               group={group}
               pathname={pathname}
               firingCount={firingCount}
+              t={t}
             />
           )
         )}
@@ -191,7 +197,7 @@ export function AppSidebar({ user }: { user: User | null }) {
             <SidebarMenuButton asChild isActive={pathname.startsWith("/docs")}>
               <Link href="/docs">
                 <BookOpen />
-                <span>Documentacao</span>
+                <span>{t("documentation")}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -207,17 +213,19 @@ function FlatNavGroup({
   group,
   pathname,
   firingCount,
+  t,
 }: {
   group: NavGroup
   pathname: string
   firingCount: number
+  t: (key: string) => string
 }) {
   return (
     <SidebarGroup>
-      <SidebarGroupLabel className="uppercase">{group.label}</SidebarGroupLabel>
+      <SidebarGroupLabel className="uppercase">{t(group.labelKey)}</SidebarGroupLabel>
       <SidebarMenu>
         {group.items.map((item) => (
-          <NavItemButton key={item.path} item={item} pathname={pathname} firingCount={firingCount} />
+          <NavItemButton key={item.path} item={item} pathname={pathname} firingCount={firingCount} allPaths={group.items.map(i => i.path)} t={t} />
         ))}
       </SidebarMenu>
     </SidebarGroup>
@@ -230,13 +238,16 @@ function CollapsibleNavGroup({
   group,
   pathname,
   firingCount,
+  t,
 }: {
   group: NavGroup
   pathname: string
   firingCount: number
+  t: (key: string) => string
 }) {
   const { state } = useSidebar()
-  const isActive = group.items.some((item) => pathname.startsWith(item.path))
+  const isActive = group.items.some((item) => pathname === item.path || pathname.startsWith(item.path + "/"))
+  const groupLabel = t(group.labelKey)
 
   // Collapsed sidebar: show first item icon as trigger with floating dropdown
   if (state === "collapsed") {
@@ -249,19 +260,19 @@ function CollapsibleNavGroup({
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   isActive={isActive}
-                  tooltip={group.label}
+                  tooltip={groupLabel}
                 >
                   <firstItem.icon />
-                  <span>{group.label}</span>
+                  <span>{groupLabel}</span>
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="right" align="start" className="min-w-48">
-                <DropdownMenuLabel className="text-xs text-muted-foreground">{group.label}</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-xs text-muted-foreground">{groupLabel}</DropdownMenuLabel>
                 {group.items.map((item) => (
-                  <DropdownMenuItem key={item.path} asChild className={pathname.startsWith(item.path) ? "bg-accent" : ""}>
+                  <DropdownMenuItem key={item.path} asChild className={isNavItemActive(item.path, pathname, group.items.map(i => i.path)) ? "bg-accent" : ""}>
                     <Link href={item.path} className="flex items-center gap-2">
                       <item.icon className="h-4 w-4" />
-                      <span>{item.label}</span>
+                      <span>{t(item.labelKey)}</span>
                       {item.badge === "firing" && firingCount > 0 && (
                         <Badge variant="destructive" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px]">
                           {firingCount}
@@ -284,14 +295,14 @@ function CollapsibleNavGroup({
       <SidebarGroup>
         <SidebarGroupLabel asChild>
           <CollapsibleTrigger className="flex w-full items-center uppercase">
-            {group.label}
+            {groupLabel}
             <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform group-data-[state=open]/collapsible:rotate-90" />
           </CollapsibleTrigger>
         </SidebarGroupLabel>
         <CollapsibleContent>
           <SidebarMenu>
             {group.items.map((item) => (
-              <NavItemButton key={item.path} item={item} pathname={pathname} firingCount={firingCount} />
+              <NavItemButton key={item.path} item={item} pathname={pathname} firingCount={firingCount} allPaths={group.items.map(i => i.path)} t={t} />
             ))}
           </SidebarMenu>
         </CollapsibleContent>
@@ -300,22 +311,37 @@ function CollapsibleNavGroup({
   )
 }
 
+/** Check if a nav item is the best (most specific) match for the current pathname */
+function isNavItemActive(itemPath: string, pathname: string, allPaths: string[]): boolean {
+  const matches = pathname === itemPath || pathname.startsWith(itemPath + "/")
+  if (!matches) return false
+  // If another sibling path is a longer/more specific match, this one is not active
+  return !allPaths.some(
+    (other) => other !== itemPath && other.length > itemPath.length &&
+      (pathname === other || pathname.startsWith(other + "/"))
+  )
+}
+
 /** Single nav item button (shared between flat and collapsible) */
 function NavItemButton({
   item,
   pathname,
   firingCount,
+  allPaths,
+  t,
 }: {
   item: NavItem
   pathname: string
   firingCount: number
+  allPaths: string[]
+  t: (key: string) => string
 }) {
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild isActive={pathname.startsWith(item.path)}>
+      <SidebarMenuButton asChild isActive={isNavItemActive(item.path, pathname, allPaths)}>
         <Link href={item.path}>
           <item.icon />
-          <span>{item.label}</span>
+          <span>{t(item.labelKey)}</span>
           {item.badge === "firing" && firingCount > 0 && (
             <Badge variant="destructive" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px]">
               {firingCount}

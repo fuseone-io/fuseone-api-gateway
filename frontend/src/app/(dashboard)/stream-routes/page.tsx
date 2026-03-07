@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useTranslations } from "next-intl"
 import Link from "next/link"
 import { toast } from "sonner"
 import {
@@ -63,6 +64,8 @@ function formatUpstream(route: APISIXStreamRoute): string {
 }
 
 export default function StreamRoutesPage() {
+  const t = useTranslations("streamRoutes")
+  const tc = useTranslations("common")
   const [routes, setRoutes] = useState<APISIXStreamRoute[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -102,10 +105,10 @@ export default function StreamRoutesPage() {
     if (!deleteId) return
     try {
       await api.deleteResource("stream-routes", deleteId)
-      toast.success("Stream route deleted")
+      toast.success(t("toasts.deleted"))
       fetchRoutes()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete failed")
+      toast.error(err instanceof Error ? err.message : t("toasts.failedDelete"))
     } finally {
       setDeleteId(null)
     }
@@ -130,27 +133,25 @@ export default function StreamRoutesPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Stream Proxy"
-          description="Manage TCP/UDP Layer 4 proxy routes"
+          title={t("title")}
+          description={t("description")}
+          icon={<Wifi className="h-6 w-6" />}
         />
 
         <Card className="border-amber-500/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-amber-600">
               <AlertTriangle className="h-5 w-5" />
-              Stream Proxy Not Enabled
+              {t("streamDisabled.title")}
             </CardTitle>
             <CardDescription>
-              The API Gateway cluster does not have stream proxy mode enabled.
-              Stream proxy allows you to route TCP/UDP traffic (Layer 4) for
-              non-HTTP protocols like MySQL, Redis, MQTT, and more.
+              {t("streamDisabled.description")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg bg-muted/50 p-4 space-y-3">
               <p className="text-sm font-medium">
-                To enable stream proxy, add the following to your APISIX
-                configuration:
+                {t("streamDisabled.instructions")}
               </p>
               <pre className="text-xs bg-background rounded-md p-3 border overflow-x-auto font-mono">
 {`apisix:
@@ -164,12 +165,11 @@ export default function StreamRoutesPage() {
       - 9200                 # UDP listen port`}
               </pre>
               <p className="text-xs text-muted-foreground">
-                After updating the configuration, restart the API Gateway for
-                changes to take effect.
+                {t("streamDisabled.restartHint")}
               </p>
             </div>
             <Button variant="outline" onClick={fetchRoutes}>
-              Retry Detection
+              {t("streamDisabled.retry")}
             </Button>
           </CardContent>
         </Card>
@@ -180,13 +180,14 @@ export default function StreamRoutesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Stream Proxy"
-        description="Manage TCP/UDP Layer 4 proxy routes for non-HTTP protocols"
+        title={t("title")}
+        description={t("description")}
+        icon={<Wifi className="h-6 w-6" />}
         actions={
           <Button asChild>
             <Link href="/stream-routes/new">
               <Plus className="mr-2 h-4 w-4" />
-              New Stream Route
+              {t("newStreamRoute")}
             </Link>
           </Button>
         }
@@ -195,7 +196,7 @@ export default function StreamRoutesPage() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by name, SNI, IP..."
+          placeholder={t("searchPlaceholder")}
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -206,11 +207,11 @@ export default function StreamRoutesPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead>ID</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Match</TableHead>
-              <TableHead>Upstream</TableHead>
-              <TableHead>Plugins</TableHead>
+              <TableHead>{t("tableHeaders.id")}</TableHead>
+              <TableHead>{tc("name")}</TableHead>
+              <TableHead>{t("tableHeaders.match")}</TableHead>
+              <TableHead>{t("tableHeaders.upstream")}</TableHead>
+              <TableHead>{t("tableHeaders.plugins")}</TableHead>
               <TableHead className="w-[70px]" />
             </TableRow>
           </TableHeader>
@@ -232,13 +233,13 @@ export default function StreamRoutesPage() {
                     <Wifi className="h-8 w-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
                       {search
-                        ? "No stream routes match your search"
-                        : "No stream routes configured"}
+                        ? t("noMatchSearch")
+                        : t("noConfigured")}
                     </p>
                     {!search && (
                       <Button asChild variant="outline" size="sm">
                         <Link href="/stream-routes/new">
-                          Create your first stream route
+                          {t("createFirst")}
                         </Link>
                       </Button>
                     )}
@@ -292,7 +293,7 @@ export default function StreamRoutesPage() {
                           ))
                         ) : (
                           <span className="text-muted-foreground text-sm">
-                            Any
+                            {t("any")}
                           </span>
                         )}
                         {route.protocol?.name && (
@@ -340,7 +341,7 @@ export default function StreamRoutesPage() {
                           <DropdownMenuItem asChild>
                             <Link href={`/stream-routes/${route.id}`}>
                               <Pencil className="mr-2 h-4 w-4" />
-                              Edit
+                              {tc("edit")}
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem
@@ -348,7 +349,7 @@ export default function StreamRoutesPage() {
                             onClick={() => setDeleteId(route.id!)}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
+                            {tc("delete")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -364,16 +365,14 @@ export default function StreamRoutesPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Stream Route</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this stream route? This action
-              cannot be undone. Any TCP/UDP traffic using this route will be
-              affected.
+              {t("deleteDialog.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{tc("delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

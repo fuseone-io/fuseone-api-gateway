@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -115,6 +116,8 @@ function generateApiKey(): string {
 }
 
 export default function ApplicationDetailPage() {
+  const t = useTranslations("applications")
+  const tc = useTranslations("common")
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
@@ -181,17 +184,17 @@ export default function ApplicationDetailPage() {
         // subscriptions endpoint may not be available yet
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load application")
+      toast.error(err instanceof Error ? err.message : tc("failedToLoad", { resource: t("title") }))
     } finally {
       setLoading(false)
     }
   }
 
   const SUB_STATUS_BADGE: Record<string, { label: string; className: string }> = {
-    pending: { label: "Pending", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
-    active: { label: "Active", className: "bg-green-500/15 text-green-600 border-green-500/30" },
-    suspended: { label: "Suspended", className: "bg-blue-500/15 text-blue-600 border-blue-500/30" },
-    revoked: { label: "Revoked", className: "bg-red-500/15 text-red-600 border-red-500/30" },
+    pending: { label: t("subscriptions.statusPending"), className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
+    active: { label: t("subscriptions.statusActive"), className: "bg-green-500/15 text-green-600 border-green-500/30" },
+    suspended: { label: t("subscriptions.statusSuspended"), className: "bg-blue-500/15 text-blue-600 border-blue-500/30" },
+    revoked: { label: t("subscriptions.statusRevoked"), className: "bg-red-500/15 text-red-600 border-red-500/30" },
   }
 
   const openSubscribeDialog = async () => {
@@ -200,7 +203,7 @@ export default function ApplicationDetailPage() {
       const result = await api.listApis({ page_size: "100" })
       setAvailableApis(result.data || [])
     } catch {
-      toast.error("Failed to load APIs")
+      toast.error(tc("failedToLoad", { resource: "APIs" }))
     }
   }
 
@@ -219,9 +222,9 @@ export default function ApplicationDetailPage() {
       setSelectedApiId("")
       setSelectedSubPlan("")
       setSubNotes("")
-      toast.success("Subscription request created")
+      toast.success(t("subscriptions.created"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to subscribe")
+      toast.error(err instanceof Error ? err.message : t("subscriptions.failedSubscribe"))
     } finally {
       setSubscribing(false)
     }
@@ -241,9 +244,9 @@ export default function ApplicationDetailPage() {
         group_id: planId && planId !== "none" ? planId : undefined,
         plugins: Object.keys(plugins).length > 0 ? plugins : undefined,
       })
-      toast.success("Application saved")
+      toast.success(t("toasts.saved"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save application")
+      toast.error(err instanceof Error ? err.message : tc("failedToSave", { resource: t("title") }))
     } finally {
       setSaving(false)
     }
@@ -296,14 +299,14 @@ export default function ApplicationDetailPage() {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <p className="text-lg font-medium text-muted-foreground">
-          Application not found
+          {t("notFound")}
         </p>
         <Button
           variant="outline"
           className="mt-4"
           onClick={() => router.push("/applications")}
         >
-          Back to Applications
+          {t("backToList")}
         </Button>
       </div>
     )
@@ -320,8 +323,8 @@ export default function ApplicationDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Application: ${id}`}
-        description="Edit application settings and credentials"
+        title={`${t("detailTitle")}: ${id}`}
+        description={t("detailDescription")}
         actions={
           <div className="flex gap-2">
             <Button
@@ -329,18 +332,18 @@ export default function ApplicationDetailPage() {
               onClick={() => router.push("/applications")}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+              {tc("back")}
             </Button>
             <Button
               variant="outline"
               onClick={() => router.push(`/applications/${id}/analytics`)}
             >
               <BarChart3 className="mr-2 h-4 w-4" />
-              Analytics
+              {t("analytics")}
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               <Save className="mr-2 h-4 w-4" />
-              {saving ? "Saving..." : "Save"}
+              {saving ? tc("saving") : tc("save")}
             </Button>
           </div>
         }
@@ -350,19 +353,19 @@ export default function ApplicationDetailPage() {
         {/* Identity */}
         <Card>
           <CardHeader>
-            <CardTitle>Identity</CardTitle>
+            <CardTitle>{t("identity")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label>{tc("name")}</Label>
               <Input value={id} readOnly className="font-mono bg-muted" />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{tc("description")}</Label>
               <Input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Application description"
+                placeholder={t("descriptionPlaceholder")}
               />
             </div>
           </CardContent>
@@ -371,9 +374,9 @@ export default function ApplicationDetailPage() {
         {/* Plan */}
         <Card>
           <CardHeader>
-            <CardTitle>Plan</CardTitle>
+            <CardTitle>{t("plan")}</CardTitle>
             <CardDescription>
-              Shared policies and rate limits from the assigned plan
+              {t("planDetailDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -382,10 +385,10 @@ export default function ApplicationDetailPage() {
               onValueChange={(v) => setPlanId(v === "none" ? "" : v)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="No plan (standalone)" />
+                <SelectValue placeholder={t("noPlan")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No plan (standalone)</SelectItem>
+                <SelectItem value="none">{t("noPlan")}</SelectItem>
                 {plans.filter((p) => !!p.id).map((p) => (
                   <SelectItem key={p.id} value={p.id!}>
                     <div className="flex items-center gap-2">
@@ -406,7 +409,7 @@ export default function ApplicationDetailPage() {
                   href={`/plans/${currentPlan.id}`}
                   className="text-primary hover:underline"
                 >
-                  View plan details
+                  {t("viewPlanDetails")}
                 </Link>
               </p>
             )}
@@ -418,7 +421,7 @@ export default function ApplicationDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AuthIcon className="h-4 w-4" />
-              Credentials
+              {t("credentials")}
               {authMeta && (
                 <Badge variant="outline" className="text-xs font-normal">
                   {authMeta.label}
@@ -426,7 +429,7 @@ export default function ApplicationDetailPage() {
               )}
             </CardTitle>
             <CardDescription>
-              Authentication credentials for this application
+              {t("credentialsDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -446,12 +449,12 @@ export default function ApplicationDetailPage() {
                     {showCredentials ? (
                       <>
                         <EyeOff className="h-3 w-3" />
-                        Hide
+                        {t("hide")}
                       </>
                     ) : (
                       <>
                         <Eye className="h-3 w-3" />
-                        Show
+                        {t("show")}
                       </>
                     )}
                   </Button>
@@ -463,7 +466,7 @@ export default function ApplicationDetailPage() {
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <Label className="text-xs font-medium">
-                            API Key
+                            {t("apiKey")}
                           </Label>
                           <Button
                             type="button"
@@ -478,7 +481,7 @@ export default function ApplicationDetailPage() {
                             }
                           >
                             <Shuffle className="mr-1.5 h-3 w-3" />
-                            Regenerate
+                            {t("regenerate")}
                           </Button>
                         </div>
                         <div className="flex items-center gap-2">
@@ -501,7 +504,7 @@ export default function ApplicationDetailPage() {
                               navigator.clipboard.writeText(
                                 (authConfig.key as string) || ""
                               )
-                              toast.success("API key copied")
+                              toast.success(t("toasts.apiKeyCopied"))
                             }}
                           >
                             <Copy className="h-4 w-4" />
@@ -522,8 +525,7 @@ export default function ApplicationDetailPage() {
                 ) : (
                   <div className="rounded-lg border border-dashed p-4 text-center">
                     <p className="text-sm text-muted-foreground">
-                      Credentials are hidden. Click &quot;Show&quot; to view and
-                      edit.
+                      {t("credentialsHidden")}
                     </p>
                   </div>
                 )}
@@ -532,7 +534,7 @@ export default function ApplicationDetailPage() {
 
             {!authMethod && (
               <p className="text-sm text-muted-foreground text-center py-4">
-                No authentication method configured for this application.
+                {t("noAuthMethod")}
               </p>
             )}
           </CardContent>
@@ -546,7 +548,7 @@ export default function ApplicationDetailPage() {
                 <button className="flex items-center justify-between w-full text-left">
                   <div>
                     <CardTitle className="text-base">
-                      Policy Overrides
+                      {t("policyOverrides")}
                       {Object.keys(policyPlugins).length > 0 && (
                         <Badge
                           variant="secondary"
@@ -557,12 +559,11 @@ export default function ApplicationDetailPage() {
                       )}
                     </CardTitle>
                     <CardDescription className="mt-1">
-                      Additional plugins that override the plan&apos;s policies
-                      for this application
+                      {t("policyOverridesDescription")}
                     </CardDescription>
                   </div>
                   <Badge variant="outline" className="text-xs shrink-0">
-                    {showPolicies ? "Collapse" : "Expand"}
+                    {showPolicies ? t("collapse") : t("expand")}
                   </Badge>
                 </button>
               </CollapsibleTrigger>
@@ -571,7 +572,7 @@ export default function ApplicationDetailPage() {
               <CardContent className="space-y-3">
                 {Object.keys(policyPlugins).length === 0 ? (
                   <p className="text-sm text-muted-foreground py-4 text-center">
-                    No policy overrides. The plan&apos;s policies apply as-is.
+                    {t("noPolicyOverrides")}
                   </p>
                 ) : (
                   Object.entries(policyPlugins).map(
@@ -614,7 +615,7 @@ export default function ApplicationDetailPage() {
                                 }
                               }}
                             >
-                              Edit
+                              {tc("edit")}
                             </Button>
                             <Button
                               variant="ghost"
@@ -636,7 +637,7 @@ export default function ApplicationDetailPage() {
                   onClick={() => setShowPicker(true)}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Override
+                  {t("addOverride")}
                 </Button>
               </CardContent>
             </CollapsibleContent>
@@ -648,30 +649,30 @@ export default function ApplicationDetailPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>API Subscriptions</CardTitle>
+                <CardTitle>{t("subscriptions.title")}</CardTitle>
                 <CardDescription>
-                  APIs this application is subscribed to
+                  {t("subscriptions.description")}
                 </CardDescription>
               </div>
               <Button size="sm" variant="outline" onClick={openSubscribeDialog}>
                 <Plus className="mr-1.5 h-3.5 w-3.5" />
-                Subscribe
+                {t("subscriptions.subscribe")}
               </Button>
             </div>
           </CardHeader>
           <CardContent>
             {subscriptions.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
-                No API subscriptions yet.
+                {t("subscriptions.noSubscriptions")}
               </p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>API</TableHead>
-                    <TableHead>Plan</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead>{t("subscriptions.api")}</TableHead>
+                    <TableHead>{t("plan")}</TableHead>
+                    <TableHead>{tc("status")}</TableHead>
+                    <TableHead>{t("subscriptions.date")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -712,14 +713,14 @@ export default function ApplicationDetailPage() {
       <Dialog open={showSubscribeDialog} onOpenChange={setShowSubscribeDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Subscribe to API</DialogTitle>
+            <DialogTitle>{t("subscriptions.subscribeToApi")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>API</Label>
+              <Label>{t("subscriptions.api")}</Label>
               <Select value={selectedApiId} onValueChange={setSelectedApiId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select an API..." />
+                  <SelectValue placeholder={t("subscriptions.selectApi")} />
                 </SelectTrigger>
                 <SelectContent>
                   {availableApis.map((a) => (
@@ -731,13 +732,13 @@ export default function ApplicationDetailPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Plan (optional)</Label>
+              <Label>{t("subscriptions.planOptional")}</Label>
               <Select value={selectedSubPlan || "none"} onValueChange={(v) => setSelectedSubPlan(v === "none" ? "" : v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="No plan" />
+                  <SelectValue placeholder={t("subscriptions.noPlan")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No plan</SelectItem>
+                  <SelectItem value="none">{t("subscriptions.noPlan")}</SelectItem>
                   {plans.map((p) => (
                     <SelectItem key={p.id} value={p.id || "unknown"}>
                       {p.desc || p.id}
@@ -747,20 +748,20 @@ export default function ApplicationDetailPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Notes (optional)</Label>
+              <Label>{t("subscriptions.notesOptional")}</Label>
               <Input
                 value={subNotes}
                 onChange={(e) => setSubNotes(e.target.value)}
-                placeholder="Reason for subscription..."
+                placeholder={t("subscriptions.notesPlaceholder")}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowSubscribeDialog(false)}>
-              Cancel
+              {tc("cancel")}
             </Button>
             <Button onClick={handleSubscribe} disabled={!selectedApiId || subscribing}>
-              {subscribing ? "Subscribing..." : "Subscribe"}
+              {subscribing ? t("subscriptions.subscribing") : t("subscriptions.subscribe")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -769,7 +770,7 @@ export default function ApplicationDetailPage() {
       {/* Policy Picker Sheet */}
       <Sheet open={showPicker} onOpenChange={setShowPicker}>
         <SheetContent side="right" className="p-0 sm:max-w-sm">
-          <SheetTitle className="sr-only">Add Policy</SheetTitle>
+          <SheetTitle className="sr-only">{t("addPolicy")}</SheetTitle>
           <PolicyGallery
             onAddPolicy={handleAddPolicy}
             existingPolicies={existingPolicyNames}
@@ -801,7 +802,7 @@ export default function ApplicationDetailPage() {
               />
             ) : (
               <div className="space-y-2">
-                <Label>Configuration (JSON)</Label>
+                <Label>{t("configurationJson")}</Label>
                 <Textarea
                   value={jsonFallback}
                   onChange={(e) => setJsonFallback(e.target.value)}
@@ -816,9 +817,9 @@ export default function ApplicationDetailPage() {
               variant="outline"
               onClick={() => setEditingPlugin(null)}
             >
-              Cancel
+              {tc("cancel")}
             </Button>
-            <Button onClick={handleSavePlugin}>Apply</Button>
+            <Button onClick={handleSavePlugin}>{t("apply")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

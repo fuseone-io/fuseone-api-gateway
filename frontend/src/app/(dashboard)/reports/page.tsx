@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import {
   Download,
   FileBarChart,
@@ -32,13 +33,15 @@ import { toast } from "sonner"
 
 type ReportType = "usage" | "consumers" | "timeseries"
 
-const REPORT_TYPES: { value: ReportType; label: string; description: string; icon: typeof FileBarChart }[] = [
-  { value: "usage", label: "Usage Report", description: "Per-route traffic, latency, error rates, and bandwidth", icon: FileBarChart },
-  { value: "consumers", label: "Consumer Report", description: "Per-application traffic breakdown", icon: Users },
-  { value: "timeseries", label: "Time Series Export", description: "Raw time-series metrics data", icon: FileSpreadsheet },
+const REPORT_TYPES: { value: ReportType; labelKey: string; descriptionKey: string; icon: typeof FileBarChart }[] = [
+  { value: "usage", labelKey: "usageReport", descriptionKey: "usageReportDesc", icon: FileBarChart },
+  { value: "consumers", labelKey: "consumerReport", descriptionKey: "consumerReportDesc", icon: Users },
+  { value: "timeseries", labelKey: "timeSeriesExport", descriptionKey: "timeSeriesExportDesc", icon: FileSpreadsheet },
 ]
 
 export default function ReportsPage() {
+  const t = useTranslations("reports")
+  const tc = useTranslations("common")
   const [dateRange, setDateRange] = useState<DateRangeValue>({ type: "preset", preset: "24h" })
   const [reportType, setReportType] = useState<ReportType>("usage")
   const [downloading, setDownloading] = useState(false)
@@ -58,9 +61,9 @@ export default function ReportsPage() {
           await api.reportTimeSeriesCSV(params)
           break
       }
-      toast.success("Report downloaded")
+      toast.success(t("reportDownloaded"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to download report")
+      toast.error(err instanceof Error ? err.message : t("failedToDownload"))
     } finally {
       setDownloading(false)
     }
@@ -71,23 +74,24 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Reports"
-        description="Export usage data and metrics as CSV files"
+        title={t("title")}
+        description={t("description")}
+        icon={<FileBarChart className="h-6 w-6" />}
       />
 
       <div className="grid gap-6 max-w-2xl">
         {/* Report Configuration */}
         <Card>
           <CardHeader>
-            <CardTitle>Generate Report</CardTitle>
+            <CardTitle>{t("generateReport")}</CardTitle>
             <CardDescription>
-              Select a report type, time range, and download as CSV
+              {t("generateReportDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Report Type */}
             <div className="space-y-2">
-              <Label>Report Type</Label>
+              <Label>{t("reportType")}</Label>
               <Select value={reportType} onValueChange={(v) => setReportType(v as ReportType)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -97,25 +101,25 @@ export default function ReportsPage() {
                     <SelectItem key={rt.value} value={rt.value}>
                       <div className="flex items-center gap-2">
                         <rt.icon className="h-4 w-4 text-muted-foreground" />
-                        <span>{rt.label}</span>
+                        <span>{t(rt.labelKey)}</span>
                       </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">{selectedReport.description}</p>
+              <p className="text-xs text-muted-foreground">{t(selectedReport.descriptionKey)}</p>
             </div>
 
             {/* Date Range */}
             <div className="space-y-2">
-              <Label>Time Range</Label>
+              <Label>{t("timeRange")}</Label>
               <MetricsDateRange value={dateRange} onChange={setDateRange} />
             </div>
 
             {/* Download */}
             <Button onClick={handleDownload} disabled={downloading} className="w-full">
               <Download className="mr-2 h-4 w-4" />
-              {downloading ? "Generating..." : "Download CSV"}
+              {downloading ? t("generating") : t("downloadCsv")}
             </Button>
           </CardContent>
         </Card>
@@ -130,8 +134,8 @@ export default function ReportsPage() {
             >
               <CardContent className="p-4 text-center">
                 <rt.icon className={`h-8 w-8 mx-auto mb-2 ${reportType === rt.value ? "text-primary" : "text-muted-foreground"}`} />
-                <p className="text-sm font-medium">{rt.label}</p>
-                <p className="text-xs text-muted-foreground mt-1">{rt.description}</p>
+                <p className="text-sm font-medium">{t(rt.labelKey)}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t(rt.descriptionKey)}</p>
               </CardContent>
             </Card>
           ))}

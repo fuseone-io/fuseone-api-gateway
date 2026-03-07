@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react"
 import Link from "next/link"
@@ -63,7 +64,6 @@ interface FormState {
   sasl_mechanism: string
   sasl_username: string
   sasl_password: string
-  bridge_url: string
   is_active: boolean
 }
 
@@ -75,7 +75,6 @@ const emptyForm: FormState = {
   sasl_mechanism: "PLAIN",
   sasl_username: "",
   sasl_password: "",
-  bridge_url: "",
   is_active: true,
 }
 
@@ -84,6 +83,8 @@ function isSaslProtocol(protocol: string): boolean {
 }
 
 export default function KafkaConnectionsPage() {
+  const t = useTranslations("kafka.connections")
+  const tc = useTranslations("common")
   const { connections, loadingConnections, fetchConnections, createConnection, updateConnection, deleteConnection } = useKafkaStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -111,7 +112,6 @@ export default function KafkaConnectionsPage() {
       sasl_mechanism: conn.sasl_mechanism || "PLAIN",
       sasl_username: conn.sasl_username || "",
       sasl_password: conn.sasl_password || "",
-      bridge_url: conn.bridge_url,
       is_active: conn.is_active,
     })
     setDialogOpen(true)
@@ -119,7 +119,7 @@ export default function KafkaConnectionsPage() {
 
   const handleSave = async () => {
     if (!form.name.trim()) {
-      toast.error("Nome e obrigatorio")
+      toast.error(t("nameRequired"))
       return
     }
 
@@ -129,7 +129,7 @@ export default function KafkaConnectionsPage() {
       .filter(Boolean)
 
     if (brokers.length === 0) {
-      toast.error("Informe pelo menos um broker")
+      toast.error(t("brokersRequired"))
       return
     }
 
@@ -138,7 +138,6 @@ export default function KafkaConnectionsPage() {
       description: form.description.trim(),
       brokers,
       security_protocol: form.security_protocol,
-      bridge_url: form.bridge_url.trim(),
       is_active: form.is_active,
     }
 
@@ -152,14 +151,14 @@ export default function KafkaConnectionsPage() {
     try {
       if (editingId) {
         await updateConnection(editingId, payload)
-        toast.success("Conexao atualizada com sucesso")
+        toast.success(t("connectionUpdated"))
       } else {
         await createConnection(payload)
-        toast.success("Conexao criada com sucesso")
+        toast.success(t("connectionCreated"))
       }
       setDialogOpen(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao salvar conexao")
+      toast.error(err instanceof Error ? err.message : t("saveFailed"))
     } finally {
       setSaving(false)
     }
@@ -169,10 +168,10 @@ export default function KafkaConnectionsPage() {
     if (!deleteTarget) return
     try {
       await deleteConnection(deleteTarget.id)
-      toast.success("Conexao removida com sucesso")
+      toast.success(t("connectionDeleted"))
       setDeleteTarget(null)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao remover conexao")
+      toast.error(err instanceof Error ? err.message : t("deleteFailed"))
     }
   }
 
@@ -191,19 +190,19 @@ export default function KafkaConnectionsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Conexoes Kafka"
-        description="Gerencie suas conexoes com clusters Kafka"
+        title={t("title")}
+        description={t("description")}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" asChild>
               <Link href="/kafka">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar
+                {tc("back")}
               </Link>
             </Button>
             <Button onClick={handleOpenCreate}>
               <Plus className="mr-2 h-4 w-4" />
-              Criar Conexao
+              {t("createConnection")}
             </Button>
           </div>
         }
@@ -214,14 +213,14 @@ export default function KafkaConnectionsPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <p className="text-lg font-medium text-muted-foreground mb-2">
-              Nenhuma conexao cadastrada
+              {t("noConnections")}
             </p>
             <p className="text-sm text-muted-foreground mb-4">
-              Crie uma conexao para se conectar a um cluster Kafka
+              {t("noConnectionsDescription")}
             </p>
             <Button onClick={handleOpenCreate}>
               <Plus className="mr-2 h-4 w-4" />
-              Criar Conexao
+              {t("createConnection")}
             </Button>
           </CardContent>
         </Card>
@@ -230,12 +229,12 @@ export default function KafkaConnectionsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Descricao</TableHead>
-                <TableHead>Brokers</TableHead>
-                <TableHead>Protocolo</TableHead>
-                <TableHead className="w-[100px] text-center">Status</TableHead>
-                <TableHead className="w-[120px]">Acoes</TableHead>
+                <TableHead>{tc("name")}</TableHead>
+                <TableHead>{tc("description")}</TableHead>
+                <TableHead>{t("brokers")}</TableHead>
+                <TableHead>{t("protocol")}</TableHead>
+                <TableHead className="w-[100px] text-center">{tc("status")}</TableHead>
+                <TableHead className="w-[120px]">{tc("actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -257,9 +256,9 @@ export default function KafkaConnectionsPage() {
                   </TableCell>
                   <TableCell className="text-center">
                     {conn.is_active ? (
-                      <Badge className="bg-emerald-600 hover:bg-emerald-700">Ativo</Badge>
+                      <Badge className="bg-emerald-600 hover:bg-emerald-700">{tc("active")}</Badge>
                     ) : (
-                      <Badge variant="secondary">Inativo</Badge>
+                      <Badge variant="secondary">{tc("disabled")}</Badge>
                     )}
                   </TableCell>
                   <TableCell>
@@ -293,36 +292,36 @@ export default function KafkaConnectionsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle>{editingId ? "Editar Conexao" : "Nova Conexao Kafka"}</DialogTitle>
+            <DialogTitle>{editingId ? t("editConnection") : t("newConnection")}</DialogTitle>
             <DialogDescription>
               {editingId
-                ? "Atualize os dados da conexao com o cluster Kafka"
-                : "Configure uma nova conexao com um cluster Kafka"}
+                ? t("editConnectionDescription")
+                : t("newConnectionDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="conn-name">Nome *</Label>
+              <Label htmlFor="conn-name">{tc("name")} *</Label>
               <Input
                 id="conn-name"
-                placeholder="Meu cluster Kafka"
+                placeholder={t("namePlaceholder")}
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="conn-desc">Descricao</Label>
+              <Label htmlFor="conn-desc">{tc("description")}</Label>
               <Input
                 id="conn-desc"
-                placeholder="Descricao opcional"
+                placeholder={t("descriptionPlaceholder")}
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="conn-brokers">Brokers (separados por virgula) *</Label>
+              <Label htmlFor="conn-brokers">{t("brokersLabel")} *</Label>
               <Textarea
                 id="conn-brokers"
                 placeholder="broker1:9092, broker2:9092"
@@ -333,7 +332,7 @@ export default function KafkaConnectionsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Protocolo de Seguranca</Label>
+              <Label>{t("securityProtocol")}</Label>
               <Select
                 value={form.security_protocol}
                 onValueChange={(v) => setForm((f) => ({ ...f, security_protocol: v }))}
@@ -354,7 +353,7 @@ export default function KafkaConnectionsPage() {
             {isSaslProtocol(form.security_protocol) && (
               <>
                 <div className="space-y-2">
-                  <Label>Mecanismo SASL</Label>
+                  <Label>{t("saslMechanism")}</Label>
                   <Select
                     value={form.sasl_mechanism}
                     onValueChange={(v) => setForm((f) => ({ ...f, sasl_mechanism: v }))}
@@ -374,7 +373,7 @@ export default function KafkaConnectionsPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label htmlFor="conn-sasl-user">Usuario SASL</Label>
+                    <Label htmlFor="conn-sasl-user">{t("saslUsername")}</Label>
                     <Input
                       id="conn-sasl-user"
                       value={form.sasl_username}
@@ -382,7 +381,7 @@ export default function KafkaConnectionsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="conn-sasl-pass">Senha SASL</Label>
+                    <Label htmlFor="conn-sasl-pass">{t("saslPassword")}</Label>
                     <Input
                       id="conn-sasl-pass"
                       type="password"
@@ -394,16 +393,6 @@ export default function KafkaConnectionsPage() {
               </>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="conn-bridge">Bridge URL</Label>
-              <Input
-                id="conn-bridge"
-                placeholder="http://kafka-bridge:8080"
-                value={form.bridge_url}
-                onChange={(e) => setForm((f) => ({ ...f, bridge_url: e.target.value }))}
-              />
-            </div>
-
             <div className="flex items-center gap-3">
               <Switch
                 id="conn-active"
@@ -411,16 +400,16 @@ export default function KafkaConnectionsPage() {
                 onCheckedChange={(checked) => setForm((f) => ({ ...f, is_active: checked }))}
               />
               <Label htmlFor="conn-active" className="cursor-pointer">
-                Conexao ativa
+                {t("connectionActive")}
               </Label>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancelar
+              {tc("cancel")}
             </Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Salvando..." : editingId ? "Salvar" : "Criar"}
+              {saving ? tc("saving") : editingId ? tc("save") : tc("create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -430,14 +419,14 @@ export default function KafkaConnectionsPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remover Conexao</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja remover a conexao &quot;{deleteTarget?.name}&quot;? Esta acao nao pode ser desfeita.
+              {t("deleteConfirm", { name: deleteTarget?.name ?? "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Remover</AlertDialogAction>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{tc("delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -92,6 +92,7 @@ plugins:
   - data-masking
   - threat-protection
   - api-composition
+  - fuseone-timing
 
 deployment:
   admin:

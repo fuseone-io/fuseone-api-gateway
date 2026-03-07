@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { ArrowLeft, Plus, Save, Trash2, X } from "lucide-react"
@@ -36,6 +37,8 @@ import { PolicyGallery } from "@/components/flow/policy-gallery"
 import { api } from "@/lib/api-client"
 
 export default function NewPolicyTemplatePage() {
+  const t = useTranslations("pluginConfigs.new")
+  const tc = useTranslations("common")
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState("")
@@ -50,11 +53,11 @@ export default function NewPolicyTemplatePage() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error("Name is required")
+      toast.error(t("nameRequired"))
       return
     }
     if (Object.keys(plugins).length === 0) {
-      toast.error("Add at least one policy")
+      toast.error(t("addAtLeastOnePolicy"))
       return
     }
     setSaving(true)
@@ -66,10 +69,10 @@ export default function NewPolicyTemplatePage() {
         plugins,
         labels: Object.keys(labels).length > 0 ? labels : undefined,
       })
-      toast.success("Policy template created")
+      toast.success(t("templateCreated"))
       router.push("/plugin-configs")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create policy template")
+      toast.error(err instanceof Error ? err.message : t("createFailed"))
     } finally {
       setSaving(false)
     }
@@ -94,7 +97,7 @@ export default function NewPolicyTemplatePage() {
       try {
         config = JSON.parse(jsonFallback || "{}")
       } catch {
-        toast.error("Invalid JSON")
+        toast.error(t("invalidJson"))
         return
       }
     }
@@ -126,20 +129,20 @@ export default function NewPolicyTemplatePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Create Policy Template"
-        description="Define a reusable set of policies"
+        title={t("title")}
+        description={t("description")}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => router.push("/plugin-configs")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+              {tc("back")}
             </Button>
             <Button
               onClick={handleSave}
               disabled={saving || !name.trim() || Object.keys(plugins).length === 0}
             >
               <Save className="mr-2 h-4 w-4" />
-              {saving ? "Creating..." : "Create Template"}
+              {saving ? t("creating") : t("createTemplate")}
             </Button>
           </div>
         }
@@ -149,11 +152,11 @@ export default function NewPolicyTemplatePage() {
         {/* Template Details */}
         <Card>
           <CardHeader>
-            <CardTitle>Template Details</CardTitle>
+            <CardTitle>{t("templateDetails")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Name *</Label>
+              <Label>{tc("name")} *</Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -161,7 +164,7 @@ export default function NewPolicyTemplatePage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Labels</Label>
+              <Label>{t("labelsLabel")}</Label>
               {Object.keys(labels).length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {Object.entries(labels).map(([k, v]) => (
@@ -208,15 +211,15 @@ export default function NewPolicyTemplatePage() {
         {/* Policies */}
         <Card>
           <CardHeader>
-            <CardTitle>Policies</CardTitle>
+            <CardTitle>{t("policies")}</CardTitle>
             <CardDescription>
-              Policies included in this template. Routes using this template will inherit all these policies.
+              {t("policiesDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {Object.keys(plugins).length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
-                No policies configured. Add policies to build your template.
+                {t("noPoliciesConfigured")}
               </p>
             ) : (
               Object.entries(plugins).map(([pluginName, config]) => {
@@ -252,7 +255,7 @@ export default function NewPolicyTemplatePage() {
                           }
                         }}
                       >
-                        Edit
+                        {tc("edit")}
                       </Button>
                       <Button
                         variant="ghost"
@@ -273,7 +276,7 @@ export default function NewPolicyTemplatePage() {
               onClick={() => setShowPicker(true)}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Add Policy
+              {t("addPolicy")}
             </Button>
           </CardContent>
         </Card>
@@ -282,7 +285,7 @@ export default function NewPolicyTemplatePage() {
       {/* Policy Picker Sheet */}
       <Sheet open={showPicker} onOpenChange={setShowPicker}>
         <SheetContent side="right" className="p-0 sm:max-w-sm">
-          <SheetTitle className="sr-only">Add Policy</SheetTitle>
+          <SheetTitle className="sr-only">{t("addPolicy")}</SheetTitle>
           <PolicyGallery
             onAddPolicy={handleAddPolicy}
             existingPolicies={Object.keys(plugins)}
@@ -295,7 +298,7 @@ export default function NewPolicyTemplatePage() {
         <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Configure{" "}
+              {t("configure")}{" "}
               {PLUGINS.find((p) => p.name === editingPlugin)?.label ||
                 editingPlugin}
             </DialogTitle>
@@ -310,7 +313,7 @@ export default function NewPolicyTemplatePage() {
               />
             ) : (
               <div className="space-y-2">
-                <Label>Configuration (JSON)</Label>
+                <Label>{t("configurationJson")}</Label>
                 <Textarea
                   value={jsonFallback}
                   onChange={(e) => setJsonFallback(e.target.value)}
@@ -322,9 +325,9 @@ export default function NewPolicyTemplatePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingPlugin(null)}>
-              Cancel
+              {tc("cancel")}
             </Button>
-            <Button onClick={handleSavePlugin}>Apply</Button>
+            <Button onClick={handleSavePlugin}>{t("apply")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

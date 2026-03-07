@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
+import { useTranslations } from "next-intl"
 import {
   AlertTriangle,
   CheckCircle2,
@@ -11,8 +12,10 @@ import {
   Server,
   XCircle,
 } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { AIInsightButton } from "@/components/ai-assistant/AIInsightButton"
 import {
   Card,
   CardContent,
@@ -53,27 +56,29 @@ function countNodes(checkers: UpstreamHealthChecker[]) {
   return { total, healthy, unhealthy }
 }
 
-function StatusBadge({ status }: { status: UpstreamHealthNode["status"] }) {
-  if (status === "healthy") {
-    return (
-      <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-700 gap-1">
-        <CheckCircle2 className="h-3 w-3" />
-        Healthy
-      </Badge>
-    )
-  }
-  return (
-    <Badge variant="destructive" className="gap-1">
-      <XCircle className="h-3 w-3" />
-      Unhealthy
-    </Badge>
-  )
-}
-
 export default function ApiHealthPage() {
+  const t = useTranslations("apis")
+  const tc = useTranslations("common")
   const params = useParams()
 
   const apiId = params.id as string
+
+  function StatusBadge({ status }: { status: UpstreamHealthNode["status"] }) {
+    if (status === "healthy") {
+      return (
+        <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-700 gap-1">
+          <CheckCircle2 className="h-3 w-3" />
+          {t("detail.healthy")}
+        </Badge>
+      )
+    }
+    return (
+      <Badge variant="destructive" className="gap-1">
+        <XCircle className="h-3 w-3" />
+        {t("detail.unhealthy")}
+      </Badge>
+    )
+  }
 
   // API info
   const [record, setRecord] = useState<ApiDefRecord | null>(null)
@@ -95,13 +100,13 @@ export default function ApiHealthPage() {
         setRecord(rec)
         if (rec.name) sessionStorage.setItem(`breadcrumb:${apiId}`, rec.name)
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to load API")
+        toast.error(err instanceof Error ? err.message : tc("failedToLoad", { resource: "API" }))
       } finally {
         setLoadingApi(false)
       }
     }
     load()
-  }, [apiId])
+  }, [apiId, tc])
 
   const fetchHealth = useCallback(async () => {
     try {
@@ -110,12 +115,12 @@ export default function ApiHealthPage() {
       setError(null)
       setLastRefresh(new Date())
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to fetch health data"
+      const msg = err instanceof Error ? err.message : t("detail.unableToFetchHealth")
       setError(msg)
     } finally {
       setLoading(false)
     }
-  }, [apiId])
+  }, [apiId, t])
 
   useEffect(() => {
     if (!loadingApi) {
@@ -157,18 +162,12 @@ export default function ApiHealthPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Heart className="h-5 w-5 text-primary shrink-0" />
-            <h1 className="text-2xl font-bold tracking-tight truncate">{record?.name || "API"}</h1>
-            {record?.version && (
-              <Badge variant="outline" className="text-[10px] font-mono shrink-0">v{record.version}</Badge>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground mt-0.5">Upstream health status and node monitoring</p>
-        </div>
-      </div>
+      <PageHeader
+        title={record?.name || "API"}
+        description={t("detail.upstreamHealth")}
+        icon={<Heart className="h-5 w-5" />}
+        badge={record?.version ? <Badge variant="outline" className="text-[10px] font-mono shrink-0">v{record.version}</Badge> : undefined}
+      />
 
       {/* Summary Cards */}
       <div className="grid gap-4 grid-cols-3">
@@ -176,7 +175,7 @@ export default function ApiHealthPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Total Nodes</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("detail.totalNodes")}</p>
                 <p className="text-2xl font-bold mt-1">{total}</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/50">
@@ -189,7 +188,7 @@ export default function ApiHealthPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Healthy</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("detail.healthy")}</p>
                 <p className="text-2xl font-bold text-emerald-600 mt-1">{healthy}</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
@@ -202,7 +201,7 @@ export default function ApiHealthPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Unhealthy</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("detail.unhealthy")}</p>
                 <p className="text-2xl font-bold text-red-600 mt-1">{unhealthy}</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10">
@@ -229,10 +228,19 @@ export default function ApiHealthPage() {
             </span>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchHealth().then(() => toast.success("Health data refreshed")) }} disabled={loading}>
-          <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <AIInsightButton
+            buildPrompt={() => {
+              const apiName = record?.name ?? "this API"
+              const nodeDetails = allNodes.slice(0, 8).map((n) => `  - ${n.ip}:${n.port} → ${n.status} (http_fail:${n.counter?.http_failure ?? 0}, tcp_fail:${n.counter?.tcp_failure ?? 0})`).join("\n")
+              return `Analyze upstream health for API "${apiName}":\n- Total nodes: ${total}, Healthy: ${healthy}, Unhealthy: ${unhealthy}\n${hasActiveCheckFailures ? "- Active health check failures detected!\n" : ""}\nNode details:\n${nodeDetails || "  (no data)"}\n\nWhat is causing the unhealthy nodes and how can I fix them?`
+            }}
+          />
+          <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchHealth().then(() => toast.success(t("detail.healthRefreshed"))) }} disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+            {tc("refresh")}
+          </Button>
+        </div>
       </div>
 
       {/* Content */}
@@ -246,11 +254,11 @@ export default function ApiHealthPage() {
         <Card>
           <CardContent className="p-8 text-center">
             <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-            <p className="text-sm font-medium">Unable to fetch health data</p>
+            <p className="text-sm font-medium">{t("detail.unableToFetchHealth")}</p>
             <p className="text-xs text-muted-foreground mt-1">{error}</p>
             <Button variant="outline" size="sm" className="mt-4" onClick={() => { setLoading(true); fetchHealth() }}>
               <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-              Retry
+              {tc("retry")}
             </Button>
           </CardContent>
         </Card>
@@ -258,9 +266,9 @@ export default function ApiHealthPage() {
         <Card>
           <CardContent className="py-16 text-center">
             <Heart className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm font-medium">Deploy this API to monitor upstream health</p>
+            <p className="text-sm font-medium">{t("detail.deployToMonitor")}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Health check data will appear here once the API is deployed.
+              {t("detail.deployToMonitorDescription")}
             </p>
           </CardContent>
         </Card>
@@ -268,9 +276,9 @@ export default function ApiHealthPage() {
         <Card>
           <CardContent className="py-16 text-center">
             <Heart className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm font-medium">No health checks configured</p>
+            <p className="text-sm font-medium">{t("detail.noHealthChecks")}</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-              Enable active or passive health checks in the endpoint settings to monitor upstream node health.
+              {t("detail.noHealthChecksDescription")}
             </p>
           </CardContent>
         </Card>
@@ -282,12 +290,9 @@ export default function ApiHealthPage() {
               <CardContent className="p-4 flex items-start gap-3">
                 <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-medium text-amber-700 dark:text-amber-400">Active health check cannot reach upstream</p>
+                  <p className="font-medium text-amber-700 dark:text-amber-400">{t("detail.activeCheckFailing")}</p>
                   <p className="text-muted-foreground mt-1">
-                    Nodes show 0 successes with TCP/timeout failures. The active health checker is unable to connect to the
-                    upstream. If the API works when you send requests, the issue is likely in the health check configuration
-                    (wrong port, missing TLS, firewall blocking the probe). Passive health checks will mark nodes as healthy
-                    when real traffic succeeds, but they will go back to unhealthy once traffic stops.
+                    {t("detail.activeCheckFailingDescription")}
                   </p>
                 </div>
               </CardContent>
@@ -299,13 +304,13 @@ export default function ApiHealthPage() {
               <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Node</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Success</TableHead>
-                  <TableHead className="text-right">HTTP Failures</TableHead>
-                  <TableHead className="text-right">TCP Failures</TableHead>
-                  <TableHead className="text-right">Timeouts</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead>{t("detail.tableHeaders.node")}</TableHead>
+                  <TableHead>{t("detail.tableHeaders.status")}</TableHead>
+                  <TableHead className="text-right">{t("detail.tableHeaders.success")}</TableHead>
+                  <TableHead className="text-right">{t("detail.tableHeaders.httpFailures")}</TableHead>
+                  <TableHead className="text-right">{t("detail.tableHeaders.tcpFailures")}</TableHead>
+                  <TableHead className="text-right">{t("detail.tableHeaders.timeouts")}</TableHead>
+                  <TableHead>{t("detail.tableHeaders.type")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -15,7 +15,7 @@ function writeSidebarCookie(open: boolean) {
 }
 
 function readMonitoringTabCookie(): string {
-  if (typeof document === "undefined") return "upstream-health"
+  if (typeof document === "undefined") return "gateway"
   const match = document.cookie.match(/(?:^|;\s*)monitoring_tab=([^;]*)/)
   return match ? decodeURIComponent(match[1]) : "upstream-health"
 }

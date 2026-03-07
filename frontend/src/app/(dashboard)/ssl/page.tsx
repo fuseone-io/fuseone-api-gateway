@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useTranslations } from "next-intl"
 import Link from "next/link"
 import { toast } from "sonner"
 import {
@@ -66,6 +67,8 @@ function formatShortDate(epoch?: number): string {
 }
 
 export default function SSLPage() {
+  const t = useTranslations("ssl")
+  const tc = useTranslations("common")
   const [certs, setCerts] = useState<APISIXSSL[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -91,10 +94,10 @@ export default function SSLPage() {
     if (!deleteId) return
     try {
       await api.deleteResource("ssls", deleteId)
-      toast.success("Certificate deleted")
+      toast.success(t("toasts.deleted"))
       fetchCerts()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete failed")
+      toast.error(err instanceof Error ? err.message : t("toasts.failedDelete"))
     } finally {
       setDeleteId(null)
     }
@@ -115,13 +118,14 @@ export default function SSLPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="SSL / Certificates"
-        description="Manage SSL/TLS certificates for HTTPS termination and mTLS"
+        title={t("title")}
+        description={t("description")}
+        icon={<Lock className="h-6 w-6" />}
         actions={
           <Button asChild>
             <Link href="/ssl/new">
               <Plus className="mr-2 h-4 w-4" />
-              New Certificate
+              {t("newCertificate")}
             </Link>
           </Button>
         }
@@ -130,7 +134,7 @@ export default function SSLPage() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by ID or domain..."
+          placeholder={t("searchPlaceholder")}
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -141,11 +145,11 @@ export default function SSLPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead>ID</TableHead>
-              <TableHead>Domains</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Expires</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>{t("tableHeaders.id")}</TableHead>
+              <TableHead>{t("tableHeaders.domains")}</TableHead>
+              <TableHead>{tc("type")}</TableHead>
+              <TableHead>{t("tableHeaders.expires")}</TableHead>
+              <TableHead>{tc("status")}</TableHead>
               <TableHead className="w-[70px]" />
             </TableRow>
           </TableHeader>
@@ -167,13 +171,13 @@ export default function SSLPage() {
                     <Lock className="h-8 w-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
                       {search
-                        ? "No certificates match your search"
-                        : "No SSL certificates configured"}
+                        ? t("noMatchSearch")
+                        : t("noConfigured")}
                     </p>
                     {!search && (
                       <Button asChild variant="outline" size="sm">
                         <Link href="/ssl/new">
-                          Add your first certificate
+                          {t("createFirst")}
                         </Link>
                       </Button>
                     )}
@@ -238,7 +242,7 @@ export default function SSLPage() {
                               variant="destructive"
                               className="text-[10px] px-1 py-0"
                             >
-                              Expired
+                              {t("expired")}
                             </Badge>
                           )}
                           {expiry.expiringSoon && (
@@ -260,7 +264,7 @@ export default function SSLPage() {
                           cert.status === 1 ? "default" : "secondary"
                         }
                       >
-                        {cert.status === 1 ? "Enabled" : "Disabled"}
+                        {cert.status === 1 ? tc("enabled") : tc("disabled")}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -278,7 +282,7 @@ export default function SSLPage() {
                           <DropdownMenuItem asChild>
                             <Link href={`/ssl/${cert.id}`}>
                               <Pencil className="mr-2 h-4 w-4" />
-                              Edit
+                              {tc("edit")}
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem
@@ -286,7 +290,7 @@ export default function SSLPage() {
                             onClick={() => setDeleteId(cert.id!)}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
+                            {tc("delete")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -302,16 +306,14 @@ export default function SSLPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Certificate</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this SSL certificate? This action
-              cannot be undone. HTTPS traffic using this certificate will be
-              affected.
+              {t("deleteDialog.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{tc("delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
-import { ArrowRight, Check, X, Rocket, Clock, AlertTriangle } from "lucide-react"
+import { ArrowRight, ArrowRightLeft, Check, X, Rocket, Clock, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -30,20 +31,23 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageHeader } from "@/components/page-header"
 import { DiffViewer } from "@/components/diff-viewer"
 import { api } from "@/lib/api-client"
 import { useEnvironmentStore } from "@/stores/environment-store"
 import type { PromotionRequest } from "@/types/promotion"
 
-const STATUS_BADGE: Record<string, { label: string; className: string; icon: typeof Clock }> = {
-  pending: { label: "Pending", className: "bg-amber-500/15 text-amber-600 border-amber-500/30", icon: Clock },
-  approved: { label: "Approved", className: "bg-blue-500/15 text-blue-600 border-blue-500/30", icon: Check },
-  rejected: { label: "Rejected", className: "bg-red-500/15 text-red-600 border-red-500/30", icon: X },
-  deployed: { label: "Deployed", className: "bg-green-500/15 text-green-600 border-green-500/30", icon: Rocket },
-  failed: { label: "Failed", className: "bg-red-500/15 text-red-600 border-red-500/30", icon: AlertTriangle },
+const STATUS_BADGE: Record<string, { labelKey: string; className: string; icon: typeof Clock }> = {
+  pending: { labelKey: "statusPending", className: "bg-amber-500/15 text-amber-600 border-amber-500/30", icon: Clock },
+  approved: { labelKey: "statusApproved", className: "bg-blue-500/15 text-blue-600 border-blue-500/30", icon: Check },
+  rejected: { labelKey: "statusRejected", className: "bg-red-500/15 text-red-600 border-red-500/30", icon: X },
+  deployed: { labelKey: "statusDeployed", className: "bg-green-500/15 text-green-600 border-green-500/30", icon: Rocket },
+  failed: { labelKey: "statusFailed", className: "bg-red-500/15 text-red-600 border-red-500/30", icon: AlertTriangle },
 }
 
 export default function PromotionsPage() {
+  const t = useTranslations("promotions")
+  const tc = useTranslations("common")
   const [promotions, setPromotions] = useState<PromotionRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -67,7 +71,7 @@ export default function PromotionsPage() {
       const data = await api.listPromotions(params)
       setPromotions(data || [])
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load promotions")
+      toast.error(err instanceof Error ? err.message : t("failedToLoad"))
     } finally {
       setLoading(false)
     }
@@ -90,9 +94,9 @@ export default function PromotionsPage() {
       setPromotions((prev) => prev.map((p) => (p.id === result.id ? result : p)))
       setSelectedPromo(result)
       setReviewComment("")
-      toast.success(action === "approve" ? "Promotion approved" : "Promotion rejected")
+      toast.success(action === "approve" ? t("promotionApproved") : t("promotionRejected"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : `Failed to ${action} promotion`)
+      toast.error(err instanceof Error ? err.message : t("failedToReview"))
     }
   }
 
@@ -103,9 +107,9 @@ export default function PromotionsPage() {
       const result = await api.executePromotion(selectedPromo.id)
       setPromotions((prev) => prev.map((p) => (p.id === result.id ? result : p)))
       setSelectedPromo(result)
-      toast.success("Promotion deployed successfully")
+      toast.success(t("promotionDeployed"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to execute promotion")
+      toast.error(err instanceof Error ? err.message : t("failedToExecute"))
     } finally {
       setExecuting(false)
     }
@@ -114,10 +118,11 @@ export default function PromotionsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Promotions</h1>
-          <p className="text-muted-foreground">Promote API configurations between environments</p>
-        </div>
+        <PageHeader
+          title={t("title")}
+          description={t("description")}
+          icon={<ArrowRightLeft className="h-6 w-6" />}
+        />
         <Skeleton className="h-[400px] rounded-xl" />
       </div>
     )
@@ -125,32 +130,33 @@ export default function PromotionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Promotions</h1>
-          <p className="text-muted-foreground">Promote API configurations between environments</p>
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Filter status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
-            <SelectItem value="deployed">Deployed</SelectItem>
-            <SelectItem value="failed">Failed</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        icon={<ArrowRightLeft className="h-6 w-6" />}
+        actions={
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder={t("filterStatus")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{tc("all")}</SelectItem>
+              <SelectItem value="pending">{t("statusPending")}</SelectItem>
+              <SelectItem value="approved">{t("statusApproved")}</SelectItem>
+              <SelectItem value="rejected">{t("statusRejected")}</SelectItem>
+              <SelectItem value="deployed">{t("statusDeployed")}</SelectItem>
+              <SelectItem value="failed">{t("statusFailed")}</SelectItem>
+            </SelectContent>
+          </Select>
+        }
+      />
 
       {promotions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <ArrowRight className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-medium">No promotions</h3>
+          <h3 className="text-lg font-medium">{t("noPromotions")}</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Promote an API from the API detail page to move it between environments.
+            {t("noPromotionsDesc")}
           </p>
         </div>
       ) : (
@@ -158,10 +164,10 @@ export default function PromotionsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Promotion</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Requested</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t("promotion")}</TableHead>
+                <TableHead>{tc("status")}</TableHead>
+                <TableHead>{t("requested")}</TableHead>
+                <TableHead className="text-right">{tc("actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -190,7 +196,7 @@ export default function PromotionsPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={`text-xs ${status.className}`}>
-                        {status.label}
+                        {t(status.labelKey)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
@@ -205,7 +211,7 @@ export default function PromotionsPage() {
                             className="h-7 text-xs"
                             onClick={(e) => { e.stopPropagation(); setSelectedPromo(promo) }}
                           >
-                            Review
+                            {t("review")}
                           </Button>
                         </div>
                       )}
@@ -219,7 +225,7 @@ export default function PromotionsPage() {
                           }}
                         >
                           <Rocket className="mr-1 h-3 w-3" />
-                          Execute
+                          {t("execute")}
                         </Button>
                       )}
                     </TableCell>
@@ -251,23 +257,23 @@ export default function PromotionsPage() {
                   {getEnvName(selectedPromo.target_env_id)}
                 </DialogTitle>
                 <DialogDescription>
-                  Requested {new Date(selectedPromo.requested_at).toLocaleString()}
+                  {t("requestedAt", { date: new Date(selectedPromo.requested_at).toLocaleString() })}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4">
                 {/* Status */}
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Status:</span>
+                  <span className="text-sm text-muted-foreground">{tc("status")}:</span>
                   <Badge variant="outline" className={`text-xs ${(STATUS_BADGE[selectedPromo.status] || STATUS_BADGE.pending).className}`}>
-                    {(STATUS_BADGE[selectedPromo.status] || STATUS_BADGE.pending).label}
+                    {t((STATUS_BADGE[selectedPromo.status] || STATUS_BADGE.pending).labelKey)}
                   </Badge>
                 </div>
 
                 {/* Review comment */}
                 {selectedPromo.review_comment && (
                   <div className="rounded-md border p-3 text-sm">
-                    <span className="text-muted-foreground">Review comment: </span>
+                    <span className="text-muted-foreground">{t("reviewComment")}: </span>
                     {selectedPromo.review_comment}
                   </div>
                 )}
@@ -275,14 +281,14 @@ export default function PromotionsPage() {
                 {/* Diff */}
                 {selectedPromo.diff_summary && (
                   <div>
-                    <h4 className="text-sm font-medium mb-2">Changes</h4>
+                    <h4 className="text-sm font-medium mb-2">{t("changes")}</h4>
                     <DiffViewer diff={selectedPromo.diff_summary} />
                   </div>
                 )}
 
                 {!selectedPromo.diff_summary && (
                   <div className="text-center py-4 text-sm text-muted-foreground">
-                    No previous deployment in target environment — full deployment will be created.
+                    {t("noPreviousDeployment")}
                   </div>
                 )}
 
@@ -290,7 +296,7 @@ export default function PromotionsPage() {
                 {selectedPromo.status === "pending" && (
                   <div className="space-y-3 pt-2">
                     <Textarea
-                      placeholder="Review comment (optional)"
+                      placeholder={t("reviewCommentPlaceholder")}
                       value={reviewComment}
                       onChange={(e) => setReviewComment(e.target.value)}
                       rows={2}
@@ -302,11 +308,11 @@ export default function PromotionsPage() {
                         onClick={() => handleReview("reject")}
                       >
                         <X className="mr-1.5 h-4 w-4" />
-                        Reject
+                        {t("reject")}
                       </Button>
                       <Button className="flex-1" onClick={() => handleReview("approve")}>
                         <Check className="mr-1.5 h-4 w-4" />
-                        Approve
+                        {t("approve")}
                       </Button>
                     </div>
                   </div>
@@ -317,7 +323,7 @@ export default function PromotionsPage() {
                 {selectedPromo.status === "approved" && (
                   <Button onClick={handleExecute} disabled={executing}>
                     <Rocket className="mr-1.5 h-4 w-4" />
-                    {executing ? "Deploying..." : "Deploy to Target"}
+                    {executing ? tc("deploying") : t("deployToTarget")}
                   </Button>
                 )}
               </DialogFooter>

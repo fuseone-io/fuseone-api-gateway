@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useTranslations } from "next-intl"
 import {
   Activity,
   AlertTriangle,
@@ -39,17 +40,6 @@ const AUTO_REFRESH_INTERVAL = 10_000
 
 const HTTP_METHODS = ["__all__", "GET", "POST", "PUT", "PATCH", "DELETE"] as const
 
-const TIME_PERIODS = [
-  { value: "__all__", label: "All Time" },
-  { value: "15m", label: "Last 15min" },
-  { value: "1h", label: "Last 1h" },
-  { value: "6h", label: "Last 6h" },
-  { value: "24h", label: "Last 24h" },
-  { value: "7d", label: "Last 7d" },
-  { value: "30d", label: "Last 30d" },
-  { value: "custom", label: "Custom" },
-] as const
-
 function getTimeFrom(period: string): string | undefined {
   if (period === "__all__" || period === "custom") return undefined
   const now = new Date()
@@ -68,7 +58,7 @@ function getTimeFrom(period: string): string | undefined {
 
 function nsToMs(ns: number): string {
   const ms = ns / 1_000_000
-  if (ms < 1) return `${(ns / 1_000).toFixed(0)}µs`
+  if (ms < 1) return `${(ns / 1_000).toFixed(0)}us`
   if (ms < 1000) return `${ms.toFixed(1)}ms`
   return `${(ms / 1000).toFixed(2)}s`
 }
@@ -97,6 +87,20 @@ interface TracesTabProps {
 }
 
 export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
+  const t = useTranslations("monitoring")
+  const tc = useTranslations("common")
+
+  const TIME_PERIODS = [
+    { value: "__all__", label: t("traces.allTime") },
+    { value: "15m", label: "Last 15min" },
+    { value: "1h", label: "Last 1h" },
+    { value: "6h", label: "Last 6h" },
+    { value: "24h", label: "Last 24h" },
+    { value: "7d", label: "Last 7d" },
+    { value: "30d", label: "Last 30d" },
+    { value: "custom", label: "Custom" },
+  ] as const
+
   const [traces, setTraces] = useState<RequestTrace[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -148,12 +152,12 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
       setError(null)
       setLastRefresh(new Date())
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to fetch traces"
+      const msg = err instanceof Error ? err.message : t("traces.unableToFetchTraces")
       setError(msg)
     } finally {
       setLoading(false)
     }
-  }, [routeId, apiId, search, method, statusFilter, timePeriod, customFrom, customTo, page])
+  }, [routeId, apiId, search, method, statusFilter, timePeriod, customFrom, customTo, page, t])
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -180,7 +184,7 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
 
   const handleRefresh = () => {
     setLoading(true)
-    fetchTraces().then(() => toast.success("Traces refreshed"))
+    fetchTraces().then(() => toast.success(t("traces.tracesRefreshed")))
   }
 
   const handleTraceClick = (trace: RequestTrace) => {
@@ -207,11 +211,11 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
       <Card>
         <CardContent className="p-8 text-center">
           <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-          <p className="text-lg font-medium">Unable to fetch traces</p>
+          <p className="text-lg font-medium">{t("traces.unableToFetchTraces")}</p>
           <p className="text-sm text-muted-foreground mt-1">{error}</p>
           <Button variant="outline" className="mt-4" onClick={handleRefresh}>
             <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
+            {tc("retry")}
           </Button>
         </CardContent>
       </Card>
@@ -229,7 +233,7 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
                 variant="outline"
                 className={status.enabled ? "border-emerald-400 text-emerald-600" : "border-red-400 text-red-600"}
               >
-                {status.enabled ? "Tracing Enabled" : "Tracing Disabled"}
+                {status.enabled ? t("traces.tracingEnabled") : t("traces.tracingDisabled")}
               </Badge>
               {status.sample_rate < 1 && (
                 <Badge variant="outline" className="text-[10px]">
@@ -241,7 +245,7 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
           <div className="flex items-center gap-2">
             <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} id="trace-auto-refresh" />
             <label htmlFor="trace-auto-refresh" className="text-sm text-muted-foreground cursor-pointer">
-              Auto-refresh
+              {t("traces.autoRefresh")}
             </label>
           </div>
           {lastRefresh && (
@@ -253,7 +257,7 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
         </div>
         <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          Refresh
+          {tc("refresh")}
         </Button>
       </div>
 
@@ -262,7 +266,7 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search URI..."
+            placeholder={t("traces.searchUri")}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0) }}
             className="pl-9 h-9 text-sm"
@@ -275,7 +279,7 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
           <SelectContent>
             {HTTP_METHODS.map((m) => (
               <SelectItem key={m} value={m}>
-                {m === "__all__" ? "All Methods" : m}
+                {m === "__all__" ? t("traces.allMethods") : m}
               </SelectItem>
             ))}
           </SelectContent>
@@ -285,11 +289,11 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">All Status</SelectItem>
+            <SelectItem value="__all__">{t("traces.allStatus")}</SelectItem>
             <SelectItem value="2xx">2xx</SelectItem>
             <SelectItem value="4xx">4xx</SelectItem>
             <SelectItem value="5xx">5xx</SelectItem>
-            <SelectItem value="error">Errors (4xx+)</SelectItem>
+            <SelectItem value="error">{t("traces.errorsFilter")}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={timePeriod} onValueChange={(v) => { setTimePeriod(v); setPage(0) }}>
@@ -325,7 +329,7 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
           </>
         )}
         <div className="text-xs text-muted-foreground">
-          {total} traces
+          {t("traces.tracesCount", { count: total })}
         </div>
       </div>
 
@@ -334,10 +338,9 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
         <Card>
           <CardContent className="p-12 text-center">
             <Activity className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-            <p className="text-lg font-medium">No traces found</p>
+            <p className="text-lg font-medium">{t("traces.noTracesFound")}</p>
             <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-              Request traces will appear here when the OpenTelemetry plugin is enabled on your routes.
-              Enable tracing on a route to start collecting data.
+              {t("traces.noTracesDescription")}
             </p>
           </CardContent>
         </Card>
@@ -348,12 +351,12 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs w-16">Method</TableHead>
-                    <TableHead className="text-xs">URI</TableHead>
-                    <TableHead className="text-xs w-16">Status</TableHead>
-                    <TableHead className="text-xs w-24 text-right">Duration</TableHead>
-                    <TableHead className="text-xs w-14 text-right">Spans</TableHead>
-                    <TableHead className="text-xs w-36">Time</TableHead>
+                    <TableHead className="text-xs w-16">{t("traces.tableHeaders.method")}</TableHead>
+                    <TableHead className="text-xs">{t("traces.tableHeaders.uri")}</TableHead>
+                    <TableHead className="text-xs w-16">{t("traces.tableHeaders.status")}</TableHead>
+                    <TableHead className="text-xs w-24 text-right">{t("traces.tableHeaders.duration")}</TableHead>
+                    <TableHead className="text-xs w-14 text-right">{t("traces.tableHeaders.spans")}</TableHead>
+                    <TableHead className="text-xs w-36">{t("traces.tableHeaders.time")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -400,7 +403,7 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
           {totalPages > 1 && (
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
-                Page {page + 1} of {totalPages}
+                {t("traces.pageOf", { page: page + 1, total: totalPages })}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -409,7 +412,7 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
                   disabled={page === 0}
                   onClick={() => setPage((p) => p - 1)}
                 >
-                  Previous
+                  {tc("previous")}
                 </Button>
                 <Button
                   variant="outline"
@@ -417,7 +420,7 @@ export function TracesTab({ routeId, apiId }: TracesTabProps = {}) {
                   disabled={page >= totalPages - 1}
                   onClick={() => setPage((p) => p + 1)}
                 >
-                  Next
+                  {tc("next")}
                 </Button>
               </div>
             </div>

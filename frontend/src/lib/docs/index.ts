@@ -18,26 +18,36 @@ import { kafkaGatewayCategory } from "./16-kafka-gateway"
 import { designStudioCategory } from "./17-design-studio"
 import { apiMindmapCategory } from "./18-api-mindmap"
 import { requestTracingCategory } from "./19-request-tracing"
+import { applicationsCategory } from "./20-applications"
+import { plansCategory } from "./21-plans"
+import { policyTemplatesCategory } from "./22-policy-templates"
+import { streamProxyCategory } from "./23-stream-proxy"
+import { reportsCategory } from "./24-reports"
 
 export type { DocCategory, DocArticle, DocSection } from "./types"
 
 export const DOC_CATEGORIES: DocCategory[] = [
   primeirosPassosCategory,
   gerenciamentoApisCategory,
-  politicasPluginsCategory,
-  referenciaPluginsCategory,
-  apiCompositionCategory,
-  scriptingCategory,
-  aiGatewayCategory,
-  graphqlGatewayCategory,
-  apiTestingCategory,
-  serviceMeshCategory,
-  kafkaGatewayCategory,
   designStudioCategory,
   apiMindmapCategory,
-  requestTracingCategory,
-  monitoramentoCategory,
+  applicationsCategory,
+  plansCategory,
+  politicasPluginsCategory,
+  referenciaPluginsCategory,
+  policyTemplatesCategory,
+  apiCompositionCategory,
+  scriptingCategory,
+  streamProxyCategory,
   segurancaCategory,
+  aiGatewayCategory,
+  graphqlGatewayCategory,
+  kafkaGatewayCategory,
+  serviceMeshCategory,
+  apiTestingCategory,
+  monitoramentoCategory,
+  requestTracingCategory,
+  reportsCategory,
   multiAmbienteCategory,
   portalDesenvolvedorCategory,
   administracaoCategory,

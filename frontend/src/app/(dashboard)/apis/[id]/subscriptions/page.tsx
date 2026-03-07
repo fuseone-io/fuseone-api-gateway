@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import { ArrowLeft, Check, Clock, Pause, Plus, Users, X, XCircle } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -31,20 +32,23 @@ import {
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageHeader } from "@/components/page-header"
 import { api } from "@/lib/api-client"
 import type { Subscription } from "@/types/subscription"
 import type { APISIXListResponse } from "@/types/apisix"
 
-const STATUS_BADGE: Record<string, { label: string; className: string; icon: typeof Clock }> = {
-  pending: { label: "Pending", className: "bg-amber-500/15 text-amber-600 border-amber-500/30", icon: Clock },
-  active: { label: "Active", className: "bg-green-500/15 text-green-600 border-green-500/30", icon: Check },
-  suspended: { label: "Suspended", className: "bg-blue-500/15 text-blue-600 border-blue-500/30", icon: Pause },
-  revoked: { label: "Revoked", className: "bg-red-500/15 text-red-600 border-red-500/30", icon: XCircle },
-}
-
 export default function ApiSubscriptionsPage() {
+  const t = useTranslations("apis")
+  const tc = useTranslations("common")
   const params = useParams()
   const apiId = params.id as string
+
+  const STATUS_BADGE: Record<string, { label: string; className: string; icon: typeof Clock }> = {
+    pending: { label: t("detail.subscriptions.status.pending"), className: "bg-amber-500/15 text-amber-600 border-amber-500/30", icon: Clock },
+    active: { label: t("detail.subscriptions.status.active"), className: "bg-green-500/15 text-green-600 border-green-500/30", icon: Check },
+    suspended: { label: t("detail.subscriptions.status.suspended"), className: "bg-blue-500/15 text-blue-600 border-blue-500/30", icon: Pause },
+    revoked: { label: t("detail.subscriptions.status.revoked"), className: "bg-red-500/15 text-red-600 border-red-500/30", icon: XCircle },
+  }
 
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
   const [loading, setLoading] = useState(true)
@@ -70,7 +74,7 @@ export default function ApiSubscriptionsPage() {
       const data = await api.listSubscriptions(params)
       setSubscriptions(data || [])
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load subscriptions")
+      toast.error(err instanceof Error ? err.message : t("detail.subscriptions.toasts.failedLoad"))
     } finally {
       setLoading(false)
     }
@@ -96,7 +100,7 @@ export default function ApiSubscriptionsPage() {
         })
       )
     } catch {
-      toast.error("Failed to load consumers or plans")
+      toast.error(t("detail.subscriptions.toasts.failedLoadConsumers"))
     }
   }
 
@@ -115,9 +119,9 @@ export default function ApiSubscriptionsPage() {
       setSelectedConsumer("")
       setSelectedPlan("")
       setNotes("")
-      toast.success("Subscription request created")
+      toast.success(t("detail.subscriptions.toasts.created"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create subscription")
+      toast.error(err instanceof Error ? err.message : t("detail.subscriptions.toasts.failedCreate"))
     } finally {
       setSubmitting(false)
     }
@@ -127,9 +131,9 @@ export default function ApiSubscriptionsPage() {
     try {
       const result = await api.reviewSubscription(id, { action: "approve" })
       setSubscriptions((prev) => prev.map((s) => (s.id === result.id ? result : s)))
-      toast.success("Subscription approved")
+      toast.success(t("detail.subscriptions.toasts.approved"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to approve")
+      toast.error(err instanceof Error ? err.message : t("detail.subscriptions.toasts.failedApprove"))
     }
   }
 
@@ -137,9 +141,9 @@ export default function ApiSubscriptionsPage() {
     try {
       const result = await api.reviewSubscription(id, { action: "reject" })
       setSubscriptions((prev) => prev.map((s) => (s.id === result.id ? result : s)))
-      toast.success("Subscription rejected")
+      toast.success(t("detail.subscriptions.toasts.rejected"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to reject")
+      toast.error(err instanceof Error ? err.message : t("detail.subscriptions.toasts.failedReject"))
     }
   }
 
@@ -147,9 +151,9 @@ export default function ApiSubscriptionsPage() {
     try {
       const result = await api.suspendSubscription(id)
       setSubscriptions((prev) => prev.map((s) => (s.id === result.id ? result : s)))
-      toast.success("Subscription suspended")
+      toast.success(t("detail.subscriptions.toasts.suspended"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to suspend")
+      toast.error(err instanceof Error ? err.message : t("detail.subscriptions.toasts.failedSuspend"))
     }
   }
 
@@ -157,26 +161,26 @@ export default function ApiSubscriptionsPage() {
     try {
       const result = await api.revokeSubscription(id)
       setSubscriptions((prev) => prev.map((s) => (s.id === result.id ? result : s)))
-      toast.success("Subscription revoked")
+      toast.success(t("detail.subscriptions.toasts.revoked"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to revoke")
+      toast.error(err instanceof Error ? err.message : t("detail.subscriptions.toasts.failedRevoke"))
     }
   }
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-2">
-          <Link href={`/apis/${apiId}`}>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Subscribers</h1>
-            <p className="text-muted-foreground">Applications subscribed to this API</p>
-          </div>
-        </div>
+        <PageHeader
+          title={t("detail.subscribers")}
+          description={t("detail.subscribersDescription")}
+          icon={
+            <Link href={`/apis/${apiId}`}>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+          }
+        />
         <Skeleton className="h-[400px] rounded-xl" />
       </div>
     )
@@ -184,44 +188,44 @@ export default function ApiSubscriptionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <PageHeader
+        title={t("detail.subscribers")}
+        description={t("detail.subscribersDescription")}
+        icon={
           <Link href={`/apis/${apiId}`}>
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Subscribers</h1>
-            <p className="text-muted-foreground">Applications subscribed to this API</p>
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder={t("detail.subscriptions.filterStatus")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{tc("all")}</SelectItem>
+                <SelectItem value="pending">{t("detail.subscriptions.status.pending")}</SelectItem>
+                <SelectItem value="active">{t("detail.subscriptions.status.active")}</SelectItem>
+                <SelectItem value="suspended">{t("detail.subscriptions.status.suspended")}</SelectItem>
+                <SelectItem value="revoked">{t("detail.subscriptions.status.revoked")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" onClick={openAddDialog}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              {t("detail.subscriptions.addSubscriber")}
+            </Button>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Filter status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="suspended">Suspended</SelectItem>
-              <SelectItem value="revoked">Revoked</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button size="sm" onClick={openAddDialog}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add Subscriber
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
       {subscriptions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-medium">No subscribers</h3>
+          <h3 className="text-lg font-medium">{t("detail.subscriptions.noSubscribers")}</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Add an application to subscribe it to this API.
+            {t("detail.subscriptions.noSubscribersDescription")}
           </p>
         </div>
       ) : (
@@ -229,11 +233,11 @@ export default function ApiSubscriptionsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Application</TableHead>
-                <TableHead>Plan</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Requested</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t("detail.subscriptions.tableHeaders.application")}</TableHead>
+                <TableHead>{t("detail.subscriptions.tableHeaders.plan")}</TableHead>
+                <TableHead>{t("detail.subscriptions.tableHeaders.status")}</TableHead>
+                <TableHead>{t("detail.subscriptions.tableHeaders.requested")}</TableHead>
+                <TableHead className="text-right">{t("detail.subscriptions.tableHeaders.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -250,7 +254,7 @@ export default function ApiSubscriptionsPage() {
                       </Link>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {sub.plan_id || "No plan"}
+                      {sub.plan_id || t("detail.subscriptions.noPlan")}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={`text-xs ${status.className}`}>
@@ -271,7 +275,7 @@ export default function ApiSubscriptionsPage() {
                               onClick={() => handleApprove(sub.id)}
                             >
                               <Check className="mr-1 h-3 w-3" />
-                              Approve
+                              {t("detail.subscriptions.approve")}
                             </Button>
                             <Button
                               size="sm"
@@ -280,7 +284,7 @@ export default function ApiSubscriptionsPage() {
                               onClick={() => handleReject(sub.id)}
                             >
                               <X className="mr-1 h-3 w-3" />
-                              Reject
+                              {t("detail.subscriptions.reject")}
                             </Button>
                           </>
                         )}
@@ -293,7 +297,7 @@ export default function ApiSubscriptionsPage() {
                               onClick={() => handleSuspend(sub.id)}
                             >
                               <Pause className="mr-1 h-3 w-3" />
-                              Suspend
+                              {t("detail.subscriptions.suspend")}
                             </Button>
                             <Button
                               size="sm"
@@ -301,7 +305,7 @@ export default function ApiSubscriptionsPage() {
                               className="h-7 text-xs text-red-600"
                               onClick={() => handleRevoke(sub.id)}
                             >
-                              Revoke
+                              {t("detail.subscriptions.revoke")}
                             </Button>
                           </>
                         )}
@@ -313,7 +317,7 @@ export default function ApiSubscriptionsPage() {
                               className="h-7 text-xs"
                               onClick={() => handleApprove(sub.id)}
                             >
-                              Reactivate
+                              {t("detail.subscriptions.reactivate")}
                             </Button>
                             <Button
                               size="sm"
@@ -321,7 +325,7 @@ export default function ApiSubscriptionsPage() {
                               className="h-7 text-xs text-red-600"
                               onClick={() => handleRevoke(sub.id)}
                             >
-                              Revoke
+                              {t("detail.subscriptions.revoke")}
                             </Button>
                           </>
                         )}
@@ -339,14 +343,14 @@ export default function ApiSubscriptionsPage() {
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Subscriber</DialogTitle>
+            <DialogTitle>{t("detail.subscriptions.addDialogTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Application</label>
+              <label className="text-sm font-medium">{t("detail.subscriptions.applicationLabel")}</label>
               <Select value={selectedConsumer} onValueChange={setSelectedConsumer}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select an application..." />
+                  <SelectValue placeholder={t("detail.subscriptions.selectApplication")} />
                 </SelectTrigger>
                 <SelectContent>
                   {consumers.map((c) => (
@@ -358,13 +362,13 @@ export default function ApiSubscriptionsPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Plan (optional)</label>
+              <label className="text-sm font-medium">{t("detail.subscriptions.planLabel")}</label>
               <Select value={selectedPlan || "none"} onValueChange={(v) => setSelectedPlan(v === "none" ? "" : v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="No plan" />
+                  <SelectValue placeholder={t("detail.subscriptions.noPlan")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No plan</SelectItem>
+                  <SelectItem value="none">{t("detail.subscriptions.noPlan")}</SelectItem>
                   {plans.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name || p.id}
@@ -374,20 +378,20 @@ export default function ApiSubscriptionsPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Notes (optional)</label>
+              <label className="text-sm font-medium">{t("detail.subscriptions.notesLabel")}</label>
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Reason for subscription..."
+                placeholder={t("detail.subscriptions.notesPlaceholder")}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-              Cancel
+              {tc("cancel")}
             </Button>
             <Button onClick={handleAdd} disabled={!selectedConsumer || submitting}>
-              {submitting ? "Creating..." : "Create Subscription"}
+              {submitting ? t("detail.subscriptions.creating") : t("detail.subscriptions.createSubscription")}
             </Button>
           </DialogFooter>
         </DialogContent>

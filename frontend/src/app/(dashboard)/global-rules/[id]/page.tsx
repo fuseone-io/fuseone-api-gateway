@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import { ArrowLeft, Lock, Plus, Save, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -40,6 +41,8 @@ export default function GlobalPolicyDetailPage() {
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
+  const t = useTranslations("globalRules.detail")
+  const tc = useTranslations("common")
 
   const [rule, setRule] = useState<APISIXGlobalRule | null>(null)
   const [plugins, setPlugins] = useState<Record<string, Record<string, unknown>>>({})
@@ -61,7 +64,7 @@ export default function GlobalPolicyDetailPage() {
       setRule(data)
       setPlugins((data.plugins || {}) as Record<string, Record<string, unknown>>)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load global policy")
+      toast.error(err instanceof Error ? err.message : t("loadFailed"))
     } finally {
       setLoading(false)
     }
@@ -69,15 +72,15 @@ export default function GlobalPolicyDetailPage() {
 
   const handleSave = async () => {
     if (Object.keys(plugins).length === 0) {
-      toast.error("Add at least one policy")
+      toast.error(t("addAtLeastOnePolicy"))
       return
     }
     setSaving(true)
     try {
       await api.updateResource("global-rules", id, { plugins })
-      toast.success("Global policy saved")
+      toast.success(t("policySaved"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save global policy")
+      toast.error(err instanceof Error ? err.message : t("saveFailed"))
     } finally {
       setSaving(false)
     }
@@ -102,7 +105,7 @@ export default function GlobalPolicyDetailPage() {
       try {
         config = JSON.parse(jsonFallback || "{}")
       } catch {
-        toast.error("Invalid JSON")
+        toast.error(t("invalidJson"))
         return
       }
     }
@@ -131,9 +134,9 @@ export default function GlobalPolicyDetailPage() {
   if (!rule) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-lg font-medium text-muted-foreground">Global policy not found</p>
+        <p className="text-lg font-medium text-muted-foreground">{t("notFound")}</p>
         <Button variant="outline" className="mt-4" onClick={() => router.push("/global-rules")}>
-          Back to Global Policies
+          {t("backToList")}
         </Button>
       </div>
     )
@@ -144,30 +147,30 @@ export default function GlobalPolicyDetailPage() {
       <PageHeader
         title={
           isSystem
-            ? "Platform Policy"
-            : `Global Policy: ${id}`
+            ? t("platformPolicy")
+            : t("globalPolicyTitle", { id })
         }
         description={
           isSystem
-            ? "Platform-managed policy applied to all API traffic (read-only)"
-            : "Edit policies applied globally to all API traffic"
+            ? t("platformPolicyDescription")
+            : t("editDescription")
         }
         actions={
           <div className="flex items-center gap-2">
             {isSystem && (
               <Badge variant="secondary" className="gap-1">
                 <Lock className="h-3 w-3" />
-                Read-only
+                {t("readOnly")}
               </Badge>
             )}
             <Button variant="outline" onClick={() => router.push("/global-rules")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+              {tc("back")}
             </Button>
             {!isSystem && (
               <Button onClick={handleSave} disabled={saving}>
                 <Save className="mr-2 h-4 w-4" />
-                {saving ? "Saving..." : "Save"}
+                {saving ? tc("saving") : tc("save")}
               </Button>
             )}
           </div>
@@ -178,15 +181,15 @@ export default function GlobalPolicyDetailPage() {
         {/* Policies */}
         <Card>
           <CardHeader>
-            <CardTitle>Policies</CardTitle>
+            <CardTitle>{t("policies")}</CardTitle>
             <CardDescription>
-              These policies are applied to all API requests globally
+              {t("policiesDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {Object.keys(plugins).length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
-                No policies configured.
+                {t("noPoliciesConfigured")}
               </p>
             ) : (
               Object.entries(plugins).map(([pluginName, config]) => {
@@ -219,7 +222,7 @@ export default function GlobalPolicyDetailPage() {
                             }
                           }}
                         >
-                          Edit
+                          {tc("edit")}
                         </Button>
                         <Button
                           variant="ghost"
@@ -242,7 +245,7 @@ export default function GlobalPolicyDetailPage() {
                 onClick={() => setShowPicker(true)}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Add Policy
+                {t("addPolicy")}
               </Button>
             )}
           </CardContent>
@@ -252,7 +255,7 @@ export default function GlobalPolicyDetailPage() {
       {/* Policy Picker Sheet */}
       <Sheet open={showPicker} onOpenChange={setShowPicker}>
         <SheetContent side="right" className="p-0 sm:max-w-sm">
-          <SheetTitle className="sr-only">Add Policy</SheetTitle>
+          <SheetTitle className="sr-only">{t("addPolicy")}</SheetTitle>
           <PolicyGallery
             onAddPolicy={handleAddPolicy}
             existingPolicies={Object.keys(plugins)}
@@ -267,7 +270,7 @@ export default function GlobalPolicyDetailPage() {
         <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Configure {PLUGINS.find((p) => p.name === editingPlugin)?.label || editingPlugin}
+              {t("configure", { plugin: PLUGINS.find((p) => p.name === editingPlugin)?.label || editingPlugin || "" })}
             </DialogTitle>
           </DialogHeader>
           <div className="py-2">
@@ -280,7 +283,7 @@ export default function GlobalPolicyDetailPage() {
               />
             ) : (
               <div className="space-y-2">
-                <Label>Configuration (JSON)</Label>
+                <Label>{t("configurationJson")}</Label>
                 <Textarea
                   value={jsonFallback}
                   onChange={(e) => setJsonFallback(e.target.value)}
@@ -292,9 +295,9 @@ export default function GlobalPolicyDetailPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingPlugin(null)}>
-              Cancel
+              {tc("cancel")}
             </Button>
-            <Button onClick={handleSavePlugin}>Apply</Button>
+            <Button onClick={handleSavePlugin}>{t("apply")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

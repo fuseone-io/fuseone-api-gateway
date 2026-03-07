@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import {
   Clock,
   Plus,
@@ -55,18 +56,6 @@ import { SLAGauge } from "@/components/sla-gauge"
 import { useTestingStore } from "@/stores/testing-store"
 import type { SLADefinition } from "@/types/testing"
 
-const COMPLIANCE_BADGE: Record<string, { label: string; className: string }> = {
-  compliant: { label: "Em Conformidade", className: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
-  at_risk: { label: "Em Risco", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
-  breached: { label: "Violado", className: "bg-red-500/15 text-red-600 border-red-500/30" },
-}
-
-const EVAL_WINDOW_LABELS: Record<string, string> = {
-  "7d": "7 dias",
-  "30d": "30 dias",
-  "90d": "90 dias",
-}
-
 function formatDateTime(dateStr: string): string {
   return new Date(dateStr).toLocaleString("pt-BR", {
     day: "2-digit",
@@ -78,6 +67,8 @@ function formatDateTime(dateStr: string): string {
 }
 
 export default function SLADashboardPage() {
+  const t = useTranslations("testing")
+  const tc = useTranslations("common")
   const { slaDefinitions, slaLoading, fetchSLAs, createSLA, deleteSLA } = useTestingStore()
 
   const [createOpen, setCreateOpen] = useState(false)
@@ -91,6 +82,12 @@ export default function SLADashboardPage() {
   const [newErrorRate, setNewErrorRate] = useState("1")
   const [newEvalWindow, setNewEvalWindow] = useState<"7d" | "30d" | "90d">("30d")
   const [creating, setCreating] = useState(false)
+
+  const COMPLIANCE_BADGE: Record<string, { label: string; className: string }> = {
+    compliant: { label: t("slaPage.compliant"), className: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
+    at_risk: { label: t("slaPage.atRisk"), className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
+    breached: { label: t("slaPage.breached"), className: "bg-red-500/15 text-red-600 border-red-500/30" },
+  }
 
   useEffect(() => {
     fetchSLAs()
@@ -108,11 +105,11 @@ export default function SLADashboardPage() {
         error_rate_pct: parseFloat(newErrorRate) || 1,
         eval_window: newEvalWindow,
       })
-      toast.success("SLA criado com sucesso")
+      toast.success(t("slaPage.toasts.created"))
       setCreateOpen(false)
       resetForm()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao criar SLA")
+      toast.error(err instanceof Error ? err.message : t("slaPage.toasts.failedCreate"))
     } finally {
       setCreating(false)
     }
@@ -122,10 +119,10 @@ export default function SLADashboardPage() {
     if (!deleteTarget) return
     try {
       await deleteSLA(deleteTarget.id)
-      toast.success("SLA excluido")
+      toast.success(t("slaPage.toasts.deleted"))
       setDeleteTarget(null)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao excluir SLA")
+      toast.error(err instanceof Error ? err.message : t("slaPage.toasts.failedDelete"))
     }
   }
 
@@ -167,43 +164,43 @@ export default function SLADashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="SLA Dashboard"
-        description="Acordos de nivel de servico e compliance das suas APIs"
+        title={t("slaPage.title")}
+        description={t("slaPage.description")}
         actions={
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
-                Novo SLA
+                {t("slaPage.newSla")}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[480px]">
               <DialogHeader>
-                <DialogTitle>Novo Acordo de Nivel de Servico</DialogTitle>
+                <DialogTitle>{t("slaPage.createDialog.title")}</DialogTitle>
                 <DialogDescription>
-                  Defina as metas de disponibilidade, latencia e taxa de erro.
+                  {t("slaPage.createDialog.description")}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="space-y-2">
-                  <Label>Nome</Label>
+                  <Label>{tc("name")}</Label>
                   <Input
-                    placeholder="Ex: SLA Premium - API Pagamentos"
+                    placeholder={t("slaPage.createDialog.namePlaceholder")}
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Descricao</Label>
+                  <Label>{tc("description")}</Label>
                   <Textarea
-                    placeholder="Descricao do SLA..."
+                    placeholder={t("slaPage.createDialog.descriptionPlaceholder")}
                     value={newDescription}
                     onChange={(e) => setNewDescription(e.target.value)}
                   />
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-2">
-                    <Label className="text-xs">Disponibilidade (%)</Label>
+                    <Label className="text-xs">{t("slaPage.createDialog.availabilityLabel")}</Label>
                     <Input
                       type="number"
                       step="0.1"
@@ -214,7 +211,7 @@ export default function SLADashboardPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs">Latencia P99 (ms)</Label>
+                    <Label className="text-xs">{t("slaPage.createDialog.latencyLabel")}</Label>
                     <Input
                       type="number"
                       min="1"
@@ -223,7 +220,7 @@ export default function SLADashboardPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs">Taxa de Erro (%)</Label>
+                    <Label className="text-xs">{t("slaPage.createDialog.errorRateLabel")}</Label>
                     <Input
                       type="number"
                       step="0.1"
@@ -235,25 +232,25 @@ export default function SLADashboardPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Janela de Avaliacao</Label>
+                  <Label>{t("slaPage.createDialog.evalWindow")}</Label>
                   <Select value={newEvalWindow} onValueChange={(v) => setNewEvalWindow(v as "7d" | "30d" | "90d")}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="7d">7 dias</SelectItem>
-                      <SelectItem value="30d">30 dias</SelectItem>
-                      <SelectItem value="90d">90 dias</SelectItem>
+                      <SelectItem value="7d">{t("slaPage.createDialog.days7")}</SelectItem>
+                      <SelectItem value="30d">{t("slaPage.createDialog.days30")}</SelectItem>
+                      <SelectItem value="90d">{t("slaPage.createDialog.days90")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setCreateOpen(false)}>
-                  Cancelar
+                  {tc("cancel")}
                 </Button>
                 <Button onClick={handleCreate} disabled={creating || !newName.trim()}>
-                  {creating ? "Criando..." : "Criar SLA"}
+                  {creating ? t("slaPage.createDialog.creating") : t("slaPage.createDialog.createSla")}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -268,7 +265,7 @@ export default function SLADashboardPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Em Conformidade</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("slaPage.compliant")}</p>
                   <p className="text-2xl font-bold text-emerald-600 mt-1">{compliant}</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
@@ -281,7 +278,7 @@ export default function SLADashboardPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Em Risco</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("slaPage.atRisk")}</p>
                   <p className="text-2xl font-bold text-amber-600 mt-1">{atRisk}</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
@@ -294,7 +291,7 @@ export default function SLADashboardPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Violados</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("slaPage.breached")}</p>
                   <p className="text-2xl font-bold text-red-600 mt-1">{breached}</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10">
@@ -312,14 +309,14 @@ export default function SLADashboardPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Shield className="h-12 w-12 text-muted-foreground/30 mb-4" />
             <p className="text-lg font-medium text-muted-foreground mb-2">
-              Nenhum SLA definido
+              {t("slaPage.noSlaDefined")}
             </p>
             <p className="text-sm text-muted-foreground mb-4">
-              Crie um acordo de nivel de servico para monitorar compliance das suas APIs
+              {t("slaPage.noSlaDescription")}
             </p>
             <Button onClick={() => setCreateOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
-              Novo SLA
+              {t("slaPage.newSla")}
             </Button>
           </CardContent>
         </Card>
@@ -351,7 +348,7 @@ export default function SLADashboardPage() {
                   <div className="flex items-center justify-around">
                     <SLAGauge
                       value={sla.current_avail}
-                      label="Disponibilidade"
+                      label={t("slaPage.availability")}
                       size={90}
                       strokeWidth={8}
                     />
@@ -366,10 +363,10 @@ export default function SLADashboardPage() {
                         {sla.current_latency}ms
                       </p>
                       <p className="text-[10px] text-muted-foreground">
-                        P99 Latencia
+                        {t("slaPage.p99Latency")}
                       </p>
                       <p className="text-[10px] text-muted-foreground">
-                        Meta: {sla.latency_p99_ms}ms
+                        {t("slaPage.target")}: {sla.latency_p99_ms}ms
                       </p>
                     </div>
                     <div className="text-center">
@@ -383,10 +380,10 @@ export default function SLADashboardPage() {
                         {sla.current_error.toFixed(2)}%
                       </p>
                       <p className="text-[10px] text-muted-foreground">
-                        Taxa de Erro
+                        {t("slaPage.errorRate")}
                       </p>
                       <p className="text-[10px] text-muted-foreground">
-                        Meta: {sla.error_rate_pct}%
+                        {t("slaPage.target")}: {sla.error_rate_pct}%
                       </p>
                     </div>
                   </div>
@@ -394,7 +391,7 @@ export default function SLADashboardPage() {
                   {/* Budget remaining */}
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">Error Budget Restante</span>
+                      <span className="text-muted-foreground">{t("slaPage.errorBudgetRemaining")}</span>
                       <span className="font-medium">
                         {sla.budget_remaining.toFixed(1)}%
                       </span>
@@ -416,15 +413,15 @@ export default function SLADashboardPage() {
                   {/* Targets row */}
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div className="bg-muted/50 rounded px-2 py-1.5 text-center">
-                      <span className="text-muted-foreground block">Meta Disp.</span>
+                      <span className="text-muted-foreground block">{t("slaPage.targetAvail")}</span>
                       <span className="font-medium">{sla.availability_pct}%</span>
                     </div>
                     <div className="bg-muted/50 rounded px-2 py-1.5 text-center">
-                      <span className="text-muted-foreground block">Janela</span>
-                      <span className="font-medium">{EVAL_WINDOW_LABELS[sla.eval_window]}</span>
+                      <span className="text-muted-foreground block">{t("slaPage.window")}</span>
+                      <span className="font-medium">{t(`slaPage.createDialog.days${sla.eval_window.replace("d", "")}` as "slaPage.createDialog.days7" | "slaPage.createDialog.days30" | "slaPage.createDialog.days90")}</span>
                     </div>
                     <div className="bg-muted/50 rounded px-2 py-1.5 text-center">
-                      <span className="text-muted-foreground block">Atual Disp.</span>
+                      <span className="text-muted-foreground block">{t("slaPage.currentAvail")}</span>
                       <span
                         className={`font-medium ${
                           sla.current_avail >= sla.availability_pct
@@ -442,8 +439,8 @@ export default function SLADashboardPage() {
                     <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       {sla.last_eval_at
-                        ? `Avaliado: ${formatDateTime(sla.last_eval_at)}`
-                        : "Ainda nao avaliado"}
+                        ? t("slaPage.evaluated", { time: formatDateTime(sla.last_eval_at) })
+                        : t("slaPage.notEvaluated")}
                     </span>
                     <Button
                       variant="ghost"
@@ -452,7 +449,7 @@ export default function SLADashboardPage() {
                       onClick={() => setDeleteTarget(sla)}
                     >
                       <Trash2 className="h-3 w-3 mr-1" />
-                      Excluir
+                      {tc("delete")}
                     </Button>
                   </div>
                 </CardContent>
@@ -466,15 +463,14 @@ export default function SLADashboardPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir SLA</AlertDialogTitle>
+            <AlertDialogTitle>{t("slaPage.deleteDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o SLA &ldquo;{deleteTarget?.name}&rdquo;?
-              O historico de compliance sera perdido.
+              {t("slaPage.deleteDialog.description", { name: deleteTarget?.name || "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Excluir</AlertDialogAction>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{tc("delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

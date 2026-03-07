@@ -4,33 +4,33 @@ export const scriptingCategory: DocCategory = {
   slug: "scripting-customizado",
   title: "Scripting Customizado",
   description:
-    "Estenda o API Gateway com scripts Lua customizados para logica de negocio, transformacoes e integracoes avancadas.",
+    "Estenda o API Gateway com scripts Lua customizados para lógica de negócio, transformações e integrações avançadas.",
   icon: "Code",
   articles: [
-    // ── 1. Introducao ao Scripting Lua ──────────────────────────
+    // ── 1. Introdução ao Scripting Lua ──────────────────────────
     {
       slug: "introducao-lua",
       title: "Scripting Lua no Gateway",
       description:
-        "Entenda como o scripting Lua permite estender o API Gateway com logica customizada no ciclo de vida da requisicao.",
+        "Entenda como o scripting Lua permite estender o API Gateway com lógica customizada no ciclo de vida da requisição.",
       icon: "Terminal",
       tags: ["lua", "serverless", "scripting"],
       content: [
         {
           id: "o-que-lua-permite",
           title: "O que o Scripting Lua Permite",
-          body: `O API Gateway executa sobre o OpenResty, uma plataforma que combina Nginx com LuaJIT. Isso significa que voce pode escrever scripts Lua que sao executados diretamente no pipeline de processamento de requisicoes, com performance proxima a de codigo nativo.
+          body: `O API Gateway executa sobre o OpenResty, uma plataforma que combina Nginx com LuaJIT. Isso significa que você pode escrever scripts Lua que são executados diretamente no pipeline de processamento de requisições, com performance próxima à de código nativo.
 
-Com scripting Lua voce pode:
+Com scripting Lua você pode:
 
-- **Transformar requisicoes e respostas** de formas que plugins declarativos nao suportam
-- **Implementar logica de negocio** customizada no gateway (validacoes, roteamento inteligente)
-- **Integrar com servicos externos** durante o processamento da requisicao
-- **Manipular headers, body e parametros** com total flexibilidade
-- **Implementar autenticacao customizada** com logica especifica da sua organizacao
-- **Gerar respostas sinteticas** sem precisar consultar o upstream
+- **Transformar requisições e respostas** de formas que plugins declarativos não suportam
+- **Implementar lógica de negócio** customizada no gateway (validações, roteamento inteligente)
+- **Integrar com serviços externos** durante o processamento da requisição
+- **Manipular headers, body e parâmetros** com total flexibilidade
+- **Implementar autenticação customizada** com lógica específica da sua organização
+- **Gerar respostas sintéticas** sem precisar consultar o upstream
 
-> **Nota:** Scripts Lua sao poderosos mas devem ser usados com cuidado. Sempre que um plugin declarativo resolver o problema, prefira o plugin. Scripts sao para casos que os plugins padrao nao cobrem.`,
+> **Nota:** Scripts Lua são poderosos mas devem ser usados com cuidado. Sempre que um plugin declarativo resolver o problema, prefira o plugin. Scripts são para casos que os plugins padrão não cobrem.`,
         },
         {
           id: "plugins-serverless",
@@ -39,14 +39,14 @@ Com scripting Lua voce pode:
 
 ### serverless-pre-function
 
-Executa o script **antes** de enviar a requisicao ao upstream. E a fase ideal para:
+Executa o script **antes** de enviar a requisição ao upstream. É a fase ideal para:
 
-- Validar e transformar a requisicao
-- Injetar headers baseados em logica customizada
-- Bloquear requisicoes com base em regras de negocio
-- Fazer chamadas a servicos auxiliares para enriquecimento
+- Validar e transformar a requisição
+- Injetar headers baseados em lógica customizada
+- Bloquear requisições com base em regras de negócio
+- Fazer chamadas a serviços auxiliares para enriquecimento
 
-**Configuracao:**
+**Configuração:**
 
 \`\`\`json
 {
@@ -59,14 +59,14 @@ Executa o script **antes** de enviar a requisicao ao upstream. E a fase ideal pa
 
 ### serverless-post-function
 
-Executa o script **depois** de receber a resposta do upstream. E indicado para:
+Executa o script **depois** de receber a resposta do upstream. É indicado para:
 
 - Transformar o corpo da resposta
-- Adicionar headers de resposta baseados em logica customizada
-- Registrar metricas e logs customizados
-- Modificar o status code com base em condicoes
+- Adicionar headers de resposta baseados em lógica customizada
+- Registrar métricas e logs customizados
+- Modificar o status code com base em condições
 
-**Configuracao:**
+**Configuração:**
 
 \`\`\`json
 {
@@ -77,48 +77,48 @@ Executa o script **depois** de receber a resposta do upstream. E indicado para:
 }
 \`\`\`
 
-> **Dica:** O campo \`phase\` define em qual fase do Nginx o script executa. As fases mais comuns sao: \`rewrite\` (antes do upstream), \`header_filter\` (ao receber headers da resposta) e \`body_filter\` (ao receber o body da resposta).`,
+> **Dica:** O campo \`phase\` define em qual fase do Nginx o script executa. As fases mais comuns são: \`rewrite\` (antes do upstream), \`header_filter\` (ao receber headers da resposta) e \`body_filter\` (ao receber o body da resposta).`,
         },
         {
           id: "ciclo-vida-requisicao",
-          title: "Ciclo de Vida da Requisicao",
-          body: `Entender o ciclo de vida da requisicao no API Gateway e fundamental para escrever scripts eficientes. O processamento segue estas fases:
+          title: "Ciclo de Vida da Requisição",
+          body: `Entender o ciclo de vida da requisição no API Gateway é fundamental para escrever scripts eficientes. O processamento segue estas fases:
 
 **1. Rewrite (reescrita)**
-- Primeira fase apos o recebimento da requisicao
-- Ideal para modificar URI, headers e parametros
+- Primeira fase após o recebimento da requisição
+- Ideal para modificar URI, headers e parâmetros
 - \`serverless-pre-function\` com \`phase: "rewrite"\` executa aqui
 
 **2. Access (acesso)**
-- Fase de autenticacao e autorizacao
-- Plugins de autenticacao (key-auth, jwt-auth) executam aqui
-- Use \`phase: "access"\` para validacoes que dependem do consumer
+- Fase de autenticação e autorização
+- Plugins de autenticação (key-auth, jwt-auth) executam aqui
+- Use \`phase: "access"\` para validações que dependem do consumer
 
 **3. Before Proxy (antes do proxy)**
-- Ultima chance de modificar a requisicao antes de enviar ao upstream
-- Util para transformacoes finais baseadas em dados de autenticacao
+- Última chance de modificar a requisição antes de enviar ao upstream
+- Útil para transformações finais baseadas em dados de autenticação
 
 **4. Header Filter (filtro de headers)**
-- Executada quando os headers da resposta do upstream sao recebidos
+- Executada quando os headers da resposta do upstream são recebidos
 - Ideal para modificar headers de resposta
 - \`serverless-post-function\` com \`phase: "header_filter"\` executa aqui
 
 **5. Body Filter (filtro do body)**
-- Executada quando o corpo da resposta e recebido
+- Executada quando o corpo da resposta é recebido
 - Permite transformar o corpo antes de enviar ao cliente
 - Cuidado: o corpo pode chegar em chunks
 
 **6. Log (registro)**
-- Fase final, apos a resposta ser enviada ao cliente
-- Ideal para logging e metricas customizadas
-- Nao afeta a resposta (ja foi enviada)
+- Fase final, após a resposta ser enviada ao cliente
+- Ideal para logging e métricas customizadas
+- Não afeta a resposta (já foi enviada)
 
-> **Atencao:** Nunca execute operacoes bloqueantes (I/O sincrono, sleep) nas fases de processamento. Isso trava o worker do Nginx e impacta todas as requisicoes.`,
+> **Atenção:** Nunca execute operações bloqueantes (I/O síncrono, sleep) nas fases de processamento. Isso trava o worker do Nginx e impacta todas as requisições.`,
         },
         {
           id: "apis-disponiveis",
-          title: "APIs Disponiveis nos Scripts",
-          body: `Scripts Lua no API Gateway tem acesso a diversas APIs para interagir com a requisicao, resposta e servicos externos.
+          title: "APIs Disponíveis nos Scripts",
+          body: `Scripts Lua no API Gateway têm acesso a diversas APIs para interagir com a requisição, resposta e serviços externos.
 
 ### API do Nginx (ngx)
 
@@ -184,7 +184,7 @@ if res and res.status == 200 then
 end
 \`\`\`
 
-> **Dica:** Sempre trate erros (\`if not res then\`) ao usar a API HTTP. Falhas de rede sao comuns e devem ser tratadas graciosamente.`,
+> **Dica:** Sempre trate erros (\`if not res then\`) ao usar a API HTTP. Falhas de rede são comuns e devem ser tratadas graciosamente.`,
         },
       ],
     },
@@ -193,40 +193,40 @@ end
       slug: "biblioteca-scripts",
       title: "Biblioteca de Scripts",
       description:
-        "Scripts pre-construidos disponiveis no FuseOne para injecao de headers, transformacao de body, roteamento e mais.",
+        "Scripts pré-construídos disponíveis no FuseOne para injeção de headers, transformação de body, roteamento e mais.",
       icon: "Library",
       tags: ["scripts", "biblioteca", "templates"],
       content: [
         {
           id: "sobre-biblioteca",
           title: "Sobre a Biblioteca de Scripts",
-          body: `O FuseOne API Gateway inclui uma **biblioteca de scripts** pre-construidos que cobrem os casos de uso mais comuns. Esses scripts foram testados, otimizados e podem ser aplicados diretamente nas suas rotas sem precisar escrever codigo do zero.
+          body: `O FuseOne API Gateway inclui uma **biblioteca de scripts** pré-construídos que cobrem os casos de uso mais comuns. Esses scripts foram testados, otimizados e podem ser aplicados diretamente nas suas rotas sem precisar escrever código do zero.
 
-A biblioteca esta disponivel no editor visual de politicas. Ao adicionar um plugin \`serverless-pre-function\` ou \`serverless-post-function\`, voce pode escolher um script da biblioteca e customizar os parametros.
+A biblioteca está disponível no editor visual de políticas. Ao adicionar um plugin \`serverless-pre-function\` ou \`serverless-post-function\`, você pode escolher um script da biblioteca e customizar os parâmetros.
 
-**Categorias disponiveis:**
-- Injecao e manipulacao de headers
-- Transformacao de body (requisicao e resposta)
+**Categorias disponíveis:**
+- Injeção e manipulação de headers
+- Transformação de body (requisição e resposta)
 - Roteamento condicional
 - Logging customizado
-- Validacao de tokens e dados
+- Validação de tokens e dados
 
 Cada script da biblioteca inclui:
-- Descricao do que faz
-- Parametros configuraveis
+- Descrição do que faz
+- Parâmetros configuráveis
 - Exemplo de uso
 - Notas sobre performance
 
-> **Dica:** Use os scripts da biblioteca como ponto de partida. Voce pode copia-los e customiza-los conforme a necessidade do seu cenario.`,
+> **Dica:** Use os scripts da biblioteca como ponto de partida. Você pode copiá-los e customizá-los conforme a necessidade do seu cenário.`,
         },
         {
           id: "scripts-headers",
-          title: "Scripts de Injecao de Headers",
-          body: `Scripts para adicionar, modificar ou remover headers em requisicoes e respostas.
+          title: "Scripts de Injeção de Headers",
+          body: `Scripts para adicionar, modificar ou remover headers em requisições e respostas.
 
-### Injetar Header Baseado em Horario
+### Injetar Header Baseado em Horário
 
-Adiciona um header indicando o periodo do dia (util para roteamento por horario comercial):
+Adiciona um header indicando o período do dia (útil para roteamento por horário comercial):
 
 \`\`\`lua
 return function(conf, ctx)
@@ -241,7 +241,7 @@ end
 
 ### Propagar Headers do Consumer
 
-Injeta headers com informacoes do consumidor autenticado para o upstream:
+Injeta headers com informações do consumidor autenticado para o upstream:
 
 \`\`\`lua
 return function(conf, ctx)
@@ -255,7 +255,7 @@ end
 
 ### Sanitizar Headers de Resposta
 
-Remove headers internos que nao devem ser expostos ao cliente:
+Remove headers internos que não devem ser expostos ao cliente:
 
 \`\`\`lua
 return function(conf, ctx)
@@ -272,16 +272,16 @@ return function(conf, ctx)
 end
 \`\`\`
 
-> **Nota:** O script de sanitizacao de headers deve ser usado como \`serverless-post-function\` na fase \`header_filter\`.`,
+> **Nota:** O script de sanitização de headers deve ser usado como \`serverless-post-function\` na fase \`header_filter\`.`,
         },
         {
           id: "scripts-transformacao",
-          title: "Scripts de Transformacao de Body",
-          body: `Scripts para modificar o corpo da requisicao ou resposta em transito.
+          title: "Scripts de Transformação de Body",
+          body: `Scripts para modificar o corpo da requisição ou resposta em trânsito.
 
 ### Adicionar Envelope na Resposta
 
-Encapsula a resposta do upstream em um envelope padrao com metadados:
+Encapsula a resposta do upstream em um envelope padrão com metadados:
 
 \`\`\`lua
 return function(conf, ctx)
@@ -303,9 +303,9 @@ return function(conf, ctx)
 end
 \`\`\`
 
-### Remover Campos Sensiveis da Resposta
+### Remover Campos Sensíveis da Resposta
 
-Filtra campos que nao devem ser retornados ao cliente (ex: dados internos, IDs de banco):
+Filtra campos que não devem ser retornados ao cliente (ex: dados internos, IDs de banco):
 
 \`\`\`lua
 return function(conf, ctx)
@@ -323,16 +323,16 @@ return function(conf, ctx)
 end
 \`\`\`
 
-> **Atencao:** Scripts de transformacao de body na fase \`body_filter\` podem receber o corpo em chunks. Certifique-se de tratar o caso onde \`ngx.arg[1]\` contem apenas um fragmento do JSON completo.`,
+> **Atenção:** Scripts de transformação de body na fase \`body_filter\` podem receber o corpo em chunks. Certifique-se de tratar o caso onde \`ngx.arg[1]\` contém apenas um fragmento do JSON completo.`,
         },
         {
           id: "scripts-roteamento",
           title: "Scripts de Roteamento Condicional",
-          body: `Scripts que modificam o destino da requisicao com base em condicoes dinamicas.
+          body: `Scripts que modificam o destino da requisição com base em condições dinâmicas.
 
 ### Roteamento por Tenant (Multi-tenancy)
 
-Direciona a requisicao para o upstream correto com base no tenant identificado no header ou subdominio:
+Direciona a requisição para o upstream correto com base no tenant identificado no header ou subdomínio:
 
 \`\`\`lua
 return function(conf, ctx)
@@ -370,7 +370,7 @@ end
 
 ### Roteamento por Feature Flag
 
-Consulta um servico de feature flags para decidir o roteamento:
+Consulta um serviço de feature flags para decidir o roteamento:
 
 \`\`\`lua
 return function(conf, ctx)
@@ -399,16 +399,16 @@ return function(conf, ctx)
 end
 \`\`\`
 
-> **Dica:** Sempre implemente um fallback quando o roteamento depende de servicos externos. Se o servico de feature flags estiver fora do ar, a rota deve continuar funcionando com o comportamento padrao.`,
+> **Dica:** Sempre implemente um fallback quando o roteamento depende de serviços externos. Se o serviço de feature flags estiver fora do ar, a rota deve continuar funcionando com o comportamento padrão.`,
         },
         {
           id: "scripts-logging-validacao",
-          title: "Scripts de Logging e Validacao",
-          body: `Scripts para registro customizado e validacao de dados.
+          title: "Scripts de Logging e Validação",
+          body: `Scripts para registro customizado e validação de dados.
 
-### Logging Customizado com Contexto de Negocio
+### Logging Customizado com Contexto de Negócio
 
-Registra informacoes de negocio nos logs do gateway para facilitar o debugging:
+Registra informações de negócio nos logs do gateway para facilitar o debugging:
 
 \`\`\`lua
 return function(conf, ctx)
@@ -430,9 +430,9 @@ return function(conf, ctx)
 end
 \`\`\`
 
-### Validacao de Payload JSON
+### Validação de Payload JSON
 
-Valida campos obrigatorios no corpo da requisicao antes de enviar ao upstream:
+Valida campos obrigatórios no corpo da requisição antes de enviar ao upstream:
 
 \`\`\`lua
 return function(conf, ctx)
@@ -475,9 +475,9 @@ return function(conf, ctx)
 end
 \`\`\`
 
-### Validacao de Token Customizado
+### Validação de Token Customizado
 
-Valida um token proprietario consultando um servico de autenticacao:
+Valida um token proprietário consultando um serviço de autenticação:
 
 \`\`\`lua
 return function(conf, ctx)
@@ -514,30 +514,30 @@ return function(conf, ctx)
 end
 \`\`\`
 
-> **Nota:** O script de logging deve ser usado na fase \`log\` (\`serverless-post-function\` com \`phase: "log"\`). Os scripts de validacao devem usar a fase \`rewrite\` ou \`access\`.`,
+> **Nota:** O script de logging deve ser usado na fase \`log\` (\`serverless-post-function\` com \`phase: "log"\`). Os scripts de validação devem usar a fase \`rewrite\` ou \`access\`.`,
         },
       ],
     },
-    // ── 3. Boas Praticas e Limitacoes ───────────────────────────
+    // ── 3. Boas Práticas e Limitações ───────────────────────────
     {
       slug: "boas-praticas-lua",
-      title: "Boas Praticas e Limitacoes",
+      title: "Boas Práticas e Limitações",
       description:
-        "Performance, seguranca, debugging e limitacoes do scripting Lua no API Gateway.",
+        "Performance, segurança, debugging e limitações do scripting Lua no API Gateway.",
       icon: "AlertTriangle",
-      tags: ["boas-praticas", "performance", "seguranca"],
+      tags: ["boas-práticas", "performance", "segurança"],
       content: [
         {
           id: "performance",
-          title: "Performance e Otimizacao",
-          body: `Scripts Lua no API Gateway sao executados pelo LuaJIT, que compila o codigo para instrucoes nativas. Ainda assim, scripts mal escritos podem degradar significativamente a performance do gateway.
+          title: "Performance e Otimização",
+          body: `Scripts Lua no API Gateway são executados pelo LuaJIT, que compila o código para instruções nativas. Ainda assim, scripts mal escritos podem degradar significativamente a performance do gateway.
 
 ### Regras de Ouro
 
-- **Evite alocacoes desnecessarias**: Reutilize tabelas e strings sempre que possivel
-- **Minimize chamadas externas**: Cada chamada HTTP adiciona latencia
-- **Use cache em memoria**: O modulo \`lua-resty-lrucache\` permite cache local no worker
-- **Prefira operacoes nao-bloqueantes**: Use \`ngx.timer.at\` para tarefas em background
+- **Evite alocações desnecessárias**: Reutilize tabelas e strings sempre que possível
+- **Minimize chamadas externas**: Cada chamada HTTP adiciona latência
+- **Use cache em memória**: O módulo \`lua-resty-lrucache\` permite cache local no worker
+- **Prefira operações não-bloqueantes**: Use \`ngx.timer.at\` para tarefas em background
 
 ### O que FAZER
 
@@ -554,13 +554,13 @@ local cache = lrucache.new(1000)
 local reusable_table = {}
 \`\`\`
 
-### O que NAO FAZER
+### O que NÃO FAZER
 
 \`\`\`lua
 -- RUIM: operacao bloqueante
 os.execute("sleep 1")
 
--- RUIM: leitura de arquivo sincrone em cada requisicao
+-- RUIM: leitura de arquivo sincrona em cada requisicao
 local f = io.open("/path/to/file")
 
 -- RUIM: loop infinito ou muito longo
@@ -571,26 +571,26 @@ local big_table = {}
 for i = 1, 100000 do big_table[i] = i end
 \`\`\`
 
-> **Atencao:** Um script que bloqueia um worker do Nginx afeta **todas** as requisicoes processadas por aquele worker, nao apenas a requisicao atual.
+> **Atenção:** Um script que bloqueia um worker do Nginx afeta **todas** as requisições processadas por aquele worker, não apenas a requisição atual.
 
-### Metricas de Performance
-- Scripts simples (header injection): < 0.1ms de latencia adicional
-- Scripts com chamada HTTP externa: 1-50ms dependendo do servico
-- Scripts com transformacao de body: 0.5-5ms dependendo do tamanho`,
+### Métricas de Performance
+- Scripts simples (header injection): < 0.1ms de latência adicional
+- Scripts com chamada HTTP externa: 1-50ms dependendo do serviço
+- Scripts com transformação de body: 0.5-5ms dependendo do tamanho`,
         },
         {
           id: "limites-memoria",
-          title: "Limites de Memoria e Recursos",
-          body: `O API Gateway impoe limites para evitar que scripts consumam recursos excessivos e afetem a estabilidade do sistema.
+          title: "Limites de Memória e Recursos",
+          body: `O API Gateway impõe limites para evitar que scripts consumam recursos excessivos e afetem a estabilidade do sistema.
 
-### Limites Padrao
+### Limites Padrão
 
-- **Tamanho maximo do script**: 64KB de codigo Lua por plugin
-- **Memoria por requisicao**: O Nginx limita a memoria alocada por requisicao
-- **Tempo de execucao**: Scripts nao devem exceder 60 segundos (timeout do worker)
-- **Conexoes HTTP externas**: Limitadas pelo pool de conexoes do worker
+- **Tamanho máximo do script**: 64KB de código Lua por plugin
+- **Memória por requisição**: O Nginx limita a memória alocada por requisição
+- **Tempo de execução**: Scripts não devem exceder 60 segundos (timeout do worker)
+- **Conexões HTTP externas**: Limitadas pelo pool de conexões do worker
 
-### Gerenciamento de Memoria
+### Gerenciamento de Memória
 
 \`\`\`lua
 -- Use o pool de conexoes para reutilizar conexoes HTTP
@@ -604,32 +604,32 @@ httpc:set_keepalive(60000, 100) -- 60s keepalive, pool de 100
 \`\`\`
 
 ### Sinais de Problemas
-- Aumento gradual no consumo de memoria dos workers
-- Latencia crescente sem aumento de trafego
+- Aumento gradual no consumo de memória dos workers
+- Latência crescente sem aumento de tráfego
 - Erros "lua_alloc" ou "out of memory" nos logs
 
-> **Dica:** Monitore o consumo de memoria dos workers do Nginx apos habilitar scripts customizados. Use \`ngx.worker.pid()\` para identificar o worker nos logs e correlacionar com metricas do sistema.
+> **Dica:** Monitore o consumo de memória dos workers do Nginx após habilitar scripts customizados. Use \`ngx.worker.pid()\` para identificar o worker nos logs e correlacionar com métricas do sistema.
 
-**Boas praticas:**
-- Teste scripts com carga realista antes de aplicar em producao
-- Monitore metricas de memoria apos deployar novos scripts
+**Boas práticas:**
+- Teste scripts com carga realista antes de aplicar em produção
+- Monitore métricas de memória após deployar novos scripts
 - Use \`collectgarbage("count")\` durante o desenvolvimento para medir o consumo
-- Prefira scripts curtos e focados em uma unica responsabilidade`,
+- Prefira scripts curtos e focados em uma única responsabilidade`,
         },
         {
           id: "operacoes-evitar",
-          title: "Operacoes Bloqueantes a Evitar",
-          body: `O modelo de concorrencia do OpenResty e baseado em **coroutines cooperativas**. Isso significa que um script que bloqueia impede que o worker processe outras requisicoes. Conhecer as operacoes proibidas e essencial.
+          title: "Operações Bloqueantes a Evitar",
+          body: `O modelo de concorrência do OpenResty é baseado em **coroutines cooperativas**. Isso significa que um script que bloqueia impede que o worker processe outras requisições. Conhecer as operações proibidas é essencial.
 
-### Operacoes PROIBIDAS
+### Operações PROIBIDAS
 
 - **\`os.execute()\`**: Executa comandos do sistema de forma bloqueante
-- **\`io.open()\` / \`io.read()\`**: I/O de arquivo sincrono
-- **\`socket\` (LuaSocket padrao)**: Use \`ngx.socket.tcp\` ou \`resty.http\` em vez disso
+- **\`io.open()\` / \`io.read()\`**: I/O de arquivo síncrono
+- **\`socket\` (LuaSocket padrão)**: Use \`ngx.socket.tcp\` ou \`resty.http\` em vez disso
 - **\`os.clock()\` em loops**: Pode causar busy-wait
-- **\`require\` condicional em cada requisicao**: Carregue modulos no escopo do modulo, nao dentro da funcao
+- **\`require\` condicional em cada requisição**: Carregue módulos no escopo do módulo, não dentro da função
 
-### Alternativas Nao-Bloqueantes
+### Alternativas Não-Bloqueantes
 
 \`\`\`lua
 -- Em vez de io.open, use ngx.shared.DICT para dados compartilhados
@@ -652,18 +652,18 @@ ngx.timer.at(0, function(premature)
 end)
 \`\`\`
 
-> **Nota:** \`ngx.sleep()\` e cooperativo e nao bloqueia o worker, diferente de \`os.execute("sleep")\`. Ainda assim, use com moderacao pois a requisicao ficara pendente durante o sleep.
+> **Nota:** \`ngx.sleep()\` é cooperativo e não bloqueia o worker, diferente de \`os.execute("sleep")\`. Ainda assim, use com moderação pois a requisição ficará pendente durante o sleep.
 
-### Checklist Pre-Deploy
-- O script usa apenas APIs nao-bloqueantes (ngx.*, resty.*)?
-- Todos os timeouts estao configurados em chamadas externas?
+### Checklist Pré-Deploy
+- O script usa apenas APIs não-bloqueantes (ngx.*, resty.*)?
+- Todos os timeouts estão configurados em chamadas externas?
 - O script trata erros de rede e timeouts graciosamente?
-- Nao ha loops infinitos ou condicionais que possam nunca terminar?`,
+- Não há loops infinitos ou condicionais que possam nunca terminar?`,
         },
         {
           id: "debugging",
           title: "Debugging e Troubleshooting",
-          body: `Depurar scripts Lua no gateway requer tecnicas especificas, ja que nao e possivel usar debuggers tradicionais em ambiente de producao.
+          body: `Depurar scripts Lua no gateway requer técnicas específicas, já que não é possível usar debuggers tradicionais em ambiente de produção.
 
 ### Logging como Principal Ferramenta
 
@@ -682,16 +682,16 @@ core.log.info("dados: ", core.json.encode(data))
 
 ### Onde Ver os Logs
 
-Os logs de script aparecem no log de erro do API Gateway. No FuseOne, voce pode visualiza-los na aba de **Logs de Debug** do painel de monitoramento.
+Os logs de script aparecem no log de erro do API Gateway. No FuseOne, você pode visualizá-los na aba de **Logs de Debug** do painel de monitoramento.
 
-### Estrategias de Debugging
+### Estratégias de Debugging
 
 **1. Desenvolvimento local:**
 - Use o ambiente de desenvolvimento com \`make infra\` e \`make backend\`
-- Habilite o nivel de log \`debug\` na configuracao do gateway
+- Habilite o nível de log \`debug\` na configuração do gateway
 - Teste o script com \`curl\` e verifique os logs
 
-**2. Tratamento de erros explicito:**
+**2. Tratamento de erros explícito:**
 
 \`\`\`lua
 local ok, err = pcall(function()
@@ -716,33 +716,33 @@ if ngx.req.get_headers()["X-Debug"] == "true" then
 end
 \`\`\`
 
-> **Dica:** Use o header \`X-Debug\` durante o desenvolvimento para expor informacoes de debugging sem afetar requisicoes normais. Remova ou desabilite antes de ir para producao.
+> **Dica:** Use o header \`X-Debug\` durante o desenvolvimento para expor informações de debugging sem afetar requisições normais. Remova ou desabilite antes de ir para produção.
 
-**Erros comuns e solucoes:**
-- \`attempt to index a nil value\`: Variavel nao inicializada — verifique se o dado existe
-- \`bad argument to decode\`: JSON invalido — valide o input antes de decodificar
-- \`no resolver defined\`: DNS nao configurado — use IPs ou configure o resolver no Nginx`,
+**Erros comuns e soluções:**
+- \`attempt to index a nil value\`: Variável não inicializada — verifique se o dado existe
+- \`bad argument to decode\`: JSON inválido — valide o input antes de decodificar
+- \`no resolver defined\`: DNS não configurado — use IPs ou configure o resolver no Nginx`,
         },
         {
           id: "seguranca-scripts",
-          title: "Seguranca dos Scripts",
-          body: `Scripts Lua executam com os mesmos privilegios do processo do API Gateway. Isso significa que scripts mal-intencionados ou mal escritos podem comprometer a seguranca de todo o sistema.
+          title: "Segurança dos Scripts",
+          body: `Scripts Lua executam com os mesmos privilégios do processo do API Gateway. Isso significa que scripts mal-intencionados ou mal escritos podem comprometer a segurança de todo o sistema.
 
-### Riscos de Seguranca
+### Riscos de Segurança
 
-- **Vazamento de dados**: Scripts podem acessar headers e bodies de todas as requisicoes
-- **Acesso ao filesystem**: Funcoes como \`io.open\` podem ler arquivos do servidor
+- **Vazamento de dados**: Scripts podem acessar headers e bodies de todas as requisições
+- **Acesso ao filesystem**: Funções como \`io.open\` podem ler arquivos do servidor
 - **Exfiltração de dados**: Scripts podem enviar dados para endpoints externos
 - **Denial of Service**: Scripts mal escritos podem consumir todos os recursos
 
 ### Controles Recomendados
 
 **1. Controle de acesso:**
-- Restrinja quem pode criar e editar scripts (permissao \`plugins:write\` no FuseOne)
-- Implemente um processo de revisao (code review) para novos scripts
-- Mantenha um registro de auditoria de alteracoes em scripts
+- Restrinja quem pode criar e editar scripts (permissão \`plugins:write\` no FuseOne)
+- Implemente um processo de revisão (code review) para novos scripts
+- Mantenha um registro de auditoria de alterações em scripts
 
-**2. Validacao de scripts:**
+**2. Validação de scripts:**
 
 \`\`\`lua
 -- NUNCA confie em dados de entrada sem validacao
@@ -759,24 +759,24 @@ end
 -- core.log.info("Token: ", auth_token)  -- NAO FACA ISSO
 \`\`\`
 
-**3. Principio do menor privilegio:**
-- Scripts devem acessar apenas os dados necessarios para sua funcao
-- Nao propague credenciais internas para respostas ao cliente
+**3. Princípio do menor privilégio:**
+- Scripts devem acessar apenas os dados necessários para sua função
+- Não propague credenciais internas para respostas ao cliente
 - Limite os endpoints que scripts podem chamar (use service mesh/iptables)
 
-**4. Protecao contra injection:**
+**4. Proteção contra injection:**
 - Valide e sanitize todos os inputs usados em chamadas externas
-- Nunca concatene inputs do usuario em URLs ou queries sem validacao
-- Use parametros tipados em vez de concatenacao de strings
+- Nunca concatene inputs do usuário em URLs ou queries sem validação
+- Use parâmetros tipados em vez de concatenação de strings
 
-> **Atencao:** Trate todo script Lua como codigo de producao. Aplique as mesmas praticas de seguranca que voce usaria em qualquer outro componente do sistema: validacao de entrada, tratamento de erros, principio do menor privilegio e auditoria.
+> **Atenção:** Trate todo script Lua como código de produção. Aplique as mesmas práticas de segurança que você usaria em qualquer outro componente do sistema: validação de entrada, tratamento de erros, princípio do menor privilégio e auditoria.
 
-### Checklist de Seguranca
-- O script valida todos os inputs do usuario?
-- O script evita logar dados sensiveis (tokens, senhas, PII)?
-- O script limita o acesso a apenas os recursos necessarios?
+### Checklist de Segurança
+- O script valida todos os inputs do usuário?
+- O script evita logar dados sensíveis (tokens, senhas, PII)?
+- O script limita o acesso a apenas os recursos necessários?
 - O script foi revisado por outro desenvolvedor?
-- As permissoes de quem pode editar scripts estao restritas?`,
+- As permissões de quem pode editar scripts estão restritas?`,
         },
       ],
     },

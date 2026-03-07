@@ -1,0 +1,21 @@
+{{- if .Values.eventGateway.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fuseone.fullname" . }}-event-gateway
+  labels:
+    {{- include "fuseone.eventGateway.labels" . | nindent 4 }}
+  {{- with .Values.eventGateway.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.eventGateway.service.type }}
+  ports:
+    - port: {{ .Values.eventGateway.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "fuseone.eventGateway.selectorLabels" . | nindent 4 }}
+{{- end }}

@@ -74,6 +74,11 @@ func (sp *SystemPolicies) EnsureSystemGlobalRules(ctx context.Context) error {
 			"upstream_status",
 		}
 		plugins["opentelemetry"] = otelPlugin
+
+		// Enable fuseone-timing globally — provides per-phase timing attributes
+		// (rewrite_ms, access_plus_upstream_ms, header_filter_ms) that the backend
+		// uses to decompose "Gateway Processing" into meaningful waterfall sub-spans.
+		plugins["fuseone-timing"] = map[string]interface{}{}
 	}
 
 	payload := map[string]interface{}{

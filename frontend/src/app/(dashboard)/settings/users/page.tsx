@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import {
   Eye,
   EyeOff,
@@ -55,6 +56,8 @@ import type { User, Role } from "@/types/auth"
 import { toast } from "sonner"
 
 export default function UsersContent() {
+  const t = useTranslations("settings.users")
+  const tc = useTranslations("common")
   const [users, setUsers] = useState<User[]>([])
   const [total, setTotal] = useState(0)
   const [roles, setRoles] = useState<Role[]>([])
@@ -82,7 +85,7 @@ export default function UsersContent() {
       setTotal(usersRes.total)
       setRoles(rolesData)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load users")
+      toast.error(err instanceof Error ? err.message : t("failedToLoad"))
     } finally {
       setLoading(false)
     }
@@ -125,12 +128,12 @@ export default function UsersContent() {
     if (!deleteUserId) return
     try {
       await api.deleteUser(deleteUserId)
-      toast.success("User deleted")
+      toast.success(t("userDeleted"))
       setShowDeleteDialog(false)
       setDeleteUserId(null)
       fetchData()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete user")
+      toast.error(err instanceof Error ? err.message : t("failedToDelete"))
     }
   }
 
@@ -140,21 +143,21 @@ export default function UsersContent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">User Management</h3>
+          <h3 className="text-lg font-semibold">{t("heading")}</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Create and manage user accounts for the API Gateway
+            {t("subtitle")}
           </p>
         </div>
         <Button size="sm" onClick={() => setShowDialog(true)}>
           <Plus className="h-3.5 w-3.5 mr-1.5" />
-          Add User
+          {t("addUser")}
         </Button>
       </div>
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search users..."
+          placeholder={t("searchPlaceholder")}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           className="pl-9"
@@ -170,29 +173,29 @@ export default function UsersContent() {
       ) : users.length === 0 ? (
         <div className="py-12 text-center rounded-lg border border-dashed bg-muted/30">
           <Users className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm font-medium">No users found</p>
+          <p className="text-sm font-medium">{t("noUsersFound")}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            {search ? "Try a different search term." : "Create the first user account."}
+            {search ? t("tryDifferentSearch") : t("createFirstUser")}
           </p>
         </div>
       ) : (
         <>
           <div className="rounded-lg border bg-card p-6">
             <div className="mb-5">
-              <h4 className="text-sm font-semibold">Users</h4>
-              <p className="text-xs text-muted-foreground mt-0.5">{total} user{total !== 1 ? "s" : ""} total</p>
+              <h4 className="text-sm font-semibold">{t("title")}</h4>
+              <p className="text-xs text-muted-foreground mt-0.5">{t("totalCount", { count: total })}</p>
             </div>
             <div className="rounded-lg border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Display Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last Login</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t("username")}</TableHead>
+                    <TableHead>{t("displayName")}</TableHead>
+                    <TableHead>{t("email")}</TableHead>
+                    <TableHead>{t("role")}</TableHead>
+                    <TableHead>{t("status")}</TableHead>
+                    <TableHead>{t("lastLogin")}</TableHead>
+                    <TableHead className="text-right">{tc("actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -202,7 +205,7 @@ export default function UsersContent() {
                         <span className="font-medium text-sm">{user.username}</span>
                         {user.id === currentUserId && (
                           <Badge variant="secondary" className="ml-2 text-[9px] px-1.5 py-0">
-                            You
+                            {t("you")}
                           </Badge>
                         )}
                       </TableCell>
@@ -224,13 +227,13 @@ export default function UsersContent() {
                               : "bg-red-500/10 text-red-600 border-red-200"
                           }`}
                         >
-                          {user.is_active ? "Active" : "Inactive"}
+                          {user.is_active ? t("active") : t("inactive")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {user.last_login_at
                           ? new Date(user.last_login_at).toLocaleString()
-                          : "Never"}
+                          : t("never")}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -238,7 +241,7 @@ export default function UsersContent() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            title="Reset password"
+                            title={t("resetPassword")}
                             onClick={() => {
                               setResetUserId(user.id)
                               setShowResetDialog(true)
@@ -278,7 +281,7 @@ export default function UsersContent() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
-                Page {page} of {totalPages}
+                {t("pageOf", { page, totalPages })}
               </p>
               <div className="flex gap-2">
                 <Button
@@ -287,7 +290,7 @@ export default function UsersContent() {
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
                 >
-                  Previous
+                  {tc("previous")}
                 </Button>
                 <Button
                   variant="outline"
@@ -295,7 +298,7 @@ export default function UsersContent() {
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => p + 1)}
                 >
-                  Next
+                  {tc("next")}
                 </Button>
               </div>
             </div>
@@ -320,20 +323,20 @@ export default function UsersContent() {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="sm:max-w-sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteUser")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this user? This action cannot be undone.
+              {t("deleteConfirm")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setShowDeleteDialog(false)}>
-              Cancel
+              {tc("cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={handleDelete}
             >
-              Delete
+              {tc("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -355,6 +358,8 @@ function UserDialog({
   editingUser: User | null
   roles: Role[]
 }) {
+  const t = useTranslations("settings.users")
+  const tc = useTranslations("common")
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [displayName, setDisplayName] = useState("")
@@ -385,23 +390,23 @@ function UserDialog({
 
   const handleSubmit = async () => {
     if (!username.trim()) {
-      toast.error("Username is required")
+      toast.error(t("usernameRequired"))
       return
     }
     if (!displayName.trim()) {
-      toast.error("Display name is required")
+      toast.error(t("displayNameRequired"))
       return
     }
     if (!editingUser && !password) {
-      toast.error("Password is required for new users")
+      toast.error(t("passwordRequired"))
       return
     }
     if (!editingUser && password.length < 6) {
-      toast.error("Password must be at least 6 characters")
+      toast.error(t("passwordMinLength"))
       return
     }
     if (!roleId) {
-      toast.error("Please select a role")
+      toast.error(t("selectRoleRequired"))
       return
     }
 
@@ -415,7 +420,7 @@ function UserDialog({
           role_id: roleId,
           is_active: isActive,
         })
-        toast.success("User updated")
+        toast.success(t("userUpdated"))
       } else {
         await api.createUser({
           username: username.trim(),
@@ -425,11 +430,11 @@ function UserDialog({
           role_id: roleId,
           is_active: isActive,
         })
-        toast.success("User created")
+        toast.success(t("userCreated"))
       }
       onSaved()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save user")
+      toast.error(err instanceof Error ? err.message : t("failedToSave"))
     } finally {
       setSaving(false)
     }
@@ -441,12 +446,12 @@ function UserDialog({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            {editingUser ? "Edit User" : "New User"}
+            {editingUser ? t("editUser") : t("newUser")}
           </SheetTitle>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto space-y-4 px-4">
           <div className="space-y-2">
-            <Label>Username</Label>
+            <Label>{t("username")}</Label>
             <Input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -454,7 +459,7 @@ function UserDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label>Display Name</Label>
+            <Label>{t("displayName")}</Label>
             <Input
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
@@ -462,7 +467,7 @@ function UserDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label>Email (optional)</Label>
+            <Label>{t("emailOptional")}</Label>
             <Input
               type="email"
               value={email}
@@ -472,13 +477,13 @@ function UserDialog({
           </div>
           {!editingUser && (
             <div className="space-y-2">
-              <Label>Password</Label>
+              <Label>{tc("password")}</Label>
               <div className="relative">
                 <Input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Minimum 6 characters"
+                  placeholder={t("minSixChars")}
                   className="pr-10"
                 />
                 <Button
@@ -498,10 +503,10 @@ function UserDialog({
             </div>
           )}
           <div className="space-y-2">
-            <Label>Role</Label>
+            <Label>{t("role")}</Label>
             <Select value={roleId} onValueChange={setRoleId}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a role..." />
+                <SelectValue placeholder={t("selectRole")} />
               </SelectTrigger>
               <SelectContent>
                 {roles.map((role) => (
@@ -515,16 +520,16 @@ function UserDialog({
           <div className="flex items-center gap-2">
             <Switch checked={isActive} onCheckedChange={setIsActive} id="user-active" />
             <Label htmlFor="user-active" className="text-sm cursor-pointer">
-              Active
+              {t("active")}
             </Label>
           </div>
         </div>
         <SheetFooter className="border-t pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {tc("cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={saving}>
-            {saving ? "Saving..." : editingUser ? "Save Changes" : "Create User"}
+            {saving ? tc("saving") : editingUser ? tc("saveChanges") : t("createUser")}
           </Button>
         </SheetFooter>
       </SheetContent>
@@ -541,6 +546,8 @@ function ResetPasswordDialog({
   onOpenChange: (open: boolean) => void
   userId: string | null
 }) {
+  const t = useTranslations("settings.users")
+  const tc = useTranslations("common")
   const [newPassword, setNewPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -555,16 +562,16 @@ function ResetPasswordDialog({
   const handleSubmit = async () => {
     if (!userId) return
     if (newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters")
+      toast.error(t("passwordMinLength"))
       return
     }
     setSaving(true)
     try {
       await api.resetPassword(userId, { new_password: newPassword })
-      toast.success("Password reset successfully")
+      toast.success(t("passwordResetSuccess"))
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to reset password")
+      toast.error(err instanceof Error ? err.message : t("failedToResetPassword"))
     } finally {
       setSaving(false)
     }
@@ -576,18 +583,18 @@ function ResetPasswordDialog({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <KeyRound className="h-4 w-4" />
-            Reset Password
+            {t("resetPassword")}
           </SheetTitle>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto space-y-4 px-4">
           <div className="space-y-2">
-            <Label>New Password</Label>
+            <Label>{t("newPassword")}</Label>
             <div className="relative">
               <Input
                 type={showPassword ? "text" : "password"}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Minimum 6 characters"
+                placeholder={t("minSixChars")}
                 className="pr-10"
               />
               <Button
@@ -608,16 +615,16 @@ function ResetPasswordDialog({
         </div>
         <SheetFooter className="border-t pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {tc("cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={saving}>
             {saving ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                Resetting...
+                {t("resetting")}
               </>
             ) : (
-              "Reset Password"
+              t("resetPassword")
             )}
           </Button>
         </SheetFooter>

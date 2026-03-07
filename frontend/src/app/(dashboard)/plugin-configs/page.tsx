@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useTranslations } from "next-intl"
 import Link from "next/link"
 import { toast } from "sonner"
 import {
@@ -44,6 +45,8 @@ import { api } from "@/lib/api-client"
 import type { APISIXPluginConfig } from "@/types/apisix"
 
 export default function PolicyTemplatesPage() {
+  const t = useTranslations("pluginConfigs")
+  const tc = useTranslations("common")
   const [templates, setTemplates] = useState<APISIXPluginConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -69,10 +72,10 @@ export default function PolicyTemplatesPage() {
     if (!deleteId) return
     try {
       await api.deleteResource("plugin-configs", deleteId)
-      toast.success("Policy template deleted")
+      toast.success(t("templateDeleted"))
       fetchTemplates()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete failed")
+      toast.error(err instanceof Error ? err.message : t("deleteFailed"))
     } finally {
       setDeleteId(null)
     }
@@ -103,13 +106,14 @@ export default function PolicyTemplatesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Policy Templates"
-        description="Create reusable policy sets that can be shared across multiple API flows"
+        title={t("title")}
+        description={t("description")}
+        icon={<FileJson className="h-6 w-6" />}
         actions={
           <Button asChild>
             <Link href="/plugin-configs/new">
               <Plus className="mr-2 h-4 w-4" />
-              New Template
+              {t("newTemplate")}
             </Link>
           </Button>
         }
@@ -118,7 +122,7 @@ export default function PolicyTemplatesPage() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search templates..."
+          placeholder={t("searchPlaceholder")}
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -129,9 +133,9 @@ export default function PolicyTemplatesPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead>Name</TableHead>
-              <TableHead>Plugins</TableHead>
-              <TableHead>Labels</TableHead>
+              <TableHead>{tc("name")}</TableHead>
+              <TableHead>{t("plugins")}</TableHead>
+              <TableHead>{t("labels")}</TableHead>
               <TableHead className="w-[70px]" />
             </TableRow>
           </TableHeader>
@@ -153,13 +157,13 @@ export default function PolicyTemplatesPage() {
                     <FileJson className="h-8 w-8 text-muted-foreground" />
                     <p className="text-muted-foreground">
                       {search
-                        ? "No templates match your search"
-                        : "No policy templates configured"}
+                        ? t("noSearchResults")
+                        : t("noTemplates")}
                     </p>
                     {!search && (
                       <Button asChild variant="outline" size="sm">
                         <Link href="/plugin-configs/new">
-                          Create your first policy template
+                          {t("createFirstTemplate")}
                         </Link>
                       </Button>
                     )}
@@ -172,7 +176,7 @@ export default function PolicyTemplatesPage() {
                   <TableCell>
                     <div>
                       <p className="text-sm font-medium">
-                        {tpl.desc || "Untitled"}
+                        {tpl.desc || tc("untitled")}
                       </p>
                       <p className="text-xs text-muted-foreground font-mono">
                         {tpl.id}
@@ -245,7 +249,7 @@ export default function PolicyTemplatesPage() {
                         <DropdownMenuItem asChild>
                           <Link href={`/plugin-configs/${tpl.id}`}>
                             <Pencil className="mr-2 h-4 w-4" />
-                            Edit
+                            {tc("edit")}
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem
@@ -253,7 +257,7 @@ export default function PolicyTemplatesPage() {
                           onClick={() => setDeleteId(tpl.id!)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
+                          {tc("delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -268,16 +272,14 @@ export default function PolicyTemplatesPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Policy Template</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this policy template? Routes
-              referencing this template will lose their inherited policies.
-              This action cannot be undone.
+              {t("deleteConfirm")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{tc("delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -1,0 +1,19 @@
+server:
+  port: 8090
+  idle_timeout: 120
+  shutdown_sec: 30
+
+database:
+  host: localhost
+  port: 5432
+  name: fuseone_gateway
+  user: gateway
+  password: gateway
+  sslmode: disable
+
+kafka:
+  max_poll_records: 100
+  session_timeout_ms: 30000
+  heartbeat_ms: 3000
+  max_message_bytes: 1048576
+  sse_keepalive_ms: 15000

@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useTranslations } from "next-intl"
 import { useParams } from "next/navigation"
 import {
   LineChart,
@@ -59,12 +60,15 @@ import {
   dateRangeSpanHours,
 } from "@/lib/metrics-utils"
 import type { TimeSeriesPoint, MetricsSummary, TopRoute, DateRangeValue } from "@/types/metrics"
+import { PageHeader } from "@/components/page-header"
 import { toast } from "sonner"
 
 const AUTO_REFRESH_INTERVAL = 30_000
 const SYNC_ID = "consumer-analytics"
 
 export default function ApplicationAnalyticsPage() {
+  const t = useTranslations("applications.analyticsPage")
+  const tc = useTranslations("common")
   const params = useParams()
   const consumerId = params.id as string
 
@@ -95,7 +99,7 @@ export default function ApplicationAnalyticsPage() {
       setLastRefresh(new Date())
     } catch (err) {
       if (!autoRefresh) {
-        toast.error(err instanceof Error ? err.message : "Failed to fetch metrics")
+        toast.error(err instanceof Error ? err.message : t("failedToFetch"))
       }
     } finally {
       setLoading(false)
@@ -168,13 +172,11 @@ export default function ApplicationAnalyticsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tight truncate">{consumerId}</h1>
-          <Badge variant="outline" className="text-[10px] shrink-0">Application</Badge>
-        </div>
-        <p className="text-sm text-muted-foreground mt-0.5">Traffic analytics for this application</p>
-      </div>
+      <PageHeader
+        title={consumerId}
+        description={t("subtitle")}
+        badge={<Badge variant="outline" className="text-[10px] shrink-0">{t("applicationBadge")}</Badge>}
+      />
 
       {/* Controls */}
       <div className="flex items-center justify-between">
@@ -195,7 +197,7 @@ export default function ApplicationAnalyticsPage() {
         </div>
         <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchData() }} disabled={loading}>
           <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh
+          {tc("refresh")}
         </Button>
       </div>
 
@@ -206,7 +208,7 @@ export default function ApplicationAnalyticsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Total Requests</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("totalRequests")}</p>
                   <p className="text-2xl font-bold mt-1">{formatNumber(summary.total_requests)}</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
@@ -219,7 +221,7 @@ export default function ApplicationAnalyticsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Avg Latency</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("avgLatency")}</p>
                   <p className="text-2xl font-bold mt-1">{formatLatency(summary.avg_latency_ms)}</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
@@ -232,7 +234,7 @@ export default function ApplicationAnalyticsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Error Rate</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("errorRate")}</p>
                   <p className={`text-2xl font-bold mt-1 ${summary.error_rate > 0.05 ? "text-red-600" : "text-emerald-600"}`}>
                     {formatErrorRate(summary.error_rate)}
                   </p>
@@ -251,7 +253,7 @@ export default function ApplicationAnalyticsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Bandwidth</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("bandwidth")}</p>
                   <p className="text-2xl font-bold mt-1">
                     {formatBytes(summary.total_bandwidth_ingress + summary.total_bandwidth_egress)}
                   </p>
@@ -270,10 +272,9 @@ export default function ApplicationAnalyticsPage() {
         <Card>
           <CardContent className="py-16 text-center">
             <Activity className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm font-medium">No traffic data yet</p>
+            <p className="text-sm font-medium">{t("noTrafficYet")}</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-              Metrics will appear here once this application generates traffic.
-              Make sure the consumer is using authenticated requests.
+              {t("noTrafficDescription")}
             </p>
           </CardContent>
         </Card>
@@ -282,8 +283,8 @@ export default function ApplicationAnalyticsPage() {
           {/* Requests Over Time */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Requests Over Time</CardTitle>
-              <CardDescription>Drag on any chart to select a time range</CardDescription>
+              <CardTitle className="text-base">{t("requestsOverTime")}</CardTitle>
+              <CardDescription>{t("dragToZoom")}</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
@@ -304,8 +305,8 @@ export default function ApplicationAnalyticsPage() {
           {/* Latency Percentiles */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Latency Percentiles</CardTitle>
-              <CardDescription>Response time distribution (ms)</CardDescription>
+              <CardTitle className="text-base">{t("latencyPercentiles")}</CardTitle>
+              <CardDescription>{t("responseTimeDistribution")}</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
@@ -332,8 +333,8 @@ export default function ApplicationAnalyticsPage() {
           {/* Status Code Distribution */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Status Code Distribution</CardTitle>
-              <CardDescription>HTTP response status codes over time</CardDescription>
+              <CardTitle className="text-base">{t("statusCodeDistribution")}</CardTitle>
+              <CardDescription>{t("statusCodesOverTime")}</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
@@ -361,8 +362,8 @@ export default function ApplicationAnalyticsPage() {
             {topRoutes.length > 0 && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Traffic by Route</CardTitle>
-                  <CardDescription>Routes used by this application</CardDescription>
+                  <CardTitle className="text-base">{t("trafficByRoute")}</CardTitle>
+                  <CardDescription>{t("routesUsed")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={Math.max(200, topRoutes.length * 36)}>
@@ -391,8 +392,8 @@ export default function ApplicationAnalyticsPage() {
             {summary && summary.total_requests > 0 && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Status Distribution</CardTitle>
-                  <CardDescription>HTTP response status breakdown</CardDescription>
+                  <CardTitle className="text-base">{t("statusDistribution")}</CardTitle>
+                  <CardDescription>{t("statusBreakdown")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
@@ -437,18 +438,18 @@ export default function ApplicationAnalyticsPage() {
           {topRoutes.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Routes Used</CardTitle>
-                <CardDescription>Routes accessed by this application</CardDescription>
+                <CardTitle className="text-base">{t("routesUsedTable")}</CardTitle>
+                <CardDescription>{t("routesAccessed")}</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Route</TableHead>
-                      <TableHead className="text-right">Requests</TableHead>
-                      <TableHead className="text-right">Avg Latency</TableHead>
-                      <TableHead className="text-right">Error Rate</TableHead>
-                      <TableHead className="text-right">Bandwidth</TableHead>
+                      <TableHead>{t("route")}</TableHead>
+                      <TableHead className="text-right">{t("requests")}</TableHead>
+                      <TableHead className="text-right">{t("avgLatency")}</TableHead>
+                      <TableHead className="text-right">{t("errorRate")}</TableHead>
+                      <TableHead className="text-right">{t("bandwidth")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

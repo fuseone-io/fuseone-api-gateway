@@ -1,8 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import {
-  Activity,
   CheckCircle2,
   Database,
   ExternalLink,
@@ -17,7 +17,6 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import {
   Table,
   TableBody,
@@ -49,6 +48,8 @@ interface HealthState {
 }
 
 export default function ConnectionContent() {
+  const t = useTranslations("settings.connection")
+  const tc = useTranslations("common")
   const { environments, activeEnvironmentId, fetchEnvironments } = useEnvironmentStore()
   const [loading, setLoading] = useState(true)
   const [testStates, setTestStates] = useState<Record<string, TestState>>({})
@@ -58,7 +59,7 @@ export default function ConnectionContent() {
     try {
       await fetchEnvironments()
     } catch {
-      toast.error("Failed to load environments")
+      toast.error(t("failedToLoadEnvironments"))
     } finally {
       setLoading(false)
     }
@@ -112,7 +113,7 @@ export default function ConnectionContent() {
         [envId]: { loading: false, result },
       }))
       if (result.success) {
-        toast.success(`Connection successful (${result.latency_ms}ms)`)
+        toast.success(t("connectionSuccess", { ms: result.latency_ms ?? 0 }))
       } else {
         toast.error(result.message)
       }
@@ -124,7 +125,7 @@ export default function ConnectionContent() {
           result: { success: false, message: err instanceof Error ? err.message : "Connection failed" },
         },
       }))
-      toast.error(err instanceof Error ? err.message : "Connection test failed")
+      toast.error(err instanceof Error ? err.message : t("connectionFailed"))
     }
   }
 
@@ -133,15 +134,14 @@ export default function ConnectionContent() {
   }
 
   const activeEnv = environments.find((e) => e.id === activeEnvironmentId)
-  const activeHealth = activeEnv ? healthStates[activeEnv.id] : undefined
 
   if (loading) {
     return (
       <div className="space-y-6">
         <div>
-          <h3 className="text-lg font-semibold">Gateway Connection</h3>
+          <h3 className="text-lg font-semibold">{t("title")}</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            API Gateway endpoint configuration and health check
+            {t("heading")}
           </p>
         </div>
         <Skeleton className="h-[200px] rounded-lg" />
@@ -153,9 +153,9 @@ export default function ConnectionContent() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold">Gateway Connection</h3>
+        <h3 className="text-lg font-semibold">{t("title")}</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          API Gateway endpoint configuration and health check
+          {t("heading")}
         </p>
       </div>
 
@@ -170,7 +170,7 @@ export default function ConnectionContent() {
               />
               <div>
                 <h4 className="text-sm font-semibold">{activeEnv.name}</h4>
-                <p className="text-xs text-muted-foreground">Active Environment</p>
+                <p className="text-xs text-muted-foreground">{t("activeEnvironment")}</p>
               </div>
             </div>
             <Button
@@ -184,7 +184,7 @@ export default function ConnectionContent() {
               ) : (
                 <Plug className="h-3.5 w-3.5 mr-1.5" />
               )}
-              Test Connection
+              {t("testConnection")}
             </Button>
           </div>
 
@@ -214,38 +214,31 @@ export default function ConnectionContent() {
 
           <div className="grid gap-3">
             <ConnectionField
-              label="Admin API"
+              label={t("adminApi")}
               value={activeEnv.admin_url}
               icon={<KeyRound className="h-3.5 w-3.5" />}
             />
             <ConnectionField
-              label="Control API"
-              value={activeEnv.control_url || "Not configured"}
+              label={t("controlApi")}
+              value={activeEnv.control_url || t("notConfigured")}
               muted={!activeEnv.control_url}
               icon={<Plug className="h-3.5 w-3.5" />}
             />
             <ConnectionField
-              label="Metrics Endpoint"
-              value={activeEnv.metrics_url || "Not configured"}
+              label={t("metricsEndpoint")}
+              value={activeEnv.metrics_url || t("notConfigured")}
               muted={!activeEnv.metrics_url}
               icon={<Plug className="h-3.5 w-3.5" />}
             />
           </div>
 
-          {/* Gateway Health for Active Environment */}
-          {activeHealth?.data?.available && (
-            <>
-              <Separator className="my-4" />
-              <GatewayHealthPanel health={activeHealth.data} />
-            </>
-          )}
         </div>
       ) : (
         <div className="py-8 text-center rounded-lg border border-dashed bg-muted/30">
           <Plug className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm font-medium">No active environment</p>
+          <p className="text-sm font-medium">{t("noActiveEnvironment")}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Configure an environment in the Environments tab.
+            {t("configureEnvironmentHint")}
           </p>
         </div>
       )}
@@ -255,27 +248,27 @@ export default function ConnectionContent() {
         <div className="rounded-lg border bg-card p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h4 className="text-sm font-semibold">All Environments</h4>
+              <h4 className="text-sm font-semibold">{t("allEnvironments")}</h4>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {environments.length} environment{environments.length !== 1 ? "s" : ""} configured
+                {t("environmentsCount", { count: environments.length })}
               </p>
             </div>
             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleRefreshAll}>
               <RefreshCw className="h-3 w-3 mr-1" />
-              Refresh Health
+              {t("refreshHealth")}
             </Button>
           </div>
           <div className="rounded-lg border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Environment</TableHead>
-                  <TableHead>Connections</TableHead>
-                  <TableHead>Memory</TableHead>
-                  <TableHead>etcd</TableHead>
-                  <TableHead>Version</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t("environment")}</TableHead>
+                  <TableHead>{t("connections")}</TableHead>
+                  <TableHead>{t("memory")}</TableHead>
+                  <TableHead>{t("etcd")}</TableHead>
+                  <TableHead>{tc("version")}</TableHead>
+                  <TableHead>{tc("status")}</TableHead>
+                  <TableHead className="text-right">{tc("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -294,12 +287,12 @@ export default function ConnectionContent() {
                           <span className="font-medium text-sm">{env.name}</span>
                           {env.id === activeEnvironmentId && (
                             <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
-                              Active
+                              {tc("active")}
                             </Badge>
                           )}
                           {env.is_default && (
                             <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-amber-500/10 text-amber-600">
-                              Default
+                              {tc("default")}
                             </Badge>
                           )}
                         </div>
@@ -317,13 +310,13 @@ export default function ConnectionContent() {
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="text-xs">
                               <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-                                <span className="text-muted-foreground">Active:</span>
+                                <span className="text-muted-foreground">{t("connActive")}:</span>
                                 <span className="font-mono">{h.connections.active ?? 0}</span>
-                                <span className="text-muted-foreground">Reading:</span>
+                                <span className="text-muted-foreground">{t("connReading")}:</span>
                                 <span className="font-mono">{h.connections.reading ?? 0}</span>
-                                <span className="text-muted-foreground">Writing:</span>
+                                <span className="text-muted-foreground">{t("connWriting")}:</span>
                                 <span className="font-mono">{h.connections.writing ?? 0}</span>
-                                <span className="text-muted-foreground">Waiting:</span>
+                                <span className="text-muted-foreground">{t("connWaiting")}:</span>
                                 <span className="font-mono">{h.connections.waiting ?? 0}</span>
                               </div>
                             </TooltipContent>
@@ -345,11 +338,11 @@ export default function ConnectionContent() {
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="text-xs">
                               <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-                                <span className="text-muted-foreground">Used:</span>
+                                <span className="text-muted-foreground">{t("memUsed")}:</span>
                                 <span className="font-mono">{h.shared_memory.used_mb} MB</span>
-                                <span className="text-muted-foreground">Free:</span>
+                                <span className="text-muted-foreground">{t("memFree")}:</span>
                                 <span className="font-mono">{h.shared_memory.free_mb} MB</span>
-                                <span className="text-muted-foreground">Capacity:</span>
+                                <span className="text-muted-foreground">{t("memCapacity")}:</span>
                                 <span className="font-mono">{h.shared_memory.capacity_mb} MB</span>
                               </div>
                             </TooltipContent>
@@ -367,12 +360,12 @@ export default function ConnectionContent() {
                               <div className="flex items-center gap-1.5">
                                 <Database className={`h-3 w-3 ${h.etcd_reachable ? "text-emerald-500" : "text-destructive"}`} />
                                 <span className={`text-xs ${h.etcd_reachable ? "text-emerald-600" : "text-destructive"}`}>
-                                  {h.etcd_reachable ? "OK" : "Down"}
+                                  {h.etcd_reachable ? t("ok") : t("down")}
                                 </span>
                               </div>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="text-xs">
-                              etcd {h.etcd_reachable ? "reachable" : "unreachable"}
+                              {h.etcd_reachable ? t("etcdReachable") : t("etcdUnreachable")}
                             </TooltipContent>
                           </Tooltip>
                         ) : (
@@ -400,7 +393,7 @@ export default function ConnectionContent() {
                           >
                             {testState.result.success
                               ? `OK (${testState.result.latency_ms}ms)`
-                              : "Failed"}
+                              : t("failed")}
                           </Badge>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
@@ -419,7 +412,7 @@ export default function ConnectionContent() {
                           ) : (
                             <Plug className="h-3 w-3 mr-1" />
                           )}
-                          Test
+                          {tc("test")}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -434,100 +427,8 @@ export default function ConnectionContent() {
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <ExternalLink className="h-3 w-3" />
         <span>
-          To edit connection details, switch to the{" "}
-          <span className="font-medium text-foreground">Environments</span> tab.
+          {t("editHint")}
         </span>
-      </div>
-    </div>
-  )
-}
-
-function GatewayHealthPanel({ health }: { health: GatewayHealth }) {
-  const memPct = health.shared_memory?.used_pct ?? 0
-
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-3">
-        <Activity className="h-3.5 w-3.5 text-muted-foreground" />
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Gateway Health</h4>
-        {health.node?.version && (
-          <Badge variant="outline" className="text-[10px] ml-auto">
-            APISIX {health.node.version}
-          </Badge>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {/* Connections */}
-        <div className="rounded-md border p-3">
-          <div className="flex items-center gap-1.5 mb-2">
-            <Network className="h-3.5 w-3.5 text-blue-500" />
-            <span className="text-xs text-muted-foreground">Connections</span>
-          </div>
-          <div className="text-2xl font-bold tabular-nums">
-            {health.connections?.active ?? 0}
-          </div>
-          <div className="flex gap-3 mt-1 text-[10px] text-muted-foreground">
-            <span>R:{health.connections?.reading ?? 0}</span>
-            <span>W:{health.connections?.writing ?? 0}</span>
-            <span>I:{health.connections?.waiting ?? 0}</span>
-          </div>
-        </div>
-
-        {/* Shared Memory */}
-        <div className="rounded-md border p-3">
-          <div className="flex items-center gap-1.5 mb-2">
-            <HardDrive className="h-3.5 w-3.5 text-purple-500" />
-            <span className="text-xs text-muted-foreground">Shared Memory</span>
-          </div>
-          <div className="text-2xl font-bold tabular-nums">
-            {memPct}<span className="text-sm font-normal text-muted-foreground">%</span>
-          </div>
-          <Progress
-            value={memPct}
-            className="h-1.5 mt-1.5"
-          />
-          <div className="text-[10px] text-muted-foreground mt-1">
-            {health.shared_memory?.used_mb ?? 0} / {health.shared_memory?.capacity_mb ?? 0} MB
-          </div>
-        </div>
-
-        {/* etcd */}
-        <div className="rounded-md border p-3">
-          <div className="flex items-center gap-1.5 mb-2">
-            <Database className="h-3.5 w-3.5 text-amber-500" />
-            <span className="text-xs text-muted-foreground">etcd</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {health.etcd_reachable ? (
-              <>
-                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                <span className="text-sm font-medium text-emerald-600">Reachable</span>
-              </>
-            ) : (
-              <>
-                <XCircle className="h-5 w-5 text-destructive" />
-                <span className="text-sm font-medium text-destructive">Unreachable</span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Total Requests */}
-        <div className="rounded-md border p-3">
-          <div className="flex items-center gap-1.5 mb-2">
-            <Activity className="h-3.5 w-3.5 text-emerald-500" />
-            <span className="text-xs text-muted-foreground">Total Requests</span>
-          </div>
-          <div className="text-2xl font-bold tabular-nums">
-            {formatNumber(health.total_requests ?? 0)}
-          </div>
-          {health.node?.hostname && (
-            <div className="text-[10px] text-muted-foreground mt-1 truncate">
-              {health.node.hostname}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   )
@@ -559,10 +460,4 @@ function ConnectionField({
       </div>
     </div>
   )
-}
-
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
 }

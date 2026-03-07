@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { ArrowLeft, Plus, Save, X } from "lucide-react"
@@ -35,6 +36,8 @@ const TLS_PROTOCOLS = [
 ] as const
 
 export default function NewSSLPage() {
+  const t = useTranslations("ssl")
+  const tc = useTranslations("common")
   const router = useRouter()
   const [saving, setSaving] = useState(false)
 
@@ -88,19 +91,19 @@ export default function NewSSLPage() {
 
   const handleSave = async () => {
     if (!cert.trim()) {
-      toast.error("Certificate is required")
+      toast.error(t("validation.certRequired"))
       return
     }
     if (!key.trim()) {
-      toast.error("Private key is required")
+      toast.error(t("validation.keyRequired"))
       return
     }
     if (snis.length === 0) {
-      toast.error("At least one SNI domain is required")
+      toast.error(t("validation.sniRequired"))
       return
     }
     if (enableMtls && !clientCA.trim()) {
-      toast.error("CA certificate is required for mTLS")
+      toast.error(t("validation.caRequired"))
       return
     }
 
@@ -122,11 +125,11 @@ export default function NewSSLPage() {
         ssl_protocols: protocols.length > 0 ? protocols : undefined,
         status: enabled ? 1 : 0,
       })
-      toast.success("Certificate created")
+      toast.success(t("toasts.created"))
       router.push("/ssl")
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to create certificate"
+        err instanceof Error ? err.message : t("toasts.failedCreate")
       )
     } finally {
       setSaving(false)
@@ -136,20 +139,20 @@ export default function NewSSLPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="New Certificate"
-        description="Add an SSL/TLS certificate for HTTPS termination"
+        title={t("createTitle")}
+        description={t("createDescription")}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => router.push("/ssl")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+              {tc("back")}
             </Button>
             <Button
               onClick={handleSave}
               disabled={saving || !cert || !key || snis.length === 0}
             >
               <Save className="mr-2 h-4 w-4" />
-              {saving ? "Creating..." : "Create Certificate"}
+              {saving ? t("creating") : t("createButton")}
             </Button>
           </div>
         }
@@ -159,14 +162,14 @@ export default function NewSSLPage() {
         {/* Certificate */}
         <Card>
           <CardHeader>
-            <CardTitle>Certificate</CardTitle>
+            <CardTitle>{t("certificate")}</CardTitle>
             <CardDescription>
-              Upload the PEM-encoded certificate and private key
+              {t("certificateDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Type</Label>
+              <Label>{tc("type")}</Label>
               <Select
                 value={certType}
                 onValueChange={(v) => setCertType(v as "server" | "client")}
@@ -176,22 +179,22 @@ export default function NewSSLPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="server">
-                    Server — Inbound TLS termination
+                    {t("typeServer")}
                   </SelectItem>
                   <SelectItem value="client">
-                    Client — Upstream mTLS identity
+                    {t("typeClient")}
                   </SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
                 {certType === "server"
-                  ? "Used to terminate HTTPS connections from clients to the API Gateway"
-                  : "Used as client certificate when the API Gateway connects to upstream services"}
+                  ? t("typeServerHint")
+                  : t("typeClientHint")}
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label>Certificate (PEM)</Label>
+              <Label>{t("certPem")}</Label>
               <Textarea
                 value={cert}
                 onChange={(e) => setCert(e.target.value)}
@@ -201,7 +204,7 @@ export default function NewSSLPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Private Key (PEM)</Label>
+              <Label>{t("privateKeyPem")}</Label>
               <Textarea
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
@@ -211,7 +214,7 @@ export default function NewSSLPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>SNI Domains</Label>
+              <Label>{t("sniDomains")}</Label>
               <div className="flex gap-2">
                 <Input
                   value={sniInput}
@@ -254,8 +257,7 @@ export default function NewSSLPage() {
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
-                Domains that this certificate will serve. Supports wildcards
-                (e.g. *.example.com).
+                {t("sniDomainsHint")}
               </p>
             </div>
           </CardContent>
@@ -267,9 +269,9 @@ export default function NewSSLPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Mutual TLS (mTLS)</CardTitle>
+                  <CardTitle>{t("mtls")}</CardTitle>
                   <CardDescription>
-                    Require clients to present a certificate
+                    {t("mtlsDescription")}
                   </CardDescription>
                 </div>
                 <Switch
@@ -281,7 +283,7 @@ export default function NewSSLPage() {
             {enableMtls && (
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>CA Certificate (PEM)</Label>
+                  <Label>{t("caCertPem")}</Label>
                   <Textarea
                     value={clientCA}
                     onChange={(e) => setClientCA(e.target.value)}
@@ -289,12 +291,12 @@ export default function NewSSLPage() {
                     placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
                   />
                   <p className="text-xs text-muted-foreground">
-                    The CA certificate used to verify client certificates
+                    {t("caCertHint")}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Verification Depth</Label>
+                  <Label>{t("verifyDepth")}</Label>
                   <Input
                     type="number"
                     min={1}
@@ -306,12 +308,12 @@ export default function NewSSLPage() {
                     className="w-24"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Maximum depth of the certificate chain to verify
+                    {t("verifyDepthHint")}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Skip mTLS for URIs (optional)</Label>
+                  <Label>{t("skipMtlsUris")}</Label>
                   <div className="flex gap-2">
                     <Input
                       value={skipUriInput}
@@ -354,7 +356,7 @@ export default function NewSSLPage() {
                     </div>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Regex patterns for URIs that should bypass mTLS verification
+                    {t("skipMtlsUrisHint")}
                   </p>
                 </div>
               </CardContent>
@@ -365,11 +367,11 @@ export default function NewSSLPage() {
         {/* Settings */}
         <Card>
           <CardHeader>
-            <CardTitle>Settings</CardTitle>
+            <CardTitle>{t("settings")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>TLS Protocols</Label>
+              <Label>{t("tlsProtocols")}</Label>
               <div className="flex flex-wrap gap-4">
                 {TLS_PROTOCOLS.map((proto) => (
                   <label
@@ -395,9 +397,9 @@ export default function NewSSLPage() {
 
             <div className="flex items-center justify-between">
               <div>
-                <Label>Status</Label>
+                <Label>{tc("status")}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Enable or disable this certificate
+                  {t("statusHint")}
                 </p>
               </div>
               <Switch checked={enabled} onCheckedChange={setEnabled} />

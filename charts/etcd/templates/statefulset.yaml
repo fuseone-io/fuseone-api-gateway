@@ -1,33 +1,37 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ include "etcd.fullname" . }}
   labels:
-    app: {{ .Release.Name }}
-    app.kubernetes.io/name: {{ .Release.Name }}
+    app: {{ include "etcd.fullname" . }}
+    app.kubernetes.io/name: {{ include "etcd.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
-  serviceName: {{ .Release.Name }}
+  serviceName: {{ include "etcd.fullname" . }}
   replicas: {{ .Values.replicaCount }}
   podManagementPolicy: Parallel
   updateStrategy:
     type: RollingUpdate
   selector:
     matchLabels:
-      app: {{ .Release.Name }}
+      app: {{ include "etcd.fullname" . }}
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}
-        app.kubernetes.io/name: {{ .Release.Name }}
+        app: {{ include "etcd.fullname" . }}
+        app.kubernetes.io/name: {{ include "etcd.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
       annotations:
-        serviceName: {{ .Release.Name }}
+        serviceName: {{ include "etcd.fullname" . }}
     spec:
-      affinity:
-        {{- with .Values.affinity }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
         {{- toYaml . | nindent 8 }}
-        {{- end }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
@@ -60,6 +64,8 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
           env:
             - name: K8S_NAMESPACE
               valueFrom:

@@ -3,6 +3,7 @@ import { Inter } from "next/font/google"
 import { ThemeProvider } from "next-themes"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { I18nProvider } from "@/components/i18n-provider"
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -21,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider
           attribute="class"
@@ -29,10 +30,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <TooltipProvider>
-            {children}
-            <Toaster richColors position="top-right" />
-          </TooltipProvider>
+          <I18nProvider>
+            <TooltipProvider>
+              {children}
+              <Toaster richColors position="top-right" />
+            </TooltipProvider>
+          </I18nProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import {
   ArrowLeft,
@@ -58,19 +59,19 @@ import { useTestingStore } from "@/stores/testing-store"
 import { api } from "@/lib/api-client"
 import type { TestSuite, TestRun, StepResult, TestStep } from "@/types/testing"
 
-const RUN_STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  passed: { label: "Aprovado", className: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
-  failed: { label: "Falhou", className: "bg-red-500/15 text-red-600 border-red-500/30" },
-  error: { label: "Erro", className: "bg-red-500/15 text-red-600 border-red-500/30" },
-  running: { label: "Executando", className: "bg-blue-500/15 text-blue-600 border-blue-500/30" },
-  pending: { label: "Pendente", className: "bg-slate-500/15 text-slate-600 border-slate-500/30" },
+const RUN_STATUS_BADGE: Record<string, { labelKey: string; className: string }> = {
+  passed: { labelKey: "passed", className: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
+  failed: { labelKey: "failed", className: "bg-red-500/15 text-red-600 border-red-500/30" },
+  error: { labelKey: "error", className: "bg-red-500/15 text-red-600 border-red-500/30" },
+  running: { labelKey: "running", className: "bg-blue-500/15 text-blue-600 border-blue-500/30" },
+  pending: { labelKey: "pending", className: "bg-slate-500/15 text-slate-600 border-slate-500/30" },
 }
 
-const STEP_STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  passed: { label: "OK", className: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
-  failed: { label: "Falhou", className: "bg-red-500/15 text-red-600 border-red-500/30" },
-  error: { label: "Erro", className: "bg-red-500/15 text-red-600 border-red-500/30" },
-  skipped: { label: "Pulado", className: "bg-slate-500/15 text-slate-600 border-slate-500/30" },
+const STEP_STATUS_BADGE: Record<string, { labelKey: string; className: string }> = {
+  passed: { labelKey: "passed", className: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
+  failed: { labelKey: "failed", className: "bg-red-500/15 text-red-600 border-red-500/30" },
+  error: { labelKey: "error", className: "bg-red-500/15 text-red-600 border-red-500/30" },
+  skipped: { labelKey: "skipped", className: "bg-slate-500/15 text-slate-600 border-slate-500/30" },
 }
 
 function formatDuration(ms: number): string {
@@ -79,7 +80,7 @@ function formatDuration(ms: number): string {
 }
 
 function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString("pt-BR", {
+  return new Date(dateStr).toLocaleString(undefined, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -91,6 +92,7 @@ function formatDateTime(dateStr: string): string {
 
 // ── Step Result Details (expandable row) ──
 function StepResultDetail({ result }: { result: StepResult }) {
+  const t = useTranslations("testing")
   const [expanded, setExpanded] = useState(false)
   const badge = STEP_STATUS_BADGE[result.status] || STEP_STATUS_BADGE.skipped
 
@@ -116,7 +118,7 @@ function StepResultDetail({ result }: { result: StepResult }) {
             ) : result.status === "failed" || result.status === "error" ? (
               <XCircle className="h-3 w-3 mr-1" />
             ) : null}
-            {badge.label}
+            {t(`stepStatus.${badge.labelKey}`)}
           </Badge>
         </TableCell>
         <TableCell className="font-mono text-xs text-center">
@@ -139,7 +141,7 @@ function StepResultDetail({ result }: { result: StepResult }) {
             <div className="space-y-3">
               {/* Assertion results */}
               <div>
-                <p className="text-xs font-semibold mb-2">Assertions</p>
+                <p className="text-xs font-semibold mb-2">{t("suiteDetail.assertions")}</p>
                 <div className="space-y-1">
                   {result.assertions.map((a, i) => (
                     <div
@@ -158,7 +160,7 @@ function StepResultDetail({ result }: { result: StepResult }) {
                       </span>
                       {!a.passed && (
                         <span className="text-muted-foreground ml-auto">
-                          Obtido: &ldquo;{a.actual}&rdquo;
+                          {t("suiteDetail.got")}: &ldquo;{a.actual}&rdquo;
                         </span>
                       )}
                     </div>
@@ -169,7 +171,7 @@ function StepResultDetail({ result }: { result: StepResult }) {
               {/* Error */}
               {result.error && (
                 <div>
-                  <p className="text-xs font-semibold text-destructive mb-1">Erro</p>
+                  <p className="text-xs font-semibold text-destructive mb-1">{t("stepStatus.error")}</p>
                   <pre className="text-xs bg-destructive/10 rounded p-2 overflow-x-auto">
                     {result.error}
                   </pre>
@@ -179,7 +181,7 @@ function StepResultDetail({ result }: { result: StepResult }) {
               {/* Extracted variables */}
               {result.extracted_vars && Object.keys(result.extracted_vars).length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold mb-1">Variaveis Extraidas</p>
+                  <p className="text-xs font-semibold mb-1">{t("suiteDetail.extractedVars")}</p>
                   <div className="space-y-0.5">
                     {Object.entries(result.extracted_vars).map(([key, val]) => (
                       <p key={key} className="text-xs font-mono">
@@ -193,7 +195,7 @@ function StepResultDetail({ result }: { result: StepResult }) {
               {/* Response body (truncated) */}
               {result.response_body && (
                 <div>
-                  <p className="text-xs font-semibold mb-1">Response Body</p>
+                  <p className="text-xs font-semibold mb-1">{t("suiteDetail.responseBody")}</p>
                   <pre className="text-xs bg-muted rounded p-2 overflow-x-auto max-h-[200px]">
                     {result.response_body.length > 2000
                       ? result.response_body.substring(0, 2000) + "..."
@@ -211,6 +213,8 @@ function StepResultDetail({ result }: { result: StepResult }) {
 
 // ── Run History Entry ──
 function RunEntry({ run }: { run: TestRun }) {
+  const t = useTranslations("testing")
+  const tc = useTranslations("common")
   const [expanded, setExpanded] = useState(false)
   const badge = RUN_STATUS_BADGE[run.status] || RUN_STATUS_BADGE.pending
 
@@ -231,17 +235,21 @@ function RunEntry({ run }: { run: TestRun }) {
           ) : run.status === "failed" || run.status === "error" ? (
             <XCircle className="h-3 w-3 mr-1" />
           ) : null}
-          {badge.label}
+          {t(`runStatus.${badge.labelKey}`)}
         </Badge>
         <span className="text-xs text-muted-foreground">
           <span className="text-emerald-600 font-medium">{run.passed_steps}</span>
-          /{run.total_steps} steps
+          /{run.total_steps} {t("suiteDetail.steps_count").toLowerCase()}
         </span>
         <span className="text-xs font-mono text-muted-foreground ml-auto">
           {formatDuration(run.duration_ms)}
         </span>
         <Badge variant="outline" className="text-[10px]">
-          {run.trigger_type === "manual" ? "Manual" : run.trigger_type === "synthetic" ? "Sintetico" : "CI"}
+          {run.trigger_type === "manual"
+            ? t("suiteDetail.triggerManual")
+            : run.trigger_type === "synthetic"
+              ? t("suiteDetail.triggerSynthetic")
+              : t("suiteDetail.triggerCI")}
         </Badge>
         <span className="text-xs text-muted-foreground flex items-center gap-1">
           <Clock className="h-3 w-3" />
@@ -256,11 +264,11 @@ function RunEntry({ run }: { run: TestRun }) {
               <TableRow>
                 <TableHead className="w-[40px]" />
                 <TableHead className="w-[50px]">#</TableHead>
-                <TableHead>Step</TableHead>
-                <TableHead className="w-[100px]">Status</TableHead>
-                <TableHead className="w-[80px] text-center">HTTP</TableHead>
-                <TableHead className="w-[100px] text-right">Tempo</TableHead>
-                <TableHead className="w-[100px] text-center">Assertions</TableHead>
+                <TableHead>{t("suiteDetail.step")}</TableHead>
+                <TableHead className="w-[100px]">{tc("status")}</TableHead>
+                <TableHead className="w-[80px] text-center">{t("suiteDetail.http")}</TableHead>
+                <TableHead className="w-[100px] text-right">{t("suiteDetail.time")}</TableHead>
+                <TableHead className="w-[100px] text-center">{t("suiteDetail.assertions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -280,6 +288,8 @@ export default function TestSuiteDetailPage() {
   const params = useParams()
   const router = useRouter()
   const suiteId = params.id as string
+  const t = useTranslations("testing")
+  const tc = useTranslations("common")
 
   const { runs, runsLoading, fetchRuns, runSuite, updateSuite, deleteSuite } =
     useTestingStore()
@@ -307,12 +317,12 @@ export default function TestSuiteDetailPage() {
       setEditSteps(data.steps || [])
       if (data.name) sessionStorage.setItem(`breadcrumb:${suiteId}`, data.name)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao carregar suite")
+      toast.error(err instanceof Error ? err.message : t("suiteDetail.failedToLoad"))
       router.push("/testing/suites")
     } finally {
       setLoading(false)
     }
-  }, [suiteId, router])
+  }, [suiteId, router, t])
 
   useEffect(() => {
     loadSuite()
@@ -330,9 +340,9 @@ export default function TestSuiteDetailPage() {
         tags: editTags,
       })
       setSuite(updated)
-      toast.success("Suite salva com sucesso")
+      toast.success(t("suiteDetail.suiteSaved"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao salvar suite")
+      toast.error(err instanceof Error ? err.message : t("suiteDetail.failedToSave"))
     } finally {
       setSaving(false)
     }
@@ -344,15 +354,15 @@ export default function TestSuiteDetailPage() {
       const run = await runSuite(suiteId)
       toast.success(
         run.status === "passed"
-          ? "Teste aprovado!"
+          ? t("suiteDetail.testPassed")
           : run.status === "failed"
-            ? "Teste falhou"
-            : "Teste executado"
+            ? t("suiteDetail.testFailed")
+            : t("suiteDetail.testExecuted")
       )
       await fetchRuns(suiteId)
       setActiveTab("runs")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao executar suite")
+      toast.error(err instanceof Error ? err.message : t("suiteDetail.failedToExecute"))
     } finally {
       setRunning(false)
     }
@@ -362,10 +372,10 @@ export default function TestSuiteDetailPage() {
     if (!suite) return
     try {
       await deleteSuite(suite.id)
-      toast.success("Suite excluida")
+      toast.success(t("suiteDetail.suiteDeleted"))
       router.push("/testing/suites")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao excluir suite")
+      toast.error(err instanceof Error ? err.message : t("suiteDetail.failedToDelete"))
     }
   }
 
@@ -393,7 +403,7 @@ export default function TestSuiteDetailPage() {
       <PageHeader
         icon={<FlaskConical className="h-5 w-5" />}
         title={suite.name}
-        description={suite.description || "Suite de teste"}
+        description={suite.description || t("suiteDetail.testSuite")}
         actions={
           <div className="flex gap-2">
             <Button
@@ -401,7 +411,7 @@ export default function TestSuiteDetailPage() {
               onClick={() => router.push("/testing/suites")}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar
+              {tc("back")}
             </Button>
             <Button
               variant="outline"
@@ -422,12 +432,12 @@ export default function TestSuiteDetailPage() {
               }
             >
               <Plus className="mr-2 h-4 w-4" />
-              Adicionar Step
+              {t("suiteDetail.addStep")}
             </Button>
             {hasChanges && (
               <Button variant="outline" onClick={handleSave} disabled={saving}>
                 <Save className="mr-2 h-4 w-4" />
-                {saving ? "Salvando..." : "Salvar"}
+                {saving ? tc("saving") : t("suiteDetail.save")}
               </Button>
             )}
             <Button
@@ -439,7 +449,7 @@ export default function TestSuiteDetailPage() {
               ) : (
                 <Play className="mr-2 h-4 w-4" />
               )}
-              {running ? "Executando..." : "Executar"}
+              {running ? t("suiteDetail.executing") : t("suiteDetail.execute")}
             </Button>
           </div>
         }
@@ -461,15 +471,15 @@ export default function TestSuiteDetailPage() {
         <TabsList>
           <TabsTrigger value="steps" className="gap-1.5">
             <FlaskConical className="h-4 w-4" />
-            Steps ({editSteps.length})
+            {t("suiteDetail.steps")} ({editSteps.length})
           </TabsTrigger>
           <TabsTrigger value="runs" className="gap-1.5">
             <Play className="h-4 w-4" />
-            Execucoes ({runs.length})
+            {t("suiteDetail.runs")} ({runs.length})
           </TabsTrigger>
           <TabsTrigger value="settings" className="gap-1.5">
             <Settings className="h-4 w-4" />
-            Configuracoes
+            {t("suiteDetail.settings")}
           </TabsTrigger>
         </TabsList>
 
@@ -491,7 +501,7 @@ export default function TestSuiteDetailPage() {
               <CardContent className="py-12 text-center">
                 <Play className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
                 <p className="text-sm text-muted-foreground">
-                  Nenhuma execucao encontrada. Clique em &ldquo;Executar&rdquo; para rodar a suite.
+                  {t("suiteDetail.noRuns")}. {t("suiteDetail.noRunsDescription")}.
                 </p>
               </CardContent>
             </Card>
@@ -504,45 +514,45 @@ export default function TestSuiteDetailPage() {
         <TabsContent value="settings" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Configuracoes da Suite</CardTitle>
-              <CardDescription>Edite as informacoes basicas da suite de teste</CardDescription>
+              <CardTitle className="text-base">{t("suiteDetail.suiteSettings")}</CardTitle>
+              <CardDescription>{t("suiteDetail.editBasicInfo")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Nome</Label>
+                <Label>{t("suiteDetail.suiteName")}</Label>
                 <Input
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  placeholder="Nome da suite"
+                  placeholder={t("suiteDetail.suitePlaceholder")}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Descricao</Label>
+                <Label>{t("suiteDetail.suiteDescription")}</Label>
                 <Textarea
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
-                  placeholder="Descricao da suite"
+                  placeholder={t("suiteDetail.suiteDescriptionPlaceholder")}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Tags</Label>
+                <Label>{t("suiteDetail.tags")}</Label>
                 <TagInput
                   value={editTags}
                   onChange={setEditTags}
-                  placeholder="Digite e pressione Enter"
+                  placeholder={t("suiteDetail.enterAndPress")}
                 />
               </div>
 
               <div className="flex items-center justify-between pt-4 border-t">
                 <div>
-                  <p className="text-sm font-medium text-destructive">Zona de Perigo</p>
+                  <p className="text-sm font-medium text-destructive">{t("suiteDetail.dangerZone")}</p>
                   <p className="text-xs text-muted-foreground">
-                    Excluir permanentemente esta suite e todo o historico de execucoes
+                    {t("suiteDetail.dangerZoneDescription")}
                   </p>
                 </div>
                 <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Excluir Suite
+                  {t("suiteDetail.deleteSuite")}
                 </Button>
               </div>
             </CardContent>
@@ -554,15 +564,14 @@ export default function TestSuiteDetailPage() {
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Suite</AlertDialogTitle>
+            <AlertDialogTitle>{t("suiteDetail.deleteConfirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir a suite &ldquo;{suite.name}&rdquo;?
-              Todas as execucoes serao removidas. Esta acao nao pode ser desfeita.
+              {t("suiteDetail.deleteConfirmDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Excluir</AlertDialogAction>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{tc("delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

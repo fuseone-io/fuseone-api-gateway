@@ -1,7 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Copy, Clock, Activity, Code2 } from "lucide-react"
+import { Copy, Clock, Activity } from "lucide-react"
+import { AIInsightButton } from "@/components/ai-assistant/AIInsightButton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -64,11 +65,6 @@ export function TraceDetailSheet({ trace, open, onOpenChange }: TraceDetailSheet
 
   if (!trace) return null
 
-  const handleCopyJSON = () => {
-    navigator.clipboard.writeText(JSON.stringify(trace, null, 2))
-    toast.success("Trace JSON copied to clipboard")
-  }
-
   const handleCopyTraceId = () => {
     navigator.clipboard.writeText(trace.trace_id)
     toast.success("Trace ID copied")
@@ -77,10 +73,18 @@ export function TraceDetailSheet({ trace, open, onOpenChange }: TraceDetailSheet
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="!w-[50vw] !max-w-[50vw] p-0 flex flex-col">
-        <SheetHeader className="px-6 py-4 border-b shrink-0">
+        <SheetHeader className="px-6 pr-12 py-4 border-b shrink-0">
           <SheetTitle className="text-base flex items-center gap-2">
             <Activity className="h-4 w-4 text-primary" />
-            Request Trace
+            <span className="flex-1">Request Trace</span>
+            <AIInsightButton
+              variant="ghost"
+              buildPrompt={() => {
+                const durationMs = (trace.duration_ns / 1e6).toFixed(1)
+                const slowSpans = sortedSpans.slice(0, 3).map((s) => `  - ${s.name}: ${(s.duration_ns / 1e6).toFixed(1)}ms`).join("\n")
+                return `Analyze this request trace:\n- ${trace.method} ${trace.uri} → ${trace.status_code}\n- Total duration: ${durationMs}ms\n- Spans: ${trace.spans.length}\n- Service: ${trace.service_name}\n\nSlowest spans:\n${slowSpans || "  (none)"}\n\n${trace.status_code >= 400 ? `This request failed with status ${trace.status_code}. ` : ""}What is causing ${parseFloat(durationMs) > 500 ? "the high latency" : "any issues"} and how can I fix it?`
+              }}
+            />
           </SheetTitle>
 
           {/* Request summary */}
@@ -124,10 +128,6 @@ export function TraceDetailSheet({ trace, open, onOpenChange }: TraceDetailSheet
             <TabsTrigger value="spans" className="gap-1.5 text-xs">
               <Clock className="h-3 w-3" />
               Spans
-            </TabsTrigger>
-            <TabsTrigger value="raw" className="gap-1.5 text-xs">
-              <Code2 className="h-3 w-3" />
-              Raw
             </TabsTrigger>
           </TabsList>
 
@@ -177,17 +177,7 @@ export function TraceDetailSheet({ trace, open, onOpenChange }: TraceDetailSheet
             </Table>
           </TabsContent>
 
-          <TabsContent value="raw" className="flex-1 overflow-auto px-6 pb-6 mt-3">
-            <div className="flex justify-end mb-2">
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={handleCopyJSON}>
-                <Copy className="h-3 w-3" />
-                Copy JSON
-              </Button>
-            </div>
-            <pre className="text-xs font-mono bg-muted rounded-lg p-4 overflow-auto max-h-[600px]">
-              {JSON.stringify(trace, null, 2)}
-            </pre>
-          </TabsContent>
+
         </Tabs>
       </SheetContent>
     </Sheet>

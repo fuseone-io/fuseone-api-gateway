@@ -2,109 +2,109 @@ import type { DocCategory } from "./types"
 
 export const apiCompositionCategory: DocCategory = {
   slug: "api-composition",
-  title: "Composicao de APIs",
+  title: "Composição de APIs",
   description:
-    "Agregue multiplas chamadas de backend em uma unica resposta de API usando o plugin de composicao.",
+    "Agregue múltiplas chamadas de backend em uma única resposta de API usando o plugin de composição.",
   icon: "GitMerge",
   articles: [
-    // ── 1. Introducao a Composicao ──────────────────────────────
+    // ── 1. Introdução à Composição ──────────────────────────────
     {
       slug: "introducao-composicao",
-      title: "O que e Composicao de APIs?",
+      title: "O que é Composição de APIs?",
       description:
-        "Entenda o conceito de composicao de APIs e como agregar multiplas chamadas de backend em uma unica resposta.",
+        "Entenda o conceito de composição de APIs e como agregar múltiplas chamadas de backend em uma única resposta.",
       icon: "Layers",
-      tags: ["composicao", "agregacao", "orquestracao"],
+      tags: ["composição", "agregação", "orquestração"],
       content: [
         {
           id: "conceito",
-          title: "Conceito de Composicao",
-          body: `A **composicao de APIs** e um padrao arquitetural que permite combinar os resultados de multiplas chamadas a servicos de backend em uma unica resposta de API. Em vez de o cliente fazer varias requisicoes separadas, o API Gateway orquestra as chamadas internamente e retorna um resultado unificado.
+          title: "Conceito de Composição",
+          body: `A **composição de APIs** é um padrão arquitetural que permite combinar os resultados de múltiplas chamadas a serviços de backend em uma única resposta de API. Em vez de o cliente fazer várias requisições separadas, o API Gateway orquestra as chamadas internamente e retorna um resultado unificado.
 
-Esse padrao resolve problemas comuns em arquiteturas de microsservicos:
+Esse padrão resolve problemas comuns em arquiteturas de microsserviços:
 
-- **Reducao de round-trips**: O cliente faz uma unica chamada em vez de multiplas
-- **Menor latencia**: Chamadas paralelas no backend sao mais rapidas do que chamadas sequenciais do cliente
-- **Simplicidade para o consumidor**: O cliente recebe uma resposta consolidada sem precisar conhecer os servicos internos
+- **Redução de round-trips**: O cliente faz uma única chamada em vez de múltiplas
+- **Menor latência**: Chamadas paralelas no backend são mais rápidas do que chamadas sequenciais do cliente
+- **Simplicidade para o consumidor**: O cliente recebe uma resposta consolidada sem precisar conhecer os serviços internos
 - **Menor consumo de banda**: Especialmente importante para clientes mobile
 
-> **Nota:** A composicao de APIs no gateway e ideal para cenarios de leitura (GET). Para operacoes de escrita que exigem transacoes distribuidas, considere padroes como Saga ou Outbox implementados no backend.`,
+> **Nota:** A composição de APIs no gateway é ideal para cenários de leitura (GET). Para operações de escrita que exigem transações distribuídas, considere padrões como Saga ou Outbox implementados no backend.`,
         },
         {
           id: "padroes-composicao",
-          title: "Padroes de Composicao",
-          body: `O API Gateway suporta tres padroes principais de composicao, cada um adequado a cenarios diferentes:
+          title: "Padrões de Composição",
+          body: `O API Gateway suporta três padrões principais de composição, cada um adequado a cenários diferentes:
 
 ### Pipeline (Sequencial)
 
-No padrao pipeline, as chamadas sao executadas **em sequencia**, onde o resultado de uma etapa alimenta a proxima. E util quando ha dependencia de dados entre os servicos.
+No padrão pipeline, as chamadas são executadas **em sequência**, onde o resultado de uma etapa alimenta a próxima. É útil quando há dependência de dados entre os serviços.
 
-**Exemplo:** Buscar o usuario (etapa 1), depois buscar os pedidos desse usuario (etapa 2) usando o ID retornado na etapa 1.
+**Exemplo:** Buscar o usuário (etapa 1), depois buscar os pedidos desse usuário (etapa 2) usando o ID retornado na etapa 1.
 
-- Vantagem: Permite dependencias entre etapas
-- Desvantagem: A latencia total e a soma de todas as etapas
+- Vantagem: Permite dependências entre etapas
+- Desvantagem: A latência total é a soma de todas as etapas
 
 ### Paralelo (Concorrente)
 
-No padrao paralelo, multiplas chamadas sao executadas **simultaneamente** e os resultados sao agregados. E ideal quando os dados sao independentes entre si.
+No padrão paralelo, múltiplas chamadas são executadas **simultaneamente** e os resultados são agregados. É ideal quando os dados são independentes entre si.
 
-**Exemplo:** Buscar perfil do usuario, ultimos pedidos e recomendacoes ao mesmo tempo.
+**Exemplo:** Buscar perfil do usuário, últimos pedidos e recomendações ao mesmo tempo.
 
-- Vantagem: Latencia total e a da chamada mais lenta (nao a soma)
-- Desvantagem: Nao suporta dependencias entre etapas
+- Vantagem: Latência total é a da chamada mais lenta (não a soma)
+- Desvantagem: Não suporta dependências entre etapas
 
 ### Condicional (Branching)
 
-No padrao condicional, o fluxo de execucao **varia com base em condicoes** definidas sobre os resultados das etapas anteriores. Permite criar logica de negocio no gateway.
+No padrão condicional, o fluxo de execução **varia com base em condições** definidas sobre os resultados das etapas anteriores. Permite criar lógica de negócio no gateway.
 
-**Exemplo:** Se o usuario e premium, buscar recomendacoes personalizadas; caso contrario, retornar recomendacoes genericas.
+**Exemplo:** Se o usuário é premium, buscar recomendações personalizadas; caso contrário, retornar recomendações genéricas.
 
-- Vantagem: Flexibilidade para logica de negocio
-- Desvantagem: Complexidade adicional na configuracao
+- Vantagem: Flexibilidade para lógica de negócio
+- Desvantagem: Complexidade adicional na configuração
 
-> **Dica:** Comece com o padrao paralelo para cenarios simples. Evolua para pipeline quando houver dependencias e condicional quando precisar de logica de negocio.`,
+> **Dica:** Comece com o padrão paralelo para cenários simples. Evolua para pipeline quando houver dependências e condicional quando precisar de lógica de negócio.`,
         },
         {
           id: "quando-usar",
-          title: "Quando Usar Composicao",
-          body: `A composicao de APIs e indicada em cenarios especificos. Entender quando usa-la — e quando evita-la — e fundamental para um bom design de API.
+          title: "Quando Usar Composição",
+          body: `A composição de APIs é indicada em cenários específicos. Entender quando usá-la — e quando evitá-la — é fundamental para um bom design de API.
 
-**Use composicao quando:**
-- O cliente precisa de dados de multiplos servicos em uma unica tela
-- Voce quer reduzir a quantidade de chamadas de rede do frontend
-- Os servicos de backend sao estáveis e tem SLAs compativeis
-- As operacoes sao de leitura (GET) sem efeitos colaterais
+**Use composição quando:**
+- O cliente precisa de dados de múltiplos serviços em uma única tela
+- Você quer reduzir a quantidade de chamadas de rede do frontend
+- Os serviços de backend são estáveis e têm SLAs compatíveis
+- As operações são de leitura (GET) sem efeitos colaterais
 
-**Evite composicao quando:**
-- As operacoes envolvem escrita transacional (use Saga no backend)
-- A logica de negocio e muito complexa (mantenha no backend)
-- Os servicos de backend tem latencias muito diferentes (o mais lento domina)
-- Voce precisa de tratamento de erro granular por servico
+**Evite composição quando:**
+- As operações envolvem escrita transacional (use Saga no backend)
+- A lógica de negócio é muito complexa (mantenha no backend)
+- Os serviços de backend têm latências muito diferentes (o mais lento domina)
+- Você precisa de tratamento de erro granular por serviço
 
 **Alternativas a considerar:**
-- **BFF (Backend for Frontend)**: Quando a logica de agregacao e muito especifica para um cliente
+- **BFF (Backend for Frontend)**: Quando a lógica de agregação é muito específica para um cliente
 - **GraphQL**: Quando o cliente precisa de flexibilidade para escolher quais campos buscar
-- **Event-driven**: Quando os dados podem ser pre-agregados via eventos
+- **Event-driven**: Quando os dados podem ser pré-agregados via eventos
 
-> **Atencao:** A composicao no gateway adiciona responsabilidade ao gateway. Monitore a latencia e o uso de recursos para garantir que o gateway nao se torne um gargalo.`,
+> **Atenção:** A composição no gateway adiciona responsabilidade ao gateway. Monitore a latência e o uso de recursos para garantir que o gateway não se torne um gargalo.`,
         },
       ],
     },
-    // ── 2. Configurando o Plugin de Composicao ──────────────────
+    // ── 2. Configurando o Plugin de Composição ──────────────────
     {
       slug: "configurando-composicao",
-      title: "Configurando o Plugin de Composicao",
+      title: "Configurando o Plugin de Composição",
       description:
-        "Aprenda a configurar o plugin api-composition com nos, dependencias e mapeamento de resposta.",
+        "Aprenda a configurar o plugin api-composition com nós, dependências e mapeamento de resposta.",
       icon: "Settings",
-      tags: ["api-composition", "configuracao", "pipeline"],
+      tags: ["api-composition", "configuração", "pipeline"],
       content: [
         {
           id: "estrutura-plugin",
           title: "Estrutura do Plugin",
-          body: `O plugin \`api-composition\` e um plugin customizado do FuseOne API Gateway que permite definir um fluxo de composicao declarativo. A configuracao e baseada em **nos** (nodes) que representam chamadas a servicos de backend.
+          body: `O plugin \`api-composition\` é um plugin customizado do FuseOne API Gateway que permite definir um fluxo de composição declarativo. A configuração é baseada em **nós** (nodes) que representam chamadas a serviços de backend.
 
-**Estrutura basica:**
+**Estrutura básica:**
 
 \`\`\`json
 {
@@ -114,7 +114,7 @@ No padrao condicional, o fluxo de execucao **varia com base em condicoes** defin
 }
 \`\`\`
 
-Cada **no** (node) representa uma etapa no fluxo de composicao:
+Cada **nó** (node) representa uma etapa no fluxo de composição:
 
 \`\`\`json
 {
@@ -128,22 +128,22 @@ Cada **no** (node) representa uma etapa no fluxo de composicao:
 }
 \`\`\`
 
-- **id**: Identificador unico do no, usado para referencias e dependencias
-- **uri**: URL completa do servico de backend
-- **method**: Metodo HTTP (GET, POST, etc.)
-- **headers**: Headers adicionais a enviar ao servico
-- **timeout**: Timeout individual do no em milissegundos
-- **depends_on**: Lista de IDs de nos que devem completar antes deste
-- **condition**: Condicao para executar este no (opcional)
+- **id**: Identificador único do nó, usado para referências e dependências
+- **uri**: URL completa do serviço de backend
+- **method**: Método HTTP (GET, POST, etc.)
+- **headers**: Headers adicionais a enviar ao serviço
+- **timeout**: Timeout individual do nó em milissegundos
+- **depends_on**: Lista de IDs de nós que devem completar antes deste
+- **condition**: Condição para executar este nó (opcional)
 
-> **Nota:** Nos sem \`depends_on\` sao executados em paralelo automaticamente. O plugin otimiza a execucao para minimizar a latencia total.`,
+> **Nota:** Nós sem \`depends_on\` são executados em paralelo automaticamente. O plugin otimiza a execução para minimizar a latência total.`,
         },
         {
           id: "configurando-nos",
-          title: "Configurando Nos (Steps)",
-          body: `Cada no na composicao representa uma chamada HTTP a um servico de backend. Veja como configurar nos para diferentes cenarios:
+          title: "Configurando Nós (Steps)",
+          body: `Cada nó na composição representa uma chamada HTTP a um serviço de backend. Veja como configurar nós para diferentes cenários:
 
-### No Basico (sem dependencia)
+### Nó Básico (sem dependência)
 
 \`\`\`json
 {
@@ -157,7 +157,7 @@ Cada **no** (node) representa uma etapa no fluxo de composicao:
 }
 \`\`\`
 
-### No com Dependencia (pipeline)
+### Nó com Dependência (pipeline)
 
 \`\`\`json
 {
@@ -169,9 +169,9 @@ Cada **no** (node) representa uma etapa no fluxo de composicao:
 }
 \`\`\`
 
-O campo \`depends_on: ["perfil"]\` garante que o no "pedidos" so sera executado apos o no "perfil" completar com sucesso. A expressao \`{{nodes.perfil.response.body.id}}\` referencia o campo \`id\` do corpo da resposta do no "perfil".
+O campo \`depends_on: ["perfil"]\` garante que o nó "pedidos" só será executado após o nó "perfil" completar com sucesso. A expressão \`{{nodes.perfil.response.body.id}}\` referencia o campo \`id\` do corpo da resposta do nó "perfil".
 
-### No com Body (POST)
+### Nó com Body (POST)
 
 \`\`\`json
 {
@@ -187,24 +187,24 @@ O campo \`depends_on: ["perfil"]\` garante que o no "pedidos" so sera executado 
 }
 \`\`\`
 
-> **Dica:** Use templates com a sintaxe \`{{...}}\` para referenciar dados da requisicao original (\`params\`, \`headers\`, \`query\`) ou de nos anteriores (\`nodes.<id>.response\`).
+> **Dica:** Use templates com a sintaxe \`{{...}}\` para referenciar dados da requisição original (\`params\`, \`headers\`, \`query\`) ou de nós anteriores (\`nodes.<id>.response\`).
 
-**Variaveis disponiveis nos templates:**
-- \`{{params.<nome>}}\`: Parametros da URL da rota
-- \`{{headers.<nome>}}\`: Headers da requisicao original
-- \`{{query.<nome>}}\`: Parametros de query string
-- \`{{body.<campo>}}\`: Corpo da requisicao original (se POST/PUT)
-- \`{{nodes.<id>.response.body.<campo>}}\`: Corpo da resposta de um no anterior
-- \`{{nodes.<id>.response.status}}\`: Status HTTP de um no anterior`,
+**Variáveis disponíveis nos templates:**
+- \`{{params.<nome>}}\`: Parâmetros da URL da rota
+- \`{{headers.<nome>}}\`: Headers da requisição original
+- \`{{query.<nome>}}\`: Parâmetros de query string
+- \`{{body.<campo>}}\`: Corpo da requisição original (se POST/PUT)
+- \`{{nodes.<id>.response.body.<campo>}}\`: Corpo da resposta de um nó anterior
+- \`{{nodes.<id>.response.status}}\`: Status HTTP de um nó anterior`,
         },
         {
           id: "dependencias-condicoes",
-          title: "Dependencias e Condicoes",
-          body: `O sistema de dependencias e condicoes permite criar fluxos complexos com logica de branching.
+          title: "Dependências e Condições",
+          body: `O sistema de dependências e condições permite criar fluxos complexos com lógica de branching.
 
-### Dependencias Simples
+### Dependências Simples
 
-Quando um no depende de outro, ele so executa apos o no pai completar com sucesso (status 2xx). Se o no pai falhar, o no dependente nao e executado.
+Quando um nó depende de outro, ele só executa após o nó pai completar com sucesso (status 2xx). Se o nó pai falhar, o nó dependente não é executado.
 
 \`\`\`json
 {
@@ -213,11 +213,11 @@ Quando um no depende de outro, ele so executa apos o no pai completar com sucess
 }
 \`\`\`
 
-No exemplo acima, "etapa-3" so executa quando **ambos** "etapa-1" e "etapa-2" completarem com sucesso.
+No exemplo acima, "etapa-3" só executa quando **ambos** "etapa-1" e "etapa-2" completarem com sucesso.
 
-### Condicoes de Execucao
+### Condições de Execução
 
-O campo \`condition\` permite executar um no apenas quando uma condicao for verdadeira:
+O campo \`condition\` permite executar um nó apenas quando uma condição for verdadeira:
 
 \`\`\`json
 {
@@ -237,21 +237,21 @@ O campo \`condition\` permite executar um no apenas quando uma condicao for verd
 - \`neq\`: Diferente
 - \`gt\`, \`gte\`: Maior que, maior ou igual
 - \`lt\`, \`lte\`: Menor que, menor ou igual
-- \`contains\`: Contem (para strings e arrays)
-- \`exists\`: Campo existe (nao e null/undefined)
+- \`contains\`: Contém (para strings e arrays)
+- \`exists\`: Campo existe (não é null/undefined)
 
-> **Nota:** Quando um no condicional nao e executado, seu resultado e \`null\` no mapeamento de resposta. Trate esse caso no \`response_mapping\`.
+> **Nota:** Quando um nó condicional não é executado, seu resultado é \`null\` no mapeamento de resposta. Trate esse caso no \`response_mapping\`.
 
-**Boas praticas:**
-- Mantenha a arvore de dependencias o mais rasa possivel (menos niveis = menor latencia)
-- Evite dependencias circulares — o plugin detecta e rejeita a configuracao
-- Use condicoes para evitar chamadas desnecessarias a servicos
-- Defina timeouts individuais por no de acordo com o SLA de cada servico`,
+**Boas práticas:**
+- Mantenha a árvore de dependências o mais rasa possível (menos níveis = menor latência)
+- Evite dependências circulares — o plugin detecta e rejeita a configuração
+- Use condições para evitar chamadas desnecessárias a serviços
+- Defina timeouts individuais por nó de acordo com o SLA de cada serviço`,
         },
         {
           id: "mapeamento-resposta",
           title: "Mapeamento de Resposta",
-          body: `O \`response_mapping\` define como os resultados dos nos sao combinados na resposta final enviada ao cliente.
+          body: `O \`response_mapping\` define como os resultados dos nós são combinados na resposta final enviada ao cliente.
 
 ### Mapeamento Simples
 
@@ -265,17 +265,17 @@ O campo \`condition\` permite executar um no apenas quando uma condicao for verd
 }
 \`\`\`
 
-A resposta final sera:
+A resposta final será:
 
 \`\`\`json
 {
-  "profile": { "id": 1, "name": "Joao", "plan": "premium" },
+  "profile": { "id": 1, "name": "João", "plan": "premium" },
   "orders": [{ "id": 100, "total": 250.00 }],
   "recommendations": [{ "id": 42, "name": "Produto X" }]
 }
 \`\`\`
 
-### Mapeamento com Transformacao
+### Mapeamento com Transformação
 
 \`\`\`json
 {
@@ -292,7 +292,7 @@ A resposta final sera:
 
 ### Tratamento de Erros
 
-Configure o comportamento quando um no falha:
+Configure o comportamento quando um nó falha:
 
 \`\`\`json
 {
@@ -305,35 +305,35 @@ Configure o comportamento quando um no falha:
 }
 \`\`\`
 
-A estrategia \`partial\` retorna os resultados dos nos que completaram com sucesso e usa valores padrao para os que falharam. A estrategia \`abort\` retorna erro se qualquer no falhar.
+A estratégia \`partial\` retorna os resultados dos nós que completaram com sucesso e usa valores padrão para os que falharam. A estratégia \`abort\` retorna erro se qualquer nó falhar.
 
-> **Dica:** Use a estrategia \`partial\` quando alguns dados sao opcionais (ex: recomendacoes) e \`abort\` quando todos sao obrigatorios (ex: dados de pagamento).
+> **Dica:** Use a estratégia \`partial\` quando alguns dados são opcionais (ex: recomendações) e \`abort\` quando todos são obrigatórios (ex: dados de pagamento).
 
-**Boas praticas:**
-- Defina valores padrao para nos opcionais
-- Use a estrategia \`partial\` para resiliencia
-- Mantenha o mapeamento simples — transformacoes complexas devem ficar no backend
+**Boas práticas:**
+- Defina valores padrão para nós opcionais
+- Use a estratégia \`partial\` para resiliência
+- Mantenha o mapeamento simples — transformações complexas devem ficar no backend
 - Documente a estrutura da resposta para os consumidores da API`,
         },
       ],
     },
-    // ── 3. Exemplos Praticos ────────────────────────────────────
+    // ── 3. Exemplos Práticos ────────────────────────────────────
     {
       slug: "exemplos-composicao",
-      title: "Exemplos Praticos",
+      title: "Exemplos Práticos",
       description:
-        "Exemplos reais de composicao de APIs: agregacao de perfil, fan-out para multiplos servicos e roteamento condicional.",
+        "Exemplos reais de composição de APIs: agregação de perfil, fan-out para múltiplos serviços e roteamento condicional.",
       icon: "BookOpen",
-      tags: ["exemplos", "agregacao", "fan-out"],
+      tags: ["exemplos", "agregação", "fan-out"],
       content: [
         {
           id: "exemplo-perfil-pedidos",
           title: "Agregando Perfil e Pedidos",
-          body: `Este exemplo demonstra um cenario comum: uma pagina de "Minha Conta" que precisa exibir o perfil do usuario junto com seus ultimos pedidos e o saldo de pontos de fidelidade.
+          body: `Este exemplo demonstra um cenário comum: uma página de "Minha Conta" que precisa exibir o perfil do usuário junto com seus últimos pedidos e o saldo de pontos de fidelidade.
 
-**Cenario:** O frontend faz uma unica chamada ao gateway, que internamente consulta 3 servicos.
+**Cenário:** O frontend faz uma única chamada ao gateway, que internamente consulta 3 serviços.
 
-**Configuracao completa:**
+**Configuração completa:**
 
 \`\`\`json
 {
@@ -377,18 +377,18 @@ A estrategia \`partial\` retorna os resultados dos nos que completaram com suces
 }
 \`\`\`
 
-**Resultado:** Os 3 nos executam em paralelo (nao ha dependencias). A latencia total e a do servico mais lento, nao a soma dos tres. Se o servico de fidelidade falhar, a resposta ainda retorna perfil e pedidos com \`loyalty_points: 0\`.
+**Resultado:** Os 3 nós executam em paralelo (não há dependências). A latência total é a do serviço mais lento, não a soma dos três. Se o serviço de fidelidade falhar, a resposta ainda retorna perfil e pedidos com \`loyalty_points: 0\`.
 
-> **Dica:** Este padrao e ideal para paginas de dashboard que precisam consolidar dados de multiplos servicos.`,
+> **Dica:** Este padrão é ideal para páginas de dashboard que precisam consolidar dados de múltiplos serviços.`,
         },
         {
           id: "exemplo-fan-out",
-          title: "Fan-out para Multiplos Servicos",
-          body: `O padrao fan-out distribui a mesma requisicao para multiplos servicos e agrega os resultados. E util para buscas federadas, onde voce precisa consultar varios catalagos ou fontes de dados.
+          title: "Fan-out para Múltiplos Serviços",
+          body: `O padrão fan-out distribui a mesma requisição para múltiplos serviços e agrega os resultados. É útil para buscas federadas, onde você precisa consultar vários catálogos ou fontes de dados.
 
-**Cenario:** Uma busca de produtos que consulta 3 catalagos diferentes (eletronicos, livros, roupas) e retorna resultados unificados.
+**Cenário:** Uma busca de produtos que consulta 3 catálogos diferentes (eletrônicos, livros, roupas) e retorna resultados unificados.
 
-**Configuracao:**
+**Configuração:**
 
 \`\`\`json
 {
@@ -433,24 +433,24 @@ A estrategia \`partial\` retorna os resultados dos nos que completaram com suces
 }
 \`\`\`
 
-**Resultado:** As 3 buscas executam em paralelo. Se um catalogo estiver indisponivel, os resultados dos outros ainda sao retornados. O campo \`total\` soma os resultados de todos os catalagos.
+**Resultado:** As 3 buscas executam em paralelo. Se um catálogo estiver indisponível, os resultados dos outros ainda são retornados. O campo \`total\` soma os resultados de todos os catálogos.
 
-> **Nota:** Em cenarios de fan-out com muitos servicos, monitore o consumo de recursos do gateway. Cada no consome uma conexao HTTP e memoria para armazenar a resposta.
+> **Nota:** Em cenários de fan-out com muitos serviços, monitore o consumo de recursos do gateway. Cada nó consome uma conexão HTTP e memória para armazenar a resposta.
 
-**Boas praticas para fan-out:**
-- Limite o numero de nos paralelos (10-20 max) para evitar sobrecarga
-- Use timeouts individuais curtos para servicos nao-criticos
-- Configure \`error_handling: "partial"\` para resiliencia
-- Considere paginacao para limitar o volume de dados retornados`,
+**Boas práticas para fan-out:**
+- Limite o número de nós paralelos (10-20 max) para evitar sobrecarga
+- Use timeouts individuais curtos para serviços não-críticos
+- Configure \`error_handling: "partial"\` para resiliência
+- Considere paginação para limitar o volume de dados retornados`,
         },
         {
           id: "exemplo-condicional",
           title: "Roteamento Condicional por Resposta",
-          body: `O roteamento condicional permite que o fluxo de composicao tome decisoes com base nos resultados de etapas anteriores. Isso cria uma logica de branching no gateway.
+          body: `O roteamento condicional permite que o fluxo de composição tome decisões com base nos resultados de etapas anteriores. Isso cria uma lógica de branching no gateway.
 
-**Cenario:** Um endpoint de checkout que verifica o estoque, valida o pagamento e, dependendo do tipo de entrega escolhido, consulta servicos diferentes (correios ou motoboy).
+**Cenário:** Um endpoint de checkout que verifica o estoque, valida o pagamento e, dependendo do tipo de entrega escolhido, consulta serviços diferentes (correios ou motoboy).
 
-**Configuracao:**
+**Configuração:**
 
 \`\`\`json
 {
@@ -521,19 +521,19 @@ A estrategia \`partial\` retorna os resultados dos nos que completaram com suces
 }
 \`\`\`
 
-**Fluxo de execucao:**
-1. O no "estoque" executa primeiro (sem dependencias)
-2. Se o estoque esta disponivel, "pagamento" executa
-3. Em paralelo, apenas um dos nos de frete executa (baseado em \`delivery_type\`)
-4. A resposta combina os resultados com \`error_handling: "abort"\` — se qualquer no critico falhar, retorna erro
+**Fluxo de execução:**
+1. O nó "estoque" executa primeiro (sem dependências)
+2. Se o estoque está disponível, "pagamento" executa
+3. Em paralelo, apenas um dos nós de frete executa (baseado em \`delivery_type\`)
+4. A resposta combina os resultados com \`error_handling: "abort"\` — se qualquer nó crítico falhar, retorna erro
 
-> **Atencao:** Use \`error_handling: "abort"\` em fluxos transacionais como checkout, onde todos os dados sao obrigatorios. Retornar dados parciais pode causar problemas.
+> **Atenção:** Use \`error_handling: "abort"\` em fluxos transacionais como checkout, onde todos os dados são obrigatórios. Retornar dados parciais pode causar problemas.
 
 **Dicas para fluxos condicionais:**
-- Mantenha as condicoes simples e faceis de entender
+- Mantenha as condições simples e fáceis de entender
 - Documente o fluxo visualmente (o editor visual do FuseOne ajuda nisso)
-- Teste todos os caminhos possiveis, incluindo cenarios de erro
-- Monitore quais caminhos sao mais executados para otimizar performance`,
+- Teste todos os caminhos possíveis, incluindo cenários de erro
+- Monitore quais caminhos são mais executados para otimizar performance`,
         },
       ],
     },
