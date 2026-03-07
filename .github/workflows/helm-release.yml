@@ -21,10 +21,6 @@ jobs:
 
       - name: Update chart dependencies
         run: |
-          # Sync extra plugin lua files into the fuseone chart before packaging
-          cp custom-plugins/apisix/plugins/api-composition.lua charts/fuseone/files/plugins/
-          cp custom-plugins/apisix/plugins/fuseone-timing.lua  charts/fuseone/files/plugins/
-          cp custom-plugins/apisix/plugins/opentelemetry.lua   charts/fuseone/files/plugins/
           cd charts/fuseone
           helm dependency update
 

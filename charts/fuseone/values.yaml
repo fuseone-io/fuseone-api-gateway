@@ -249,8 +249,8 @@ apisix:
 
   apisix:
     image:
-      repository: apache/apisix
-      tag: "3.15.0-debian"
+      repository: devopsfuseone/apisix
+      tag: "latest"
       pullPolicy: IfNotPresent
 
     admin:
@@ -262,7 +262,7 @@ apisix:
           - 0.0.0.0/0
 
     # Complete plugin list — mirrors apisix-config.yaml.
-    # Entries from customPlugins.plugins[].name are appended automatically.
+    # FuseOne custom plugins are baked into devopsfuseone/apisix image.
     plugins:
       - real-ip
       - client-control
@@ -340,6 +340,12 @@ apisix:
       - graphql-complexity
       - graphql-allowlist
       - graphql-introspection-guard
+      # FuseOne custom plugins (baked into devopsfuseone/apisix image)
+      - http-callout
+      - data-masking
+      - threat-protection
+      - api-composition
+      - fuseone-timing
 
     pluginAttrs:
       prometheus:
@@ -362,45 +368,7 @@ apisix:
             Content-Type: application/x-protobuf
 
     customPlugins:
-      enabled: true
-      luaPath: "/opts/custom_plugins/?.lua"
-      plugins:
-        # --- bundled inside the apisix .tgz (apisix/files/) ---
-        - name: "http-callout"
-          attrs: {}
-          configMap:
-            name: "fuseone-custom-plugins"
-            mounts:
-              - key: "http-callout.lua"
-                path: "/opts/custom_plugins/apisix/plugins/http-callout.lua"
-        - name: "data-masking"
-          attrs: {}
-          configMap:
-            name: "fuseone-custom-plugins"
-            mounts:
-              - key: "data-masking.lua"
-                path: "/opts/custom_plugins/apisix/plugins/data-masking.lua"
-        - name: "threat-protection"
-          attrs: {}
-          configMap:
-            name: "fuseone-custom-plugins"
-            mounts:
-              - key: "threat-protection.lua"
-                path: "/opts/custom_plugins/apisix/plugins/threat-protection.lua"
-        # --- from fuseone-extra-plugins ConfigMap (charts/fuseone/templates/) ---
-        # NOTE: api-composition and fuseone-timing share the same ConfigMap volume.
-        # Only one entry is needed; both files are mounted via the mounts list.
-        - name: "api-composition"
-          attrs: {}
-          configMap:
-            name: "fuseone-extra-plugins"
-            mounts:
-              - key: "api-composition.lua"
-                path: "/opts/custom_plugins/apisix/plugins/api-composition.lua"
-              - key: "fuseone-timing.lua"
-                path: "/opts/custom_plugins/apisix/plugins/fuseone-timing.lua"
-              - key: "opentelemetry.lua"
-                path: "/opts/custom_plugins/apisix/plugins/opentelemetry.lua"
+      enabled: false
 
   service:
     type: NodePort

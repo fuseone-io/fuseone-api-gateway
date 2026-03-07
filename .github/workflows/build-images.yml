@@ -260,12 +260,6 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@v4
 
-      - name: Sync extra plugin files
-        run: |
-          cp custom-plugins/apisix/plugins/api-composition.lua charts/fuseone/files/plugins/
-          cp custom-plugins/apisix/plugins/fuseone-timing.lua  charts/fuseone/files/plugins/
-          cp custom-plugins/apisix/plugins/opentelemetry.lua   charts/fuseone/files/plugins/
-
       - name: Update chart dependencies
         run: |
           cd charts/fuseone
